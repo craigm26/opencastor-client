@@ -2,15 +2,21 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../app.dart' show authStateProvider;
 import '../../models/robot.dart';
 import '../../services/robot_service.dart';
 import 'robot_card.dart';
 
 final _robotServiceProvider = Provider((_) => RobotService());
 
+/// StreamProvider that rebuilds whenever auth state changes.
+/// If the user is not signed in, returns an empty stream (no Firestore query).
 final fleetProvider = StreamProvider<List<Robot>>((ref) {
-  final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
-  return ref.read(_robotServiceProvider).watchFleet(uid);
+  // Watch authStateProvider so this rebuilds on sign-in / sign-out.
+  final authAsync = ref.watch(authStateProvider);
+  final user = authAsync.asData?.value;
+  if (user == null) return const Stream.empty();
+  return ref.read(_robotServiceProvider).watchFleet(user.uid);
 });
 
 class FleetScreen extends ConsumerWidget {
@@ -35,7 +41,10 @@ class FleetScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) => _ErrorView(error: err.toString()),
         data: (robots) {
-          if (robots.isEmpty) return const _EmptyFleet();
+          if (robots.isEmpty) {
+            final user = FirebaseAuth.instance.currentUser;
+            return user == null ? const _SignInPrompt() : const _EmptyFleet();
+          }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(fleetProvider),
             child: ListView.separated(
@@ -63,6 +72,28 @@ class FleetScreen extends ConsumerWidget {
         onPressed: () => context.push('/consent'),
         icon: const Icon(Icons.handshake_outlined),
         label: const Text('Manage Access'),
+      ),
+    );
+  }
+}
+
+class _SignInPrompt extends StatelessWidget {
+  const _SignInPrompt();
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset('assets/images/icon-128.png', width: 72, height: 72),
+          const SizedBox(height: 20),
+          Text('Sign in to view your fleet',
+              style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text('Use the account button above or go to /login.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center),
+        ],
       ),
     );
   }
