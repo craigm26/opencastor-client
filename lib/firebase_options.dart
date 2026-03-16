@@ -35,6 +35,7 @@ class DefaultFirebaseOptions {
     projectId: 'opencastor',
     authDomain: 'opencastor.firebaseapp.com',
     storageBucket: 'opencastor.firebasestorage.app',
+    measurementId: 'G-2P14Z5H4NY',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
