@@ -24,6 +24,8 @@ jobs:
         env:
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
         run: |
           if [ -n "$FIREBASE_OPTIONS_DART" ]; then
             echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
@@ -32,6 +34,12 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
             echo "google-services.json written from secret."
+          fi
+          # Inject Firebase config into service worker (replaces placeholders)
+          if [ -n "$FIREBASE_API_KEY" ]; then
+            sed -i "s|%%FIREBASE_API_KEY%%|$FIREBASE_API_KEY|g" web/firebase-messaging-sw.js
+            sed -i "s|%%FIREBASE_APP_ID%%|$FIREBASE_APP_ID|g" web/firebase-messaging-sw.js
+            echo "firebase-messaging-sw.js credentials injected."
           fi
 
       - name: Analyze
