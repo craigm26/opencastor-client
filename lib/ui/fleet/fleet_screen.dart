@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/robot.dart';
-import 'fleet_view_model.dart';
+import 'fleet_view_model.dart'
+    show authStateProvider, estopCommandProvider, fleetProvider;
 import 'robot_card.dart';
 
 class FleetScreen extends ConsumerWidget {
@@ -40,7 +41,6 @@ class FleetScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (ctx, i) {
                 final robot = robots[i];
-                final repo = ref.read(robotRepositoryProvider);
 
                 return RobotCard(
                   robot: robot,
@@ -48,7 +48,10 @@ class FleetScreen extends ConsumerWidget {
                   onControl: robot.hasCapability(RobotCapability.control)
                       ? () => context.push('/robot/${robot.rrn}/control')
                       : null,
-                  onEstop: () => repo.sendEstop(robot.rrn),
+                  // ESTOP command — view calls ViewModel, never repository
+                  onEstop: () => ref
+                      .read(estopCommandProvider.notifier)
+                      .send(robot.rrn),
                 );
               },
             ),

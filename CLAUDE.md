@@ -22,7 +22,8 @@ Deployed at **[app.opencastor.com](https://app.opencastor.com)** via Cloudflare 
 
 ## Architecture
 
-Following [Flutter Architecture Recommendations](https://docs.flutter.dev/app-architecture/recommendations):
+Following the [Flutter Architecture Guide](https://docs.flutter.dev/app-architecture/guide) and [Recommendations](https://docs.flutter.dev/app-architecture/recommendations).
+MVVM pattern: **Views → ViewModels → Repositories → Services**
 
 ```
 lib/
@@ -31,51 +32,87 @@ lib/
 ├── firebase_options.dart              Placeholder — real values injected by CI
 │
 ├── data/                              DATA LAYER
-│   ├── models/                        Immutable Firestore data models
+│   ├── models/                        Immutable domain models (output of repositories)
 │   │   ├── robot.dart                 Robot, RobotStatus, RobotCapability
 │   │   ├── command.dart               RobotCommand, CommandScope
 │   │   └── consent_request.dart       ConsentRequest
-│   ├── repositories/                  Abstract contracts (test against these)
-│   │   ├── robot_repository.dart      RobotRepository (abstract)
+│   ├── repositories/                  REPOSITORIES — source of truth, abstract interface
+│   │   │                              (caching, error handling, retry logic go here)
+│   │   ├── robot_repository.dart      RobotRepository (abstract — test against this)
 │   │   └── consent_repository.dart    ConsentRepository (abstract)
-│   └── services/                      Concrete Firebase implementations
-│       ├── auth_service.dart          Google sign-in, sign-out, redirect handling
-│       ├── firestore_robot_service.dart   RobotRepository → Firestore + CF
-│       ├── firestore_consent_service.dart ConsentRepository → Firestore + CF
-│       └── notification_service.dart  FCM push token + foreground routing
+│   └── services/                      SERVICES — raw API wrappers, stateless
+│       │                              (one per external data source)
+│       ├── auth_service.dart          Wraps Firebase Auth — sign-in, sign-out, redirect
+│       ├── firestore_robot_service.dart   implements RobotRepository — wraps Firestore + CF
+│       ├── firestore_consent_service.dart implements ConsentRepository — wraps Firestore + CF
+│       └── notification_service.dart  Wraps FCM — push token + foreground routing
 │
-└── ui/                                UI LAYER
+└── ui/                                UI LAYER (MVVM)
     ├── core/
     │   ├── theme/app_theme.dart       Brand palette, Material 3 theme
-    │   └── widgets/                   Shared dumb widgets
+    │   └── widgets/                   Shared dumb widgets (no business logic)
     │       ├── capability_badge.dart
     │       ├── confirmation_dialog.dart
     │       └── health_indicator.dart
-    ├── fleet/
-    │   ├── fleet_view_model.dart      Riverpod providers + robotRepositoryProvider
-    │   ├── fleet_screen.dart          View only — no business logic
-    │   └── robot_card.dart
-    ├── robot_detail/
-    │   ├── robot_detail_view_model.dart
-    │   └── robot_detail_screen.dart
-    ├── control/
-    │   ├── control_view_model.dart    ControlViewModel (AutoDisposeNotifier)
-    │   └── control_screen.dart
+    ├── fleet/                         Feature: Fleet screen
+    │   ├── fleet_view_model.dart      VIEWMODEL — providers + Commands (estopCommandProvider)
+    │   ├── fleet_screen.dart          VIEW — display only, calls Commands
+    │   └── robot_card.dart            Dumb widget
+    ├── robot_detail/                  Feature: Robot detail + chat
+    │   ├── robot_detail_view_model.dart  VIEWMODEL — robotDetailProvider, sendChatProvider
+    │   └── robot_detail_screen.dart   VIEW
+    ├── control/                       Feature: Arm control
+    │   ├── control_view_model.dart    VIEWMODEL — ControlViewModel, ControlState sealed class
+    │   └── control_screen.dart        VIEW
     ├── account/
-    │   └── account_screen.dart
+    │   └── account_screen.dart        Simple view (no ViewModel needed — just auth state)
     ├── consent/
     │   └── consent_screen.dart
     └── alerts/
         └── alerts_screen.dart
 ```
 
+### Layer Responsibilities
+
+| Layer | Classes | Rule |
+|-------|---------|------|
+| **View** | `*Screen`, `*Widget` | Display state, call Commands only. Zero business logic. |
+| **ViewModel** | `*ViewModel`, Riverpod providers | Convert repo data to UI state. Expose Commands. |
+| **Repository** | `*Repository` (abstract) | Source of truth. Caching, error handling, retry logic. |
+| **Service** | `Firestore*Service`, `AuthService` | Wraps raw API (Firebase SDK). Stateless. |
+
+Views and ViewModels have a **one-to-one relationship** — one ViewModel per screen.
+
+### Commands
+
+Commands are ViewModel methods (or `AutoDisposeNotifier` classes) that Views call in response to user interactions. **Views never call repositories directly.**
+
+```dart
+// ✅ Correct — view calls a ViewModel command
+onEstop: () => ref.read(estopCommandProvider.notifier).send(robot.rrn),
+
+// ❌ Wrong — view calls repository directly
+onEstop: () => ref.read(robotRepositoryProvider).sendEstop(robot.rrn),
+```
+
+Command state follows the sealed class pattern:
+```dart
+sealed class EstopState { ... }
+class EstopIdle    extends EstopState { ... }
+class EstopSending extends EstopState { ... }
+class EstopSent    extends EstopState { ... }
+class EstopError   extends EstopState { ... }
+```
+
 ### Key Architecture Rules
 
-- **Screens are views only.** No repository calls, no `ref.read(repo)` in build(). Logic goes in ViewModels.
-- **Depend on abstract repositories**, never on `FirestoreRobotService` directly. Use `ref.read(robotRepositoryProvider)`.
+- **Views are dumb.** No `ref.read(robotRepositoryProvider)` in screen files. Only `ref.watch(someProvider)` + `ref.read(someCommand.notifier).method()`.
+- **ViewModels own all providers** for their feature in `*_view_model.dart`. Screens import from there.
+- **Depend on abstract repositories**, never on `FirestoreRobotService` directly. DI binding is `robotRepositoryProvider`.
 - **AuthService is the single source of auth.** `AuthService.currentUser`, `AuthService.signInWithGoogle()`, etc.
 - **`fleetProvider` watches `authStateProvider`** — auto-rebuilds on sign-in/out. Never capture uid once at build.
-- **Unidirectional data flow**: Firestore → ViewModel → Screen. User events → ViewModel method → Firestore.
+- **Unidirectional data flow**: Firestore → Repository → ViewModel → View. User events → Command → Repository → Firestore.
+- **Domain layer is optional.** Add use-cases only when logic is shared across ViewModels or too complex for one ViewModel. Not needed yet.
 
 ---
 
