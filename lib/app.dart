@@ -1,75 +1,30 @@
-import 'package:firebase_auth/firebase_auth.dart';
+/// App root: MaterialApp.router + GoRouter.
+///
+/// This file contains ONLY:
+///   - [OpenCastorApp] — MaterialApp wrapper
+///   - [_AppShell]     — bottom nav shell
+///   - [_LoginScreen]  — authentication entry point
+///   - The [GoRouter] configuration
+///
+/// Auth logic lives in [AuthService].
+/// Screen-level state lives in the per-feature ViewModels.
+library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:google_sign_in/google_sign_in.dart';
 
+import 'data/services/auth_service.dart';
+import 'ui/account/account_screen.dart';
+import 'ui/core/theme/app_theme.dart';
+import 'ui/fleet/fleet_screen.dart';
+import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
+
+// Screens not yet migrated to ui/ — pending move
 import 'screens/alerts/alerts_screen.dart';
 import 'screens/consent/consent_screen.dart';
 import 'screens/control/control_screen.dart';
-import 'screens/fleet/fleet_screen.dart';
 import 'screens/robot_detail/robot_detail_screen.dart';
-import 'theme/app_theme.dart';
-
-// ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-final authStateProvider = StreamProvider<User?>((_) {
-  return FirebaseAuth.instance.authStateChanges();
-});
-
-
-Future<void> signInWithGoogle() async {
-  if (kIsWeb) {
-    final provider = GoogleAuthProvider()
-      ..addScope('email')
-      ..addScope('profile');
-
-    // Use redirect (not popup) on web.
-    // Cloudflare Pages sets Cross-Origin-Opener-Policy: same-origin which
-    // blocks window.closed polling that signInWithPopup relies on — the popup
-    // opens fine but the auth result never reaches the app.
-    // signInWithRedirect does a full-page redirect to Firebase's auth handler
-    // and back; getRedirectResult() in main() picks up the result on return.
-    await FirebaseAuth.instance.signInWithRedirect(provider);
-    return;
-  }
-  // Native mobile / desktop
-  final gs = GoogleSignIn();
-  final account = await gs.signIn();
-  if (account == null) return;
-  final auth = await account.authentication;
-  final cred = GoogleAuthProvider.credential(
-    accessToken: auth.accessToken,
-    idToken: auth.idToken,
-  );
-  await FirebaseAuth.instance.signInWithCredential(cred);
-}
-
-/// Call once on app startup to complete any pending redirect sign-in.
-/// Required when signInWithRedirect() was used (mobile browsers).
-Future<void> handleRedirectResult() async {
-  if (!kIsWeb) return;
-  try {
-    final result = await FirebaseAuth.instance.getRedirectResult();
-    if (result.user != null) {
-      debugPrint('Auth: redirect sign-in completed for ${result.user!.email}');
-    }
-  } catch (e) {
-    debugPrint('Auth: getRedirectResult error: $e');
-  }
-}
-
-Future<void> signOut() async {
-  // On web, auth was via signInWithPopup (Firebase Auth directly) — no
-  // GoogleSignIn session exists, so calling GoogleSignIn().signOut() throws.
-  if (!kIsWeb) {
-    await GoogleSignIn().signOut();
-  }
-  await FirebaseAuth.instance.signOut();
-}
 
 // ---------------------------------------------------------------------------
 // Router
@@ -78,7 +33,7 @@ Future<void> signOut() async {
 final _router = GoRouter(
   initialLocation: '/fleet',
   redirect: (context, state) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.currentUser;
     final isAuth = user != null;
     final isLogin = state.matchedLocation == '/login';
     if (!isAuth && !isLogin) return '/login';
@@ -117,7 +72,7 @@ final _router = GoRouter(
         ),
         GoRoute(
           path: '/account',
-          builder: (_, __) => const _AccountScreen(),
+          builder: (_, __) => const AccountScreen(),
         ),
       ],
     ),
@@ -145,7 +100,7 @@ class OpenCastorApp extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// App shell with bottom nav
+// App shell — bottom navigation
 // ---------------------------------------------------------------------------
 
 class _AppShell extends StatelessWidget {
@@ -167,9 +122,12 @@ class _AppShell extends StatelessWidget {
         selectedIndex: selectedIndex,
         onDestinationSelected: (i) {
           switch (i) {
-            case 0: context.go('/fleet');
-            case 1: context.go('/consent');
-            case 2: context.go('/alerts');
+            case 0:
+              context.go('/fleet');
+            case 1:
+              context.go('/consent');
+            case 2:
+              context.go('/alerts');
           }
         },
         destinations: const [
@@ -195,7 +153,7 @@ class _AppShell extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Login screen
+// Login screen — entry point for unauthenticated users
 // ---------------------------------------------------------------------------
 
 class _LoginScreen extends StatefulWidget {
@@ -210,9 +168,12 @@ class _LoginState extends State<_LoginScreen> {
   String? _error;
 
   Future<void> _signIn() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      await signInWithGoogle();
+      await AuthService.signInWithGoogle();
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -225,7 +186,8 @@ class _LoginState extends State<_LoginScreen> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0a0b1e) : const Color(0xFFF8FAFF),
+      backgroundColor:
+          isDark ? const Color(0xFF0a0b1e) : const Color(0xFFF8FAFF),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
@@ -234,23 +196,23 @@ class _LoginState extends State<_LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Logo lockup — icon + wordmark
+                // Logo lockup
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset(
-                      'assets/images/icon-128.png',
-                      height: 48,
-                      width: 48,
-                    ),
+                    Image.asset('assets/images/icon-128.png',
+                        height: 48, width: 48),
                     const SizedBox(width: 14),
                     Text(
                       'OpenCastor',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF0ea5e9),
-                        letterSpacing: -0.5,
-                      ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0ea5e9),
+                            letterSpacing: -0.5,
+                          ),
                     ),
                   ],
                 ),
@@ -265,7 +227,7 @@ class _LoginState extends State<_LoginScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Card
+                // Sign-in card
                 Container(
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF12142b) : Colors.white,
@@ -277,7 +239,8 @@ class _LoginState extends State<_LoginScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
+                        color: Colors.black
+                            .withOpacity(isDark ? 0.4 : 0.06),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
@@ -288,18 +251,25 @@ class _LoginState extends State<_LoginScreen> {
                     children: [
                       if (_error != null) ...[
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: AppTheme.danger.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.danger.withOpacity(0.3)),
+                            border: Border.all(
+                                color: AppTheme.danger.withOpacity(0.3)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: AppTheme.danger, size: 16),
+                              Icon(Icons.error_outline,
+                                  color: AppTheme.danger, size: 16),
                               const SizedBox(width: 8),
-                              Expanded(child: Text(_error!,
-                                  style: TextStyle(color: AppTheme.danger, fontSize: 13))),
+                              Expanded(
+                                child: Text(_error!,
+                                    style: TextStyle(
+                                        color: AppTheme.danger,
+                                        fontSize: 13)),
+                              ),
                             ],
                           ),
                         ),
@@ -326,19 +296,21 @@ class _LoginState extends State<_LoginScreen> {
                 ),
 
                 const SizedBox(height: 32),
-                // Brand footer
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Powered by ', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
-                    Text('RCAN v1.4',
+                    Text('Powered by ',
                         style: TextStyle(
-                          color: const Color(0xFF0ea5e9),
+                            color: cs.onSurfaceVariant, fontSize: 12)),
+                    const Text('RCAN v1.4',
+                        style: TextStyle(
+                          color: Color(0xFF0ea5e9),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         )),
                     Text(' · Protocol 66 enforced',
-                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                        style: TextStyle(
+                            color: cs.onSurfaceVariant, fontSize: 12)),
                   ],
                 ),
               ],
@@ -350,12 +322,8 @@ class _LoginState extends State<_LoginScreen> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Official Google Sign-In button
-// Follows Google's branding guidelines:
+// Official Google branding button
 // https://developers.google.com/identity/branding-guidelines
-// ---------------------------------------------------------------------------
-
 class _GoogleSignInButton extends StatelessWidget {
   const _GoogleSignInButton({required this.onPressed});
   final VoidCallback onPressed;
@@ -406,15 +374,11 @@ class _GoogleSignInButton extends StatelessWidget {
   }
 }
 
-/// Google "G" logo — official colours, proportional SVG-equivalent.
 class _GoogleLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 18,
-      height: 18,
-      child: CustomPaint(painter: _GoogleLogoPainter()),
-    );
+        width: 18, height: 18, child: CustomPaint(painter: _GoogleLogoPainter()));
   }
 }
 
@@ -427,93 +391,29 @@ class _GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width;
-    final paint = Paint()..style = PaintingStyle.fill;
-
-    // Blue arc (top-right → left, ~270°)
-    paint.color = _blue;
-    canvas.drawArc(Rect.fromLTWH(0, 0, s, s),
-        -1.5708, 4.7124, false, paint..style = PaintingStyle.stroke
-          ..strokeWidth = s * 0.22
-          ..color = _blue);
-
-    // Overwrite specific arcs with correct Google G colours
-    // Red: top-right quarter
-    paint
+    final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = s * 0.22;
     paint.color = _red;
     canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         -1.5708, 1.5708, false, paint);
-    // Yellow: bottom-right quarter
     paint.color = _yellow;
     canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         0, 1.5708, false, paint);
-    // Green: bottom-left quarter
     paint.color = _green;
     canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         1.5708, 1.5708, false, paint);
-    // Blue: top-left quarter
     paint.color = _blue;
     canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         3.14159, 1.5708, false, paint);
-
-    // White notch for the "G" horizontal bar
     paint
       ..style = PaintingStyle.fill
       ..color = Colors.white;
-    canvas.drawRect(Rect.fromLTWH(s * 0.5, s * 0.38, s * 0.5, s * 0.24), paint);
-
-    // White inner circle (hole of the G ring)
+    canvas.drawRect(
+        Rect.fromLTWH(s * 0.5, s * 0.38, s * 0.5, s * 0.24), paint);
     canvas.drawCircle(Offset(s / 2, s / 2), s * 0.28, paint);
   }
 
   @override
   bool shouldRepaint(_) => false;
-}
-
-// ---------------------------------------------------------------------------
-// Account screen
-// ---------------------------------------------------------------------------
-
-class _AccountScreen extends StatelessWidget {
-  const _AccountScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          if (user?.photoURL != null)
-            Center(
-              child: CircleAvatar(
-                radius: 40,
-                backgroundImage: NetworkImage(user!.photoURL!),
-              ),
-            ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: Text(user?.displayName ?? 'Unknown'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.email_outlined),
-            title: Text(user?.email ?? ''),
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppTheme.danger),
-            title: const Text('Sign out',
-                style: TextStyle(color: AppTheme.danger)),
-            onTap: () async {
-              await signOut();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-        ],
-      ),
-    );
-  }
 }
