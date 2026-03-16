@@ -70,7 +70,11 @@ Future<void> handleRedirectResult() async {
 }
 
 Future<void> signOut() async {
-  await GoogleSignIn().signOut();
+  // On web, auth was via signInWithPopup (Firebase Auth directly) — no
+  // GoogleSignIn session exists, so calling GoogleSignIn().signOut() throws.
+  if (!kIsWeb) {
+    await GoogleSignIn().signOut();
+  }
   await FirebaseAuth.instance.signOut();
 }
 
