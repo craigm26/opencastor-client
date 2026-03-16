@@ -1,4 +1,4 @@
-name: Deploy — app.opencastor.com
+name: Deploy to app.opencastor.com
 
 on:
   push:
@@ -7,12 +7,10 @@ on:
 
 jobs:
   build-and-deploy:
-    name: Flutter web build + Cloudflare Pages deploy
+    name: Flutter web build and Cloudflare Pages deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
@@ -23,27 +21,27 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Write Firebase options
-        # firebase_options.dart is gitignored.
-        # Store the full file contents in GitHub secret: FIREBASE_OPTIONS_DART
-        # If secret is not yet set, skip this step and use the placeholder file.
-        if: ${{ secrets.FIREBASE_OPTIONS_DART != '' }}
+      - name: Write Firebase options from secret
+        # Store full file contents as GitHub secret: FIREBASE_OPTIONS_DART
+        # If not yet set, placeholder file is used (build may warn but won't fail)
         env:
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
-        run: echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
+        run: |
+          if [ -n "$FIREBASE_OPTIONS_DART" ]; then
+            echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
+            echo "Firebase options written from secret."
+          else
+            echo "FIREBASE_OPTIONS_DART secret not set — using placeholder."
+          fi
 
       - name: Analyze
         run: flutter analyze --no-pub
 
       - name: Build Flutter web
-        run: |
-          flutter build web \
-            --release \
-            --base-href "/"
+        run: flutter build web --release --base-href "/"
 
       - name: Deploy to Cloudflare Pages
-        # Skip deploy if CF secrets are not configured yet
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
