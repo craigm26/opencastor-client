@@ -10,9 +10,6 @@
 /// Screen-level state lives in the per-feature ViewModels.
 library;
 
-import 'dart:async';
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,87 +27,98 @@ import 'screens/control/control_screen.dart';
 import 'screens/robot_detail/robot_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
-// Auth → Router bridge
+// RouterNotifier — Riverpod-aware GoRouter refresh bridge
 //
-// GoRouter's redirect guard is a synchronous snapshot of auth state.
-// Without refreshListenable, the router never re-evaluates after a
-// signInWithRedirect completes — user lands on /login and gets stuck.
+// Firebase docs (manage-users): "currentUser can be null because the auth
+// object has not finished initializing." — we must NOT redirect to /login
+// before authStateChanges() has emitted its first value.
 //
-// _AuthStateNotifier bridges Firebase authStateChanges() to GoRouter so
-// the router re-runs redirect whenever auth state changes (sign-in/out).
+// Pattern: RouterNotifier listens to authStateProvider via Riverpod.
+// - isLoading (first event not yet received) → stay on /splash
+// - user == null (definitively signed out)   → go to /login
+// - user != null (signed in)                 → go to /fleet
+//
+// The router Provider is cached by Riverpod so GoRouter is not recreated
+// on each rebuild — only refreshListenable triggers a re-evaluation.
 // ---------------------------------------------------------------------------
 
-class _AuthStateNotifier extends ChangeNotifier {
-  _AuthStateNotifier() {
-    _sub = FirebaseAuth.instance.authStateChanges().listen((_) {
-      notifyListeners();
-    });
+class _RouterNotifier extends ChangeNotifier {
+  _RouterNotifier(this._ref) {
+    // Listen to auth state changes and notify GoRouter to re-run redirect
+    _ref.listen<AsyncValue>(authStateProvider, (_, __) => notifyListeners());
   }
 
-  late final StreamSubscription<User?> _sub;
+  final Ref _ref;
 
-  @override
-  void dispose() {
-    _sub.cancel();
-    super.dispose();
+  String? redirect(BuildContext context, GoRouterState state) {
+    final authAsync = _ref.read(authStateProvider);
+    final loc = state.matchedLocation;
+
+    // Auth not yet initialized — wait on splash, don't redirect elsewhere
+    if (authAsync.isLoading || authAsync.hasError) {
+      return loc == '/splash' ? null : '/splash';
+    }
+
+    final user = authAsync.asData?.value;
+    final isAuth = user != null;
+    final isPublic = loc == '/login' || loc == '/splash';
+
+    if (!isAuth && !isPublic) return '/login';
+    if (isAuth && isPublic) return '/fleet';
+    return null;
   }
 }
 
-final _authNotifier = _AuthStateNotifier();
-
-// ---------------------------------------------------------------------------
-// Router
-// ---------------------------------------------------------------------------
-
-final _router = GoRouter(
-  initialLocation: '/fleet',
-  refreshListenable: _authNotifier, // re-run redirect on auth state change
-  redirect: (context, state) {
-    final user = AuthService.currentUser;
-    final isAuth = user != null;
-    final isLogin = state.matchedLocation == '/login';
-    if (!isAuth && !isLogin) return '/login';
-    if (isAuth && isLogin) return '/fleet';
-    return null;
-  },
-  routes: [
-    GoRoute(
-      path: '/login',
-      builder: (_, __) => const _LoginScreen(),
-    ),
-    ShellRoute(
-      builder: (ctx, state, child) => _AppShell(child: child),
-      routes: [
-        GoRoute(
-          path: '/fleet',
-          builder: (_, __) => const FleetScreen(),
-        ),
-        GoRoute(
-          path: '/robot/:rrn',
-          builder: (_, state) =>
-              RobotDetailScreen(rrn: state.pathParameters['rrn']!),
-        ),
-        GoRoute(
-          path: '/robot/:rrn/control',
-          builder: (_, state) =>
-              ControlScreen(rrn: state.pathParameters['rrn']!),
-        ),
-        GoRoute(
-          path: '/consent',
-          builder: (_, __) => const ConsentScreen(),
-        ),
-        GoRoute(
-          path: '/alerts',
-          builder: (_, __) => const AlertsScreen(),
-        ),
-        GoRoute(
-          path: '/account',
-          builder: (_, __) => const AccountScreen(),
-        ),
-      ],
-    ),
-  ],
-);
+final _routerProvider = Provider<GoRouter>((ref) {
+  final notifier = _RouterNotifier(ref);
+  return GoRouter(
+    initialLocation: '/splash',
+    refreshListenable: notifier,
+    redirect: notifier.redirect,
+    routes: [
+      // Splash — shown while Firebase Auth initializes from persisted state
+      GoRoute(
+        path: '/splash',
+        builder: (_, __) => const _SplashScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (_, __) => const _LoginScreen(),
+      ),
+      ShellRoute(
+        builder: (ctx, state, child) => _AppShell(child: child),
+        routes: [
+          GoRoute(
+            path: '/fleet',
+            builder: (_, __) => const FleetScreen(),
+          ),
+          GoRoute(
+            path: '/robot/:rrn',
+            builder: (_, state) =>
+                RobotDetailScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/control',
+            builder: (_, state) =>
+                ControlScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/consent',
+            builder: (_, __) => const ConsentScreen(),
+          ),
+          GoRoute(
+            path: '/alerts',
+            builder: (_, __) => const AlertsScreen(),
+          ),
+          GoRoute(
+            path: '/account',
+            builder: (_, __) => const AccountScreen(),
+          ),
+        ],
+      ),
+    ],
+  );
+});
 
 // ---------------------------------------------------------------------------
 // App root
@@ -121,13 +129,41 @@ class OpenCastorApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(_routerProvider);
     return MaterialApp.router(
       title: 'OpenCastor',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      routerConfig: _router,
+      routerConfig: router,
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Splash screen — shown while Firebase Auth restores persisted state
+// ---------------------------------------------------------------------------
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF0a0b1e) : const Color(0xFFF8FAFF),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/images/icon-128.png', width: 72, height: 72),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(),
+          ],
+        ),
+      ),
     );
   }
 }
