@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Notification icon — replace with your actual icon asset -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFF">
+  <path
+      android:fillColor="@android:color/white"
+      android:pathData="M19.5,12c0,-3.59 -2.91,-6.5 -6.5,-6.5S6.5,8.41 6.5,12 9.41,18.5 13,18.5c1.35,0 2.6,-0.42 3.63,-1.13L19.5,20.24V12zM13,16.5c-2.48,0 -4.5,-2.02 -4.5,-4.5S10.52,7.5 13,7.5s4.5,2.02 4.5,4.5 -2.02,4.5 -4.5,4.5z"/>
+</vector>
