@@ -11,8 +11,8 @@ build/
 lib/firebase_options.dart
 google-services.json
 GoogleService-Info.plist
-.firebaserc
 .firebase/
+# .firebaserc is committed (project names only, no secrets)
 
 # Functions
 functions/lib/

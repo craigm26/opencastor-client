@@ -1,0 +1,42 @@
+name: Deploy — app.opencastor.com
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Flutter web build + Cloudflare Pages deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: stable
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Write Firebase options
+        # firebase_options.dart is gitignored — write from CI secrets
+        run: |
+          cat > lib/firebase_options.dart << 'EOF'
+          ${{ secrets.FIREBASE_OPTIONS_DART }}
+          EOF
+
+      - name: Build Flutter web
+        run: |
+          flutter build web \
+            --release \
+            --base-href "/" \
+            --dart-define=FLUTTER_WEB_USE_SKIA=true
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=opencastor-client --branch=master

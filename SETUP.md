@@ -1,158 +1,141 @@
-# OpenCastor Client — First-Time Setup
+# Setup Guide — OpenCastor Client
 
-## Prerequisites
+## New Firebase + Google Cloud project (one-time, done by Craig)
 
-- Flutter 3.22+ (`flutter --version`)
-- Firebase CLI (`npm install -g firebase-tools`)
-- FlutterFire CLI (`dart pub global activate flutterfire_cli`)
-- Firebase project with these services enabled:
-  - Authentication (Google sign-in provider)
-  - Firestore
-  - Cloud Functions
-  - Cloud Messaging
-
----
-
-## Step 1 — Configure Firebase
+### 1. Create the projects
 
 ```bash
-# Login to Firebase
-firebase login
+# Install gcloud if not already
+brew install google-cloud-sdk   # or apt
 
-# Generate lib/firebase_options.dart for your project
-# Run from the opencastor-client/ root
-flutterfire configure --project=live-captions-xr
+# Create GCP project
+gcloud projects create opencastor-fleet --name="OpenCastor Fleet"
 
-# This creates lib/firebase_options.dart — it's gitignored, keep it local
+# Set billing account (required for Cloud Functions)
+gcloud billing projects link opencastor-fleet \
+  --billing-account=$(gcloud billing accounts list --format='value(name)' | head -1)
 ```
 
-Also download your platform credential files from the Firebase console:
+Then in [Firebase Console](https://console.firebase.google.com):
+- Add project → select existing GCP project `opencastor-fleet`
+- Enable: **Firestore**, **Authentication** (Google provider), **Functions**, **Messaging**
 
-- **Android**: `google-services.json` → `android/app/google-services.json`
-- **iOS**: `GoogleService-Info.plist` → `ios/Runner/GoogleService-Info.plist`
-
----
-
-## Step 2 — Install Flutter dependencies
+### 2. Configure the Flutter app
 
 ```bash
-flutter pub get
+# Install FlutterFire CLI (once)
+dart pub global activate flutterfire_cli
+
+# In opencastor-client/ directory:
+flutterfire configure --project=opencastor-fleet
+
+# This generates lib/firebase_options.dart — gitignored, DO NOT COMMIT
+# For CI: copy the file contents into GitHub secret FIREBASE_OPTIONS_DART
 ```
 
----
-
-## Step 3 — Deploy Cloud Functions + Firestore rules
+### 3. Deploy Cloud Functions
 
 ```bash
 cd functions
 npm install
-cd ..
 
-# Deploy everything
-firebase deploy --only functions,firestore:rules,firestore:indexes
+# Deploy functions + Firestore rules + indexes
+firebase use opencastor-fleet
+firebase deploy --only functions,firestore
 ```
 
----
+### 4. Set up app.opencastor.com
 
-## Step 4 — Run the app
+In [Cloudflare Dashboard](https://dash.cloudflare.com):
+1. Pages → Create project → `opencastor-client`
+2. Connect to GitHub repo `craigm26/opencastor-client`
+3. Build settings:
+   - Framework: Flutter
+   - Build command: `flutter build web --release --base-href /`
+   - Output: `build/web`
+4. Custom domain: `app.opencastor.com`
+5. Add CNAME in DNS: `app → opencastor-client.pages.dev`
 
-```bash
-# Android / iOS device
-flutter run
+Or use the GitHub Actions workflow (`.github/workflows/deploy-web.yml`) which handles this automatically on push to master.
 
-# Web (for dev/testing)
-flutter run -d chrome
+**Required GitHub Secrets:**
+```
+FIREBASE_OPTIONS_DART     — contents of lib/firebase_options.dart
+CLOUDFLARE_API_TOKEN      — Cloudflare API token with Pages:Edit
+CLOUDFLARE_ACCOUNT_ID     — your Cloudflare account ID
 ```
 
----
-
-## Step 5 — Start the bridge on each robot
+### 5. Robot side — start the bridge
 
 ```bash
-# On each robot (Bob, Alex, etc.)
+# Install with cloud extras
 pip install opencastor[cloud]
 
-castor bridge \
-  --config ~/opencastor/bob.rcan.yaml \
-  --firebase-project live-captions-xr \
-  --gateway-url http://127.0.0.1:8000 \
-  --gateway-token <api-token>
-```
-
-Or use the included systemd service for auto-start on boot:
-
-```bash
-# Copy service file to robot
-sudo cp deploy/systemd/castor-bridge.service /etc/systemd/system/
-sudo cp deploy/systemd/castor-gateway.service /etc/systemd/system/
-
-# Edit to set FIREBASE_PROJECT and RCAN_CONFIG
-sudo systemctl edit castor-bridge.service
-
-# Enable and start
-sudo systemctl daemon-reload
-sudo systemctl enable --now castor-gateway castor-bridge
-
-# Check status
-sudo systemctl status castor-bridge
-journalctl -u castor-bridge -f
-```
-
----
-
-## Using ADC instead of a service account
-
-The bridge works with Google Application Default Credentials:
-
-```bash
-# On the robot
+# One-time: authenticate with Google
 gcloud auth application-default login
 
-# Then start bridge without --credentials
-castor bridge --config bob.rcan.yaml --firebase-project live-captions-xr
+# Start bridge (alongside castor gateway)
+castor bridge \
+  --config bob.rcan.yaml \
+  --firebase-project opencastor-fleet \
+  --gateway-url http://127.0.0.1:8000
+
+# Or with systemd (recommended for production):
+sudo cp deploy/systemd/castor-gateway.service /etc/systemd/system/
+sudo cp deploy/systemd/castor-bridge.service /etc/systemd/system/
+# Edit /etc/systemd/system/castor-bridge.service → set FIREBASE_PROJECT=opencastor-fleet
+sudo systemctl enable --now castor-gateway castor-bridge
+```
+
+### 6. Add firebase_uid to robot RCAN config
+
+After creating the Firebase project, get your UID:
+```bash
+# Sign in at app.opencastor.com, then in Firebase Console:
+# Authentication → Users → copy your UID
+```
+
+Add to `bob.rcan.yaml`:
+```yaml
+firebase_uid: "YOUR_FIREBASE_UID_HERE"
 ```
 
 ---
 
-## Robot RCAN config — adding the cloud block
+## App Store submissions
 
-Add this to your `bob.rcan.yaml` (or whatever config you use):
+### Google Play
+- Account: existing personal developer account (already have LiveCaptionsXR)
+- Package: `com.opencastor.app`
+- Build: `flutter build appbundle --release`
+- Switch to organization account when charging subscriptions or signing enterprise contracts
 
-```yaml
-cloud:
-  firebase_project: live-captions-xr
-  gateway_url: http://127.0.0.1:8000
-  telemetry_interval_s: 30
-  poll_interval_s: 5
-```
+### Apple App Store
+- Account: existing personal developer account (\$99/year)
+- Bundle ID: `com.opencastor.app`
+- Build: `flutter build ipa --release` (requires macOS + Xcode)
+- Personal account shows your name on the App Store listing
+- Switch to organization (needs D-U-N-S number) when you want "OpenCastor" as the publisher name
 
-Then start the bridge without flags:
+### CA Sole Proprietor / DBA (when needed)
+- File "Fictitious Business Name" with your county (~\$25-75)
+- Name: "OpenCastor" or "OpenCastor Labs"
+- Required before: opening a business bank account, signing contracts as OpenCastor
+- Full LLC: when revenue is real and you want liability protection
+
+---
+
+## Self-hosting (for third-party developers)
+
+Anyone can self-host the full stack at zero cost to Craig:
 
 ```bash
-castor bridge --config bob.rcan.yaml
+# 1. Fork this repo
+# 2. Create their own Firebase project (free tier is enough for small fleets)
+# 3. Run: flutterfire configure --project=<their-project>
+# 4. Deploy functions: firebase deploy --only functions,firestore
+# 5. Build web: flutter build web
+# 6. Deploy anywhere: Cloudflare Pages, Firebase Hosting, Netlify
 ```
 
----
-
-## R2RAM — consent between robots with different owners
-
-If two robots have different owners and want to communicate:
-
-1. Robot A sends a consent request via the app (Access tab → Request Access)
-2. Robot B's owner gets an FCM push notification
-3. Robot B's owner approves in the Access tab (scope + duration)
-4. Both sides get notified; the channel opens
-
-Same-owner robots (Bob + Alex both owned by you) communicate freely with no consent prompt.
-
----
-
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| Robot shows offline | Check `castor bridge` is running; check `castor gateway` is running |
-| Commands stuck at "pending" | Bridge not polling — check `journalctl -u castor-bridge` |
-| FCM notifications not arriving | Re-run `flutterfire configure`; check FCM token is registered |
-| Firebase permission denied | Check `firestore.rules` deployed; verify owner UID matches |
-| ESTOP not working | ESTOP bypasses rate limiting — if failing, check gateway is alive |
+Their Firebase project, their costs. Craig's Firebase is never hit.
