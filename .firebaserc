@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "opencastor-fleet",
+    "default": "opencastor",
     "dev": "live-captions-xr"
   }
 }

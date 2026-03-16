@@ -9,15 +9,15 @@
 brew install google-cloud-sdk   # or apt
 
 # Create GCP project
-gcloud projects create opencastor-fleet --name="OpenCastor Fleet"
+gcloud projects create opencastor --name="OpenCastor Fleet"
 
 # Set billing account (required for Cloud Functions)
-gcloud billing projects link opencastor-fleet \
+gcloud billing projects link opencastor \
   --billing-account=$(gcloud billing accounts list --format='value(name)' | head -1)
 ```
 
 Then in [Firebase Console](https://console.firebase.google.com):
-- Add project → select existing GCP project `opencastor-fleet`
+- Add project → select existing GCP project `opencastor`
 - Enable: **Firestore**, **Authentication** (Google provider), **Functions**, **Messaging**
 
 ### 2. Configure the Flutter app
@@ -27,7 +27,7 @@ Then in [Firebase Console](https://console.firebase.google.com):
 dart pub global activate flutterfire_cli
 
 # In opencastor-client/ directory:
-flutterfire configure --project=opencastor-fleet
+flutterfire configure --project=opencastor
 
 # This generates lib/firebase_options.dart — gitignored, DO NOT COMMIT
 # For CI: copy the file contents into GitHub secret FIREBASE_OPTIONS_DART
@@ -40,7 +40,7 @@ cd functions
 npm install
 
 # Deploy functions + Firestore rules + indexes
-firebase use opencastor-fleet
+firebase use opencastor
 firebase deploy --only functions,firestore
 ```
 
@@ -77,13 +77,13 @@ gcloud auth application-default login
 # Start bridge (alongside castor gateway)
 castor bridge \
   --config bob.rcan.yaml \
-  --firebase-project opencastor-fleet \
+  --firebase-project opencastor \
   --gateway-url http://127.0.0.1:8000
 
 # Or with systemd (recommended for production):
 sudo cp deploy/systemd/castor-gateway.service /etc/systemd/system/
 sudo cp deploy/systemd/castor-bridge.service /etc/systemd/system/
-# Edit /etc/systemd/system/castor-bridge.service → set FIREBASE_PROJECT=opencastor-fleet
+# Edit /etc/systemd/system/castor-bridge.service → set FIREBASE_PROJECT=opencastor
 sudo systemctl enable --now castor-gateway castor-bridge
 ```
 
