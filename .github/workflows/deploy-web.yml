@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
-    name: Flutter web build and Cloudflare Pages deploy
+  build:
+    name: Flutter web build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,22 +16,16 @@ jobs:
         with:
           flutter-version: '3.22.x'
           channel: stable
-          cache: true
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Write Firebase options from secret
-        # Store full file contents as GitHub secret: FIREBASE_OPTIONS_DART
-        # If not yet set, placeholder file is used (build may warn but won't fail)
         env:
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
         run: |
           if [ -n "$FIREBASE_OPTIONS_DART" ]; then
             echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
-            echo "Firebase options written from secret."
-          else
-            echo "FIREBASE_OPTIONS_DART secret not set — using placeholder."
           fi
 
       - name: Analyze
@@ -40,8 +34,27 @@ jobs:
       - name: Build Flutter web
         run: flutter build web --release --base-href "/"
 
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    needs: build
+    # Only deploy when CF secrets are configured (set DEPLOY_ENABLED=true in repo vars)
+    if: vars.DEPLOY_ENABLED == 'true'
+    steps:
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+
       - name: Deploy to Cloudflare Pages
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
