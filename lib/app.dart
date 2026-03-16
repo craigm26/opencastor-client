@@ -27,20 +27,13 @@ Future<void> signInWithGoogle() async {
       ..addScope('email')
       ..addScope('profile');
 
-    try {
-      // Try popup first — works on desktop browsers and modern mobile browsers.
-      await FirebaseAuth.instance.signInWithPopup(provider);
-    } on FirebaseAuthException catch (e) {
-      // Popup blocked (common on iOS Safari, some Android browsers).
-      // Fall back to redirect — getRedirectResult() handles the result on return.
-      if (e.code == 'popup-blocked' ||
-          e.code == 'popup-closed-by-user' ||
-          e.code == 'cancelled-popup-request') {
-        await FirebaseAuth.instance.signInWithRedirect(provider);
-      } else {
-        rethrow;
-      }
-    }
+    // Use redirect (not popup) on web.
+    // Cloudflare Pages sets Cross-Origin-Opener-Policy: same-origin which
+    // blocks window.closed polling that signInWithPopup relies on — the popup
+    // opens fine but the auth result never reaches the app.
+    // signInWithRedirect does a full-page redirect to Firebase's auth handler
+    // and back; getRedirectResult() in main() picks up the result on return.
+    await FirebaseAuth.instance.signInWithRedirect(provider);
     return;
   }
   // Native mobile / desktop
