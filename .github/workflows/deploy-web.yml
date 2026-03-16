@@ -39,7 +39,9 @@ jobs:
         # Warnings are non-blocking; errors will still surface in build step
 
       - name: Build Flutter web
-        run: flutter build web --release --base-href "/"
+        # html renderer: ~1.5MB vs ~6MB CanvasKit — much faster initial load.
+        # CanvasKit has better fidelity but unacceptable TTI for a PWA.
+        run: flutter build web --release --base-href "/" --web-renderer html
 
       - name: Upload web artifact
         uses: actions/upload-artifact@v4

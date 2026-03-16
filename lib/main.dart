@@ -10,9 +10,9 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Register FCM token after auth (handled in NotificationService.init())
-  // We call it here so the service is alive before any screen renders.
-  // Actual token registration happens after the user signs in.
+  // Complete any pending redirect sign-in (mobile web browsers use
+  // signInWithRedirect instead of signInWithPopup; result arrives here).
+  await handleRedirectResult();
 
   runApp(const ProviderScope(child: OpenCastorApp()));
 }

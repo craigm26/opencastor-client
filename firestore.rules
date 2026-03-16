@@ -3,31 +3,26 @@ rules_version = '2';
 //
 // OpenCastor Firestore Security Rules
 //
-// Design principles:
-//   1. Robot documents are readable by their owner only
-//   2. Commands can be written by the owner OR a cross-owner peer with consent
-//      (enforced via Cloud Functions — direct writes blocked for cross-owner)
-//   3. Telemetry is readable by owner only
-//   4. Consent records are readable/writable only by the robot's owner
-//   5. Rate limit documents are internal — client access denied
-//   6. FCM tokens are owner-private
+// Key principle: use resource.data directly (never get() on the same doc —
+// that causes circular evaluation and breaks list/query operations).
+// Firebase Admin SDK (castor bridge) bypasses all rules.
 //
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
-
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(rrn) {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
-          == request.auth.uid;
+    // Robot doc owner check — direct field comparison, no get() call
+    function isRobotOwner() {
+      return isSignedIn() && resource.data.firebase_uid == request.auth.uid;
+    }
+
+    // For creates: check the incoming data
+    function isCreatingAsOwner() {
+      return isSignedIn() && request.resource.data.firebase_uid == request.auth.uid;
     }
 
     function isValidScope(scope) {
@@ -37,111 +32,69 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     // /robots/{rrn}  — robot identity + status
     // -----------------------------------------------------------------------
-
     match /robots/{rrn} {
-      // Owner: full read/write
-      allow read: if isOwner(rrn);
-      // Bridge writes its own telemetry (robot authenticates as owner's service account)
-      allow write: if isOwner(rrn);
+      // Owner reads their own robots (works for both get and list/query)
+      allow read: if isRobotOwner();
+      // Bridge (Admin SDK) creates/updates — bypasses rules, but allow owner too
+      allow create: if isCreatingAsOwner();
+      allow update, delete: if isRobotOwner();
 
-      // -----------------------------------------------------------------------
+      // -------------------------------------------------------------------
       // /robots/{rrn}/commands/{cmdId}
-      // -----------------------------------------------------------------------
-
+      // -------------------------------------------------------------------
       match /commands/{cmdId} {
-        // Owner can read all commands (to check status/results)
-        allow read: if isOwner(rrn);
+        // Owner reads their robot's commands
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
 
-        // Owner can create commands directly (no Cloud Function needed for same-owner)
-        allow create: if isOwner(rrn) &&
-          request.resource.data.keys().hasAll(['instruction', 'scope', 'status']) &&
-          isValidScope(request.resource.data.scope) &&
-          request.resource.data.status == 'pending';
-
-        // Only the bridge (running as owner) can update command status
-        allow update: if isOwner(rrn);
-
-        // Nobody deletes commands — they expire by status
-        allow delete: if false;
+        // Direct command writes blocked — must go through Cloud Functions relay
+        allow write: if false;
       }
 
-      // -----------------------------------------------------------------------
+      // -------------------------------------------------------------------
       // /robots/{rrn}/consent_requests/{reqId}
-      // -----------------------------------------------------------------------
-
+      // -------------------------------------------------------------------
       match /consent_requests/{reqId} {
-        // Owner reads incoming consent requests
-        allow read: if isOwner(rrn);
-
-        // Bridge writes consent requests (running as owner service account)
-        allow write: if isOwner(rrn);
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow write: if false; // Cloud Functions only
       }
 
-      // -----------------------------------------------------------------------
+      // -------------------------------------------------------------------
       // /robots/{rrn}/consent_peers/{peerId}
-      // -----------------------------------------------------------------------
-
+      // -------------------------------------------------------------------
       match /consent_peers/{peerId} {
-        // Owner reads their peer consent records
-        allow read: if isOwner(rrn);
-
-        // Only bridge/Cloud Functions write peer records
-        allow write: if isOwner(rrn);
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow write: if false;
       }
 
-      // -----------------------------------------------------------------------
+      // -------------------------------------------------------------------
       // /robots/{rrn}/alerts/{alertId}
-      // -----------------------------------------------------------------------
-
+      // -------------------------------------------------------------------
       match /alerts/{alertId} {
-        allow read: if isOwner(rrn);
-        allow write: if isOwner(rrn);
-      }
-
-      // -----------------------------------------------------------------------
-      // /robots/{rrn}/telemetry/{ts}  (optional history subcollection)
-      // -----------------------------------------------------------------------
-
-      match /telemetry/{ts} {
-        allow read: if isOwner(rrn);
-        allow write: if isOwner(rrn);
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow write: if false;
       }
     }
 
     // -----------------------------------------------------------------------
-    // /owners/{uid}/robots  — index of robots for a user
+    // /_fcm_tokens/{uid}  — FCM push tokens (owner-private)
     // -----------------------------------------------------------------------
-
-    match /owners/{uid} {
-      allow read, write: if isSignedIn() && request.auth.uid == uid;
-
-      match /robots/{rrn} {
-        allow read, write: if isSignedIn() && request.auth.uid == uid;
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // /_fcm_tokens/{uid}  — FCM push tokens (private)
-    // -----------------------------------------------------------------------
-
     match /_fcm_tokens/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
     }
 
     // -----------------------------------------------------------------------
-    // /_rate_limits/{key}  — internal rate limiting (Cloud Functions only)
+    // /_rate_limits/{key}  — rate limiting (internal only)
     // -----------------------------------------------------------------------
-
     match /_rate_limits/{key} {
-      allow read, write: if false;  // Cloud Functions use admin SDK (bypasses rules)
-    }
-
-    // -----------------------------------------------------------------------
-    // Default: deny everything else
-    // -----------------------------------------------------------------------
-
-    match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if false; // Cloud Functions admin SDK only
     }
   }
 }

@@ -20,15 +20,30 @@ final authStateProvider = StreamProvider<User?>((_) {
   return FirebaseAuth.instance.authStateChanges();
 });
 
+
 Future<void> signInWithGoogle() async {
   if (kIsWeb) {
-    // Flutter web: use Firebase popup flow (google_sign_in mobile flow
-    // returns null idToken on web — use signInWithPopup instead)
-    final provider = GoogleAuthProvider();
-    await FirebaseAuth.instance.signInWithPopup(provider);
+    final provider = GoogleAuthProvider()
+      ..addScope('email')
+      ..addScope('profile');
+
+    try {
+      // Try popup first — works on desktop browsers and modern mobile browsers.
+      await FirebaseAuth.instance.signInWithPopup(provider);
+    } on FirebaseAuthException catch (e) {
+      // Popup blocked (common on iOS Safari, some Android browsers).
+      // Fall back to redirect — getRedirectResult() handles the result on return.
+      if (e.code == 'popup-blocked' ||
+          e.code == 'popup-closed-by-user' ||
+          e.code == 'cancelled-popup-request') {
+        await FirebaseAuth.instance.signInWithRedirect(provider);
+      } else {
+        rethrow;
+      }
+    }
     return;
   }
-  // Mobile / desktop
+  // Native mobile / desktop
   final gs = GoogleSignIn();
   final account = await gs.signIn();
   if (account == null) return;
@@ -38,6 +53,20 @@ Future<void> signInWithGoogle() async {
     idToken: auth.idToken,
   );
   await FirebaseAuth.instance.signInWithCredential(cred);
+}
+
+/// Call once on app startup to complete any pending redirect sign-in.
+/// Required when signInWithRedirect() was used (mobile browsers).
+Future<void> handleRedirectResult() async {
+  if (!kIsWeb) return;
+  try {
+    final result = await FirebaseAuth.instance.getRedirectResult();
+    if (result.user != null) {
+      debugPrint('Auth: redirect sign-in completed for ${result.user!.email}');
+    }
+  } catch (e) {
+    debugPrint('Auth: getRedirectResult error: $e');
+  }
 }
 
 Future<void> signOut() async {
@@ -284,24 +313,7 @@ class _LoginState extends State<_LoginScreen> {
                               padding: EdgeInsets.symmetric(vertical: 12),
                               child: CircularProgressIndicator(),
                             )
-                          : SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: OutlinedButton.icon(
-                                onPressed: _signIn,
-                                icon: _GoogleIcon(),
-                                label: const Text(
-                                  'Continue with Google',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: cs.onSurface,
-                                  side: BorderSide(color: cs.outlineVariant),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ),
+                          : _GoogleSignInButton(onPressed: _signIn),
                       const SizedBox(height: 20),
                       Text(
                         'Access your registered robots.\nControl requires R2RAM consent.',
@@ -341,41 +353,123 @@ class _LoginState extends State<_LoginScreen> {
   }
 }
 
-/// Google "G" icon painted inline (no package dependency)
-class _GoogleIcon extends StatelessWidget {
+// ---------------------------------------------------------------------------
+// Official Google Sign-In button
+// Follows Google's branding guidelines:
+// https://developers.google.com/identity/branding-guidelines
+// ---------------------------------------------------------------------------
+
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({required this.onPressed});
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF1F1F1F),
+          elevation: 1,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: const BorderSide(color: Color(0xFFDADCE0)),
+          ),
+          padding: EdgeInsets.zero,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _GoogleLogo(),
+            ),
+            const Expanded(
+              child: Text(
+                'Sign in with Google',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1F1F1F),
+                  letterSpacing: 0.25,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Google "G" logo — official colours, proportional SVG-equivalent.
+class _GoogleLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 18,
       height: 18,
-      child: CustomPaint(painter: _GoogleIconPainter()),
+      child: CustomPaint(painter: _GoogleLogoPainter()),
     );
   }
 }
 
-class _GoogleIconPainter extends CustomPainter {
+class _GoogleLogoPainter extends CustomPainter {
+  static const _blue   = Color(0xFF4285F4);
+  static const _red    = Color(0xFFEA4335);
+  static const _yellow = Color(0xFFFBBC05);
+  static const _green  = Color(0xFF34A853);
+
   @override
   void paint(Canvas canvas, Size size) {
-    final r = size.width / 2;
-    // Simplified Google G coloured circle
-    final segments = [
-      (0.0, 0.5, const Color(0xFF4285F4)),
-      (0.5, 0.75, const Color(0xFF34A853)),
-      (0.75, 0.875, const Color(0xFFFBBC05)),
-      (0.875, 1.0, const Color(0xFFEA4335)),
-    ];
-    for (final (start, end, color) in segments) {
-      canvas.drawArc(
-        Rect.fromCircle(center: Offset(r, r), radius: r),
-        start * 2 * 3.14159,
-        (end - start) * 2 * 3.14159,
-        true,
-        Paint()..color = color,
-      );
-    }
-    // White inner circle
-    canvas.drawCircle(Offset(r, r), r * 0.6, Paint()..color = Colors.white);
+    final s = size.width;
+    final paint = Paint()..style = PaintingStyle.fill;
+
+    // Blue arc (top-right → left, ~270°)
+    paint.color = _blue;
+    canvas.drawArc(Rect.fromLTWH(0, 0, s, s),
+        -1.5708, 4.7124, false, paint..style = PaintingStyle.stroke
+          ..strokeWidth = s * 0.22
+          ..color = _blue);
+
+    // Overwrite specific arcs with correct Google G colours
+    // Red: top-right quarter
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = s * 0.22;
+    paint.color = _red;
+    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+        -1.5708, 1.5708, false, paint);
+    // Yellow: bottom-right quarter
+    paint.color = _yellow;
+    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+        0, 1.5708, false, paint);
+    // Green: bottom-left quarter
+    paint.color = _green;
+    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+        1.5708, 1.5708, false, paint);
+    // Blue: top-left quarter
+    paint.color = _blue;
+    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+        3.14159, 1.5708, false, paint);
+
+    // White notch for the "G" horizontal bar
+    paint
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
+    canvas.drawRect(Rect.fromLTWH(s * 0.5, s * 0.38, s * 0.5, s * 0.24), paint);
+
+    // White inner circle (hole of the G ring)
+    canvas.drawCircle(Offset(s / 2, s / 2), s * 0.28, paint);
   }
+
   @override
   bool shouldRepaint(_) => false;
 }
