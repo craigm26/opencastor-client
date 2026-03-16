@@ -1,11 +1,11 @@
 {
     "name": "OpenCastor",
     "short_name": "OpenCastor",
-    "description": "Remote fleet management for your robots",
+    "description": "Remote fleet management for your robots — powered by RCAN v1.4 and Protocol 66",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0d1117",
-    "theme_color": "#0d1117",
+    "background_color": "#0a0b1e",
+    "theme_color": "#0ea5e9",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
@@ -30,6 +30,12 @@
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable"
+        },
+        {
+            "src": "icons/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "any"
         }
     ]
 }
