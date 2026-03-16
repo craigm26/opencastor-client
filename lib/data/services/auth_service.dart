@@ -4,29 +4,52 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 /// Centralises all authentication logic.
 ///
-/// Auth state is exposed via [authStateChanges] which the router (go_router)
-/// and [authStateProvider] listen to for redirects.
+/// Web auth strategy (per Firebase docs + flutter/web constraints):
+///   1. Use signInWithPopup — this is the documented primary method.
+///      Firebase handles the entire flow on opencastor.firebaseapp.com,
+///      so no cross-origin storage issues.
+///   2. The Cloudflare Pages _headers file sets:
+///         Cross-Origin-Opener-Policy: same-origin-allow-popups
+///      which allows the popup to post the auth result back to the opener.
+///   3. Fallback to signInWithRedirect ONLY for browsers that block all
+///      popups (popup-blocked, cancelled-popup-request). getRedirectResult()
+///      in main() catches the result on return.
 ///
-/// Web note: signInWithRedirect is used instead of signInWithPopup because
-/// Cloudflare Pages sets Cross-Origin-Opener-Policy: same-origin, which
-/// blocks the window.closed polling that signInWithPopup relies on.
+/// Why not redirect-first:
+///   signInWithRedirect stores pending state in IndexedDB on the authDomain
+///   (opencastor.firebaseapp.com). Modern browsers with strict privacy
+///   settings block cross-origin storage access from app.opencastor.com,
+///   so getRedirectResult() silently returns null and the user loops back
+///   to /login.
 class AuthService {
   const AuthService._();
 
+  static final _googleProvider = GoogleAuthProvider()
+    ..addScope('email')
+    ..addScope('profile');
+
   /// Initiate Google sign-in.
   ///
-  /// - Web: full-page redirect via [FirebaseAuth.signInWithRedirect].
-  ///   Call [handleRedirectResult] on app startup to complete.
-  /// - Native: [GoogleSignIn] popup → Firebase credential.
+  /// Web: signInWithPopup (primary) → signInWithRedirect (popup-blocked fallback).
+  /// Native: GoogleSignIn plugin → Firebase credential.
   static Future<void> signInWithGoogle() async {
     if (kIsWeb) {
-      final provider = GoogleAuthProvider()
-        ..addScope('email')
-        ..addScope('profile');
-      await FirebaseAuth.instance.signInWithRedirect(provider);
+      try {
+        await FirebaseAuth.instance.signInWithPopup(_googleProvider);
+      } on FirebaseAuthException catch (e) {
+        // Only fall back to redirect if the popup was truly blocked by the
+        // browser's popup blocker — not for COOP or auth errors.
+        if (e.code == 'popup-blocked' ||
+            e.code == 'cancelled-popup-request') {
+          await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
+        } else {
+          rethrow;
+        }
+      }
       return;
     }
 
+    // Native mobile / desktop: GoogleSignIn plugin
     final gs = GoogleSignIn();
     final account = await gs.signIn();
     if (account == null) return; // user cancelled
@@ -38,23 +61,27 @@ class AuthService {
     await FirebaseAuth.instance.signInWithCredential(cred);
   }
 
-  /// Must be called once in [main] to complete any pending web redirect flow.
+  /// Call once at app startup to complete any pending redirect sign-in.
+  ///
+  /// Only relevant when signInWithRedirect was used as fallback.
+  /// getRedirectResult() returns immediately if there is no pending redirect.
   static Future<void> handleRedirectResult() async {
     if (!kIsWeb) return;
     try {
       final result = await FirebaseAuth.instance.getRedirectResult();
       if (result.user != null) {
-        debugPrint('AuthService: redirect sign-in completed — ${result.user!.email}');
+        debugPrint(
+            'AuthService: redirect sign-in completed — ${result.user!.email}');
       }
-    } catch (e) {
-      debugPrint('AuthService: getRedirectResult error: $e');
+    } on FirebaseAuthException catch (e) {
+      // Log but don't crash — app continues with unauthenticated state
+      debugPrint('AuthService: getRedirectResult error ${e.code}: ${e.message}');
     }
   }
 
   /// Sign out of Firebase (and Google on native).
   static Future<void> signOut() async {
     if (!kIsWeb) {
-      // On web, auth was via signInWithRedirect — no GoogleSignIn session.
       await GoogleSignIn().signOut();
     }
     await FirebaseAuth.instance.signOut();

@@ -1,0 +1,7 @@
+/*
+  # Allow Firebase Auth popup to communicate back to the opener.
+  # same-origin-allow-popups: permits popups opened by this page to retain
+  # a window.opener reference (required for OAuth popup flow), while still
+  # preventing cross-origin pages from accessing THIS window via opener.
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Cross-Origin-Embedder-Policy: unsafe-none
