@@ -10,6 +10,9 @@
 /// Screen-level state lives in the per-feature ViewModels.
 library;
 
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,11 +30,41 @@ import 'screens/control/control_screen.dart';
 import 'screens/robot_detail/robot_detail_screen.dart';
 
 // ---------------------------------------------------------------------------
+// Auth → Router bridge
+//
+// GoRouter's redirect guard is a synchronous snapshot of auth state.
+// Without refreshListenable, the router never re-evaluates after a
+// signInWithRedirect completes — user lands on /login and gets stuck.
+//
+// _AuthStateNotifier bridges Firebase authStateChanges() to GoRouter so
+// the router re-runs redirect whenever auth state changes (sign-in/out).
+// ---------------------------------------------------------------------------
+
+class _AuthStateNotifier extends ChangeNotifier {
+  _AuthStateNotifier() {
+    _sub = FirebaseAuth.instance.authStateChanges().listen((_) {
+      notifyListeners();
+    });
+  }
+
+  late final StreamSubscription<User?> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
+
+final _authNotifier = _AuthStateNotifier();
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
 final _router = GoRouter(
   initialLocation: '/fleet',
+  refreshListenable: _authNotifier, // re-run redirect on auth state change
   redirect: (context, state) {
     final user = AuthService.currentUser;
     final isAuth = user != null;
