@@ -35,7 +35,7 @@ const SCOPE_LEVEL: Record<string, number> = {
  *   4. Write command to /robots/{rrn}/commands/{cmd_id}
  *   5. Return cmd_id for polling
  */
-export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 
@@ -118,7 +118,7 @@ export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "
 /**
  * getCommandStatus — poll for command result.
  */
-export const getCommandStatus = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const getCommandStatus = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 
@@ -160,7 +160,7 @@ export const getCommandStatus = https.onCall({ cors: ["https://app.opencastor.co
 /**
  * registerFcmToken — Flutter app registers its FCM token on login.
  */
-export const registerFcmToken = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const registerFcmToken = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 

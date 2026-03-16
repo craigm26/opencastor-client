@@ -19,7 +19,7 @@ const messaging = () => admin.messaging();
 // requestConsent — called by robot A's bridge (or via Flutter app)
 // ---------------------------------------------------------------------------
 
-export const requestConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const requestConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 
@@ -100,7 +100,7 @@ export const requestConsent = https.onCall({ cors: ["https://app.opencastor.com"
 // resolveConsent — owner approves or denies (callable from Flutter app)
 // ---------------------------------------------------------------------------
 
-export const resolveConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const resolveConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 
@@ -193,7 +193,7 @@ export const resolveConsent = https.onCall({ cors: ["https://app.opencastor.com"
 // revokeConsent — owner revokes an existing peer consent
 // ---------------------------------------------------------------------------
 
-export const revokeConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"] }, async (request) => {
+export const revokeConsent = https.onCall({ cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"], invoker: "public" }, async (request) => {
   const auth = request.auth;
   if (!auth) throw new https.HttpsError("unauthenticated", "Must be authenticated");
 
