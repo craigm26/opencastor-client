@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/robot.dart';
+import '../../../data/models/robot.dart';
 
 const _labels = {
   RobotCapability.chat: ('Chat', Icons.chat_outlined),
