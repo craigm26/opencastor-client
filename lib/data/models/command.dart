@@ -15,6 +15,10 @@ class RobotCommand {
   final String? error;
   final DateTime? completedAt;
 
+  /// GAP-08: Sender type for audit trail display.
+  /// e.g. "human via OpenCastor app" | "service:opencastor-cloud-relay" | "robot:<rrn>"
+  final String? senderType;
+
   const RobotCommand({
     required this.id,
     required this.instruction,
@@ -25,6 +29,7 @@ class RobotCommand {
     this.result,
     this.error,
     this.completedAt,
+    this.senderType,
   });
 
   factory RobotCommand.fromDoc(DocumentSnapshot doc) {
@@ -43,6 +48,8 @@ class RobotCommand {
       completedAt: m['completed_at'] != null
           ? DateTime.parse(m['completed_at'] as String)
           : null,
+      // GAP-08: parse sender_type from audit field; default to human app sender
+      senderType: m['sender_type'] as String? ?? 'human via OpenCastor app',
     );
   }
 

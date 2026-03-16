@@ -25,6 +25,7 @@ import 'screens/alerts/alerts_screen.dart';
 import 'screens/consent/consent_screen.dart';
 import 'screens/control/control_screen.dart';
 import 'screens/robot_detail/robot_detail_screen.dart';
+import 'ui/consent/pending_consent_screen.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
@@ -105,6 +106,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/consent',
             builder: (_, __) => const ConsentScreen(),
+          ),
+          GoRoute(
+            path: '/consent/pending',
+            builder: (_, __) => const PendingConsentScreen(),
           ),
           GoRoute(
             path: '/alerts',

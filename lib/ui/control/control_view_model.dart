@@ -1,12 +1,19 @@
 /// ViewModel for the Control (arm) screen.
 ///
-/// All physical-layer commands go through [ControlViewModel.sendControlCommand]
+/// All physical-layer commands go through [ControlViewModel.execute]
 /// which enforces the confirmation-modal requirement and streams the result.
 ///
 /// Safety invariants enforced here:
 ///   - EVERY control-scope command requires user confirmation dialog.
 ///   - ESTOP is always available and never gated behind a confirmation.
 ///   - Commands are dispatched with [CommandScope.control] (R2RAM §5.3).
+///
+/// GAP-08 (Cloud Relay Identity / Audit Trail):
+///   - All commands sent from this app surface `sender_type: "human via
+///     OpenCastor app"` in the command history. This is written to Firestore
+///     by the Cloud Function and read back by the UI in [ControlSuccess].
+///   - The [lastSenderType] field exposes the sender_type for the most recent
+///     command, allowing the control screen to display it in the history.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,7 +46,13 @@ class ControlBusy extends ControlState {
 
 class ControlSuccess extends ControlState {
   final String result;
-  const ControlSuccess(this.result);
+
+  /// GAP-08: sender_type from the completed command's audit record.
+  /// Defaults to "human via OpenCastor app" when field is absent.
+  final String senderType;
+
+  const ControlSuccess(this.result,
+      {this.senderType = 'human via OpenCastor app'});
 }
 
 class ControlError extends ControlState {
@@ -73,8 +86,11 @@ class ControlViewModel extends AutoDisposeNotifier<ControlState> {
       await for (final cmd in repo.watchCommand(rrn, cmdId)) {
         if (cmd == null) break;
         if (cmd.isComplete) {
+          // GAP-08: Surface sender_type in command history for audit trail
           state = ControlSuccess(
             cmd.result?['raw_text']?.toString() ?? 'Done',
+            senderType:
+                cmd.senderType ?? 'human via OpenCastor app',
           );
           return;
         }

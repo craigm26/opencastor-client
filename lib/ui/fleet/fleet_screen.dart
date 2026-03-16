@@ -35,25 +35,13 @@ class FleetScreen extends ConsumerWidget {
           }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(fleetProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: robots.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, i) {
-                final robot = robots[i];
-
-                return RobotCard(
-                  robot: robot,
-                  onTap: () => context.push('/robot/${robot.rrn}'),
-                  onControl: robot.hasCapability(RobotCapability.control)
-                      ? () => context.push('/robot/${robot.rrn}/control')
-                      : null,
-                  // ESTOP command — view calls ViewModel, never repository
-                  onEstop: () => ref
-                      .read(estopCommandProvider.notifier)
-                      .send(robot.rrn),
-                );
-              },
+            child: _FleetList(
+              robots: robots,
+              onTap: (robot) => context.push('/robot/${robot.rrn}'),
+              onControl: (robot) =>
+                  context.push('/robot/${robot.rrn}/control'),
+              onEstop: (robot) =>
+                  ref.read(estopCommandProvider.notifier).send(robot.rrn),
             ),
           );
         },
@@ -111,6 +99,236 @@ class _EmptyFleet extends StatelessWidget {
             'Run  castor bridge  on a robot to add it to your fleet.',
             style: Theme.of(context).textTheme.bodyMedium,
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Fleet list with revocation + consent banners ──────────────────────────────
+
+class _FleetList extends StatelessWidget {
+  final List<Robot> robots;
+  final void Function(Robot) onTap;
+  final void Function(Robot) onControl;
+  final Future<void> Function(Robot) onEstop;
+
+  const _FleetList({
+    required this.robots,
+    required this.onTap,
+    required this.onControl,
+    required this.onEstop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trainingRobots = robots
+        .where((r) => r.telemetry['training_consent_required'] == true)
+        .toList();
+    final hasRevoked = robots.any((r) => r.isRevoked);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // EU AI Act training data consent banner (GAP-10)
+        if (trainingRobots.isNotEmpty) ...[
+          _TrainingConsentBanner(robots: trainingRobots),
+          const SizedBox(height: 8),
+        ],
+
+        // Revocation summary banner
+        if (hasRevoked) ...[
+          const _RevocationSummaryBanner(),
+          const SizedBox(height: 8),
+        ],
+
+        // Robot cards
+        for (int i = 0; i < robots.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          _RobotCardWithBadge(
+            robot: robots[i],
+            onTap: () => onTap(robots[i]),
+            onControl: robots[i].hasCapability(RobotCapability.control) &&
+                    !robots[i].isRevoked
+                ? () => onControl(robots[i])
+                : null,
+            onEstop:
+                robots[i].isOnline ? () => onEstop(robots[i]) : null,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// RobotCard wrapper that overlays a revocation/suspension badge.
+class _RobotCardWithBadge extends StatelessWidget {
+  final Robot robot;
+  final VoidCallback onTap;
+  final VoidCallback? onControl;
+  final Future<void> Function()? onEstop;
+
+  const _RobotCardWithBadge({
+    required this.robot,
+    required this.onTap,
+    this.onControl,
+    this.onEstop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        RobotCard(
+          robot: robot,
+          onTap: onTap,
+          onControl: onControl,
+          onEstop: onEstop,
+        ),
+        if (robot.isRevoked)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Tooltip(
+              message: 'Revoked robot — commands blocked',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade700,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.block_outlined,
+                        size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'REVOKED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (robot.isSuspended)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Tooltip(
+              message: 'Suspended robot — commands temporarily blocked',
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade700,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.pause_circle_outline,
+                        size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'SUSPENDED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Banner shown when one or more fleet robots are revoked.
+class _RevocationSummaryBanner extends StatelessWidget {
+  const _RevocationSummaryBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.red.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_outlined,
+              size: 16, color: Colors.red),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'One or more robots have been revoked. '
+              'Tap a robot for details.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade300),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// EU AI Act compliance banner (GAP-10) shown when a robot has
+/// training_consent_required == true in its telemetry/config.
+class _TrainingConsentBanner extends StatelessWidget {
+  final List<Robot> robots;
+  const _TrainingConsentBanner({required this.robots});
+
+  @override
+  Widget build(BuildContext context) {
+    final names = robots.map((r) => r.name).join(', ');
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.privacy_tip_outlined,
+              size: 16, color: Colors.amber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Training data consent required',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber),
+                ),
+                Text(
+                  '$names collects training data. '
+                  'Review and manage consent →',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.amber.withOpacity(0.8)),
+                ),
+              ],
+            ),
           ),
         ],
       ),

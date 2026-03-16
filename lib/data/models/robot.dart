@@ -22,6 +22,13 @@ class RobotStatus {
       );
 }
 
+/// RCAN v1.5 — revocation status values (GAP-02 §13).
+///
+/// - [active]    Normal operation.
+/// - [revoked]   Permanently revoked; commands blocked (ESTOP still accepted).
+/// - [suspended] Temporarily restricted; commands blocked.
+enum RevocationStatus { active, revoked, suspended }
+
 class Robot {
   final String rrn;
   final String name;
@@ -35,6 +42,23 @@ class Robot {
   final RobotStatus status;
   final Map<String, dynamic> telemetry;
 
+  // ── RCAN v1.5 fields ──────────────────────────────────────────────────────
+
+  /// RCAN spec version this robot supports, e.g. "1.5" (GAP-12).
+  final String? rcanVersion;
+
+  /// Current revocation status (GAP-02 §13). Defaults to [RevocationStatus.active].
+  final RevocationStatus revocationStatus;
+
+  /// Whether this robot supports QoS level 2 (exactly-once) for ESTOP (GAP-11).
+  final bool supportsQos2;
+
+  /// Whether this robot supports command delegation chains (GAP-01).
+  final bool supportsDelegation;
+
+  /// Whether this robot can operate offline with cached credentials (GAP-06).
+  final bool offlineCapable;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -47,6 +71,12 @@ class Robot {
     required this.registeredAt,
     required this.status,
     required this.telemetry,
+    // v1.5 fields — all have safe defaults
+    this.rcanVersion,
+    this.revocationStatus = RevocationStatus.active,
+    this.supportsQos2 = false,
+    this.supportsDelegation = false,
+    this.offlineCapable = false,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -70,14 +100,43 @@ class Robot {
           ? RobotStatus.fromMap(m['status'] as Map<String, dynamic>)
           : RobotStatus(online: false, lastSeen: DateTime.now()),
       telemetry: m['telemetry'] as Map<String, dynamic>? ?? {},
+      // ── RCAN v1.5 fields — safe defaults preserve v1.4 behaviour ──────────
+      rcanVersion: m['rcan_version'] as String?,
+      revocationStatus: _parseRevocationStatus(
+          m['revocation_status'] as String?),
+      supportsQos2: m['supports_qos_2'] as bool? ?? false,
+      supportsDelegation: m['supports_delegation'] as bool? ?? false,
+      offlineCapable: m['offline_capable'] as bool? ?? false,
     );
   }
 
   bool get isOnline => status.online;
 
+  bool get isRevoked => revocationStatus == RevocationStatus.revoked;
+
+  bool get isSuspended => revocationStatus == RevocationStatus.suspended;
+
+  /// True if the robot supports RCAN v1.5 or later.
+  bool get isRcanV15 {
+    if (rcanVersion == null) return false;
+    final parts = rcanVersion!.split('.');
+    if (parts.isEmpty) return false;
+    final major = int.tryParse(parts[0]) ?? 0;
+    final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return major > 1 || (major == 1 && minor >= 5);
+  }
+
   bool hasCapability(RobotCapability cap) => capabilities.contains(cap);
 
   static RobotCapability? _parseCapability(String s) {
     return RobotCapability.values.where((c) => c.name == s).firstOrNull;
+  }
+
+  static RevocationStatus _parseRevocationStatus(String? s) {
+    if (s == null) return RevocationStatus.active;
+    return RevocationStatus.values.firstWhere(
+      (e) => e.name == s,
+      orElse: () => RevocationStatus.active,
+    );
   }
 }
