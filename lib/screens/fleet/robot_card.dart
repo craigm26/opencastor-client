@@ -130,7 +130,7 @@ class _TelemetryRow extends StatelessWidget {
       chips.add(_TelChip(
         icon: Icons.storage_outlined,
         label: '${(disk as num).toStringAsFixed(0)}%',
-        color: (disk as num) > 85 ? AppTheme.warning : null,
+        color: (disk as num) > 85 ? AppTheme.warning : null, // ignore: unnecessary_cast
       ));
     }
 

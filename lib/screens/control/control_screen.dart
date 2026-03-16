@@ -122,7 +122,6 @@ class _State extends ConsumerState<ControlScreen> {
   }
 
   Widget _buildControl(BuildContext context, Robot robot) {
-    final cs = Theme.of(context).colorScheme;
     final isOnline = robot.isOnline;
 
     return Scaffold(

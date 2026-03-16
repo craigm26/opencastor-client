@@ -7,8 +7,9 @@
 .pub/
 build/
 
-# Firebase - NEVER commit real credentials
-lib/firebase_options.dart
+# Firebase - NEVER commit real credentials with actual keys
+# The placeholder file IS committed; only overwrite in CI via secret
+# lib/firebase_options.dart  <-- intentionally NOT ignored (placeholder committed)
 google-services.json
 GoogleService-Info.plist
 .firebase/

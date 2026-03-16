@@ -203,8 +203,6 @@ class _CommandTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isMe = cmd.scope == CommandScope.chat;
-
     Color statusColor = cs.onSurfaceVariant;
     IconData statusIcon = Icons.schedule_outlined;
     if (cmd.isComplete) {

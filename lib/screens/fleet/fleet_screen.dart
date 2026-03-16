@@ -4,11 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/robot.dart';
 import '../../services/robot_service.dart';
-import '../../services/consent_service.dart';
 import 'robot_card.dart';
 
 final _robotServiceProvider = Provider((_) => RobotService());
-final _consentServiceProvider = Provider((_) => ConsentService());
 
 final fleetProvider = StreamProvider<List<Robot>>((ref) {
   final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
