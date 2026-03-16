@@ -14,6 +14,7 @@ library;
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/app_logger.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../../data/services/firestore_robot_service.dart';
@@ -48,9 +49,24 @@ final authStateProvider = StreamProvider<User?>(
 /// Rebuilds automatically when auth state changes.
 final fleetProvider = StreamProvider<List<Robot>>((ref) {
   final auth = ref.watch(authStateProvider);
+
+  if (auth.isLoading) {
+    log.d('fleetProvider: auth still loading — waiting');
+    return const Stream.empty();
+  }
+
   final user = auth.asData?.value;
-  if (user == null) return const Stream.empty();
-  return ref.read(robotRepositoryProvider).watchFleet(user.uid);
+  if (user == null) {
+    log.i('fleetProvider: user is null (signed out) — empty stream');
+    return const Stream.empty();
+  }
+
+  log.i('fleetProvider: querying Firestore with uid=${user.uid} email=${user.email}');
+
+  return ref.read(robotRepositoryProvider).watchFleet(user.uid).map((robots) {
+    log.i('fleetProvider: Firestore returned ${robots.length} robot(s): ${robots.map((r) => r.rrn).join(', ')}');
+    return robots;
+  });
 });
 
 // ---------------------------------------------------------------------------

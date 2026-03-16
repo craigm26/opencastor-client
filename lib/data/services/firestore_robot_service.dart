@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import '../../core/app_logger.dart';
 import '../models/command.dart';
 import '../models/robot.dart';
 import '../repositories/robot_repository.dart';
@@ -20,12 +21,22 @@ class FirestoreRobotService implements RobotRepository {
 
   @override
   Stream<List<Robot>> watchFleet(String uid) {
+    log.d('FirestoreRobotService.watchFleet: uid="$uid"');
     return _db
         .collection('robots')
         .where('firebase_uid', isEqualTo: uid)
         .snapshots()
-        .map((snap) => snap.docs.map(Robot.fromDoc).toList()
-          ..sort((a, b) => a.name.compareTo(b.name)));
+        .map((snap) {
+          log.d('watchFleet snapshot: ${snap.docs.length} docs, fromCache=${snap.metadata.isFromCache}');
+          if (snap.docs.isEmpty) {
+            log.w('watchFleet: no documents matched firebase_uid="$uid" — check Firestore /robots docs have this uid set');
+          }
+          return snap.docs.map(Robot.fromDoc).toList()
+            ..sort((a, b) => a.name.compareTo(b.name));
+        })
+        .handleError((e, st) {
+          log.e('watchFleet ERROR — uid="$uid"', error: e, stackTrace: st as StackTrace?);
+        });
   }
 
   @override

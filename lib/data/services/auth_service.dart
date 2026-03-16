@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../core/app_logger.dart';
 
 /// Centralises all authentication logic.
 ///
@@ -33,16 +34,21 @@ class AuthService {
   /// Web: signInWithPopup (primary) → signInWithRedirect (popup-blocked fallback).
   /// Native: GoogleSignIn plugin → Firebase credential.
   static Future<void> signInWithGoogle() async {
+    log.i('AuthService: signInWithGoogle() — isWeb=$kIsWeb');
     if (kIsWeb) {
       try {
-        await FirebaseAuth.instance.signInWithPopup(_googleProvider);
+        final cred = await FirebaseAuth.instance.signInWithPopup(_googleProvider);
+        log.i('AuthService: popup sign-in OK — uid=${cred.user?.uid} email=${cred.user?.email}');
+        return;
       } on FirebaseAuthException catch (e) {
         // Only fall back to redirect if the popup was truly blocked by the
         // browser's popup blocker — not for COOP or auth errors.
         if (e.code == 'popup-blocked' ||
             e.code == 'cancelled-popup-request') {
+          log.w('AuthService: popup blocked (${e.code}), falling back to redirect');
           await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
         } else {
+          log.e('AuthService: signInWithPopup error', error: e);
           rethrow;
         }
       }
@@ -70,12 +76,12 @@ class AuthService {
     try {
       final result = await FirebaseAuth.instance.getRedirectResult();
       if (result.user != null) {
-        debugPrint(
-            'AuthService: redirect sign-in completed — ${result.user!.email}');
+        log.i('AuthService: redirect sign-in completed — uid=${result.user!.uid} email=${result.user!.email}');
+      } else {
+        log.d('AuthService: getRedirectResult — no pending redirect');
       }
     } on FirebaseAuthException catch (e) {
-      // Log but don't crash — app continues with unauthenticated state
-      debugPrint('AuthService: getRedirectResult error ${e.code}: ${e.message}');
+      log.w('AuthService: getRedirectResult error ${e.code}: ${e.message}');
     }
   }
 
