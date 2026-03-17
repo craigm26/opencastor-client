@@ -16,3 +16,6 @@ export { requestConsent, resolveConsent, revokeConsent, onConsentResolved } from
 
 // Community hub — Phase 2 config/skill/harness sharing
 export { uploadConfig, getConfig, searchConfigs, starConfig, importCommunityConfig } from "./hub";
+
+// Phase 4 social layer
+export { forkConfig, addComment, getComments, deleteComment, getMyStars, getMyConfigs, publishFork } from "./social";

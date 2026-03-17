@@ -6,9 +6,11 @@
 ///   - Fix/Enable/Upgrade buttons that open bottom sheets or external URLs
 library;
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../data/models/robot.dart';
@@ -74,6 +76,102 @@ int _p66PassCount(Robot robot) {
 
 // ── View ──────────────────────────────────────────────────────────────────────
 
+Future<void> _shareAsHarness(BuildContext ctx, Robot robot) async {
+  String title = '${robot.name} Harness';
+  final confirmed = await showDialog<bool>(
+    context: ctx,
+    builder: (dCtx) => AlertDialog(
+      title: const Text('Share as Harness'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+              'Share ${robot.name}\'s capabilities profile as a harness config to the Community Hub.',
+              style: Theme.of(dCtx).textTheme.bodySmall),
+          const SizedBox(height: 12),
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'Harness title',
+              border: OutlineInputBorder(),
+            ),
+            controller: TextEditingController(text: title),
+            onChanged: (v) => title = v,
+          ),
+          const SizedBox(height: 8),
+          Text('Type: harness  •  Secrets are scrubbed automatically.',
+              style: Theme.of(dCtx)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(
+                      color:
+                          Theme.of(dCtx).colorScheme.onSurfaceVariant)),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(dCtx, false),
+            child: const Text('Cancel')),
+        FilledButton(
+            onPressed: () => Navigator.pop(dCtx, true),
+            child: const Text('Share Harness')),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !ctx.mounted) return;
+
+  ScaffoldMessenger.of(ctx).showSnackBar(
+    const SnackBar(
+      content: Text('Uploading harness...'),
+      duration: Duration(seconds: 2),
+      behavior: SnackBarBehavior.floating,
+    ),
+  );
+
+  try {
+    final fn =
+        FirebaseFunctions.instance.httpsCallable('uploadConfig');
+    final result = await fn.call<Map<String, dynamic>>({
+      'type': 'harness',
+      'title': title,
+      'tags': [robot.rrn.toLowerCase(), 'harness', 'shared-from-app'],
+      'content': '# Harness exported from OpenCastor app\n'
+          '# Robot: ${robot.name}\n'
+          '# RRN: ${robot.rrn}\n'
+          '# RCAN Version: ${robot.rcanVersion ?? "?"}\n',
+      'filename':
+          '${robot.rrn.toLowerCase().replaceAll('-', '_')}_harness.yaml',
+      'robot_rrn': robot.rrn,
+      'public': true,
+    });
+
+    final url = result.data['url'] as String? ?? '';
+    if (ctx.mounted) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          content: Text('Harness shared! $url'),
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => ctx.push(
+                '/explore/${result.data['id'] ?? ''}'),
+          ),
+        ),
+      );
+    }
+  } catch (e) {
+    if (ctx.mounted) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+            content: Text('Upload failed: $e'),
+            behavior: SnackBarBehavior.floating),
+      );
+    }
+  }
+}
+
 class _CapabilitiesView extends StatelessWidget {
   final Robot robot;
   const _CapabilitiesView({required this.robot});
@@ -89,6 +187,11 @@ class _CapabilitiesView extends StatelessWidget {
         actions: [
           HealthIndicator(isOnline: robot.isOnline, size: 8),
           const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share as Harness',
+            onPressed: () => _shareAsHarness(context, robot),
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: 'RCAN Spec',

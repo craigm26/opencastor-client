@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import '../../data/models/hub_config.dart';
 import 'explore_view_model.dart';
+import 'social_view_model.dart';
 
 class ExploreScreen extends ConsumerWidget {
   const ExploreScreen({super.key});
@@ -14,18 +17,52 @@ class ExploreScreen extends ConsumerWidget {
     final filter = ref.watch(exploreFilterProvider);
     final configs = ref.watch(exploreConfigsProvider(filter));
     final cs = Theme.of(context).colorScheme;
+    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Explore'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner_outlined),
-            tooltip: 'Scan QR code',
-            onPressed: () => context.push('/explore/scan'),
-          ),
-        ],
+    return DefaultTabController(
+      length: isLoggedIn ? 3 : 1,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Explore'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.qr_code_scanner_outlined),
+              tooltip: 'Scan QR code',
+              onPressed: () => context.push('/explore/scan'),
+            ),
+          ],
+          bottom: isLoggedIn
+              ? const TabBar(tabs: [
+                  Tab(text: 'Discover'),
+                  Tab(text: 'My Stars'),
+                  Tab(text: 'My Configs'),
+                ])
+              : null,
+        ),
+        body: isLoggedIn
+            ? TabBarView(children: [
+                _DiscoverTab(filter: filter, configs: configs, ref: ref),
+                const _MyStarsTab(),
+                const _MyConfigsTab(),
+              ])
+            : _DiscoverTab(filter: filter, configs: configs, ref: ref),
       ),
+    );
+  }
+}
+
+class _DiscoverTab extends StatelessWidget {
+  const _DiscoverTab(
+      {required this.filter, required this.configs, required this.ref});
+  final ExploreFilter filter;
+  final AsyncValue<List<HubConfig>> configs;
+  final WidgetRef ref;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: Column(children: [
       body: Column(
         children: [
           // ── Filter chips ────────────────────────────────────────────
@@ -81,6 +118,143 @@ class ExploreScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── My Stars tab ─────────────────────────────────────────────────────────────
+
+class _MyStarsTab extends ConsumerWidget {
+  const _MyStarsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stars = ref.watch(myStarsProvider);
+    return stars.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (configs) => configs.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star_border, size: 48, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('No starred configs yet'),
+                  SizedBox(height: 6),
+                  Text('Tap ★ on any config to save it here',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () async => ref.invalidate(myStarsProvider),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: configs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, i) => _ConfigListTile(config: configs[i]),
+              ),
+            ),
+    );
+  }
+}
+
+// ── My Configs tab ────────────────────────────────────────────────────────────
+
+class _MyConfigsTab extends ConsumerWidget {
+  const _MyConfigsTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final myConfigs = ref.watch(myConfigsProvider);
+    return myConfigs.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (configs) => configs.isEmpty
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.upload_file_outlined,
+                      size: 48, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text('No uploaded configs yet'),
+                  SizedBox(height: 6),
+                  Text('Share a config from your robot\'s detail screen',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () async => ref.invalidate(myConfigsProvider),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: configs.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                itemBuilder: (ctx, i) => _ConfigListTile(
+                  config: configs[i],
+                  showPublishButton: !(configs[i].isPublic),
+                  onPublish: () async {
+                    await publishFork(configs[i].id);
+                    ref.invalidate(myConfigsProvider);
+                  },
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+class _ConfigListTile extends StatelessWidget {
+  const _ConfigListTile(
+      {required this.config,
+      this.showPublishButton = false,
+      this.onPublish});
+  final HubConfig config;
+  final bool showPublishButton;
+  final VoidCallback? onPublish;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      child: ListTile(
+        leading: _TypeBadgeIcon(type: config.type),
+        title: Text(config.title,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(
+          '${config.rcanVersion} · ${config.provider} · ${config.installs} installs',
+          style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+        ),
+        trailing: showPublishButton
+            ? TextButton(
+                onPressed: onPublish,
+                child: const Text('Publish'))
+            : null,
+        onTap: () => context.push('/explore/${config.id}'),
+      ),
+    );
+  }
+}
+
+class _TypeBadgeIcon extends StatelessWidget {
+  const _TypeBadgeIcon({required this.type});
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (type) {
+      'skill' => Icons.extension_outlined,
+      'harness' => Icons.account_tree_outlined,
+      _ => Icons.settings_outlined,
+    };
+    return CircleAvatar(
+      backgroundColor:
+          Theme.of(context).colorScheme.primaryContainer,
+      child: Icon(icon,
+          size: 18,
+          color: Theme.of(context).colorScheme.onPrimaryContainer),
     );
   }
 }
@@ -261,7 +435,17 @@ class ExploreDetailScreen extends ConsumerWidget {
       body: configAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (config) => _ConfigDetail(config: config),
+        data: (config) => SingleChildScrollView(
+          child: Column(
+            children: [
+              _ConfigDetail(config: config),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                child: _SocialSection(config: config),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -276,7 +460,7 @@ class _ConfigDetail extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return SingleChildScrollView(
+    return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,6 +480,16 @@ class _ConfigDetail extends StatelessWidget {
               Icon(Icons.star_border, size: 14, color: cs.outlineVariant),
               const SizedBox(width: 2),
               Text('${config.stars}', style: tt.labelSmall),
+              const SizedBox(width: 10),
+              Icon(Icons.call_split_outlined,
+                  size: 14, color: cs.outlineVariant),
+              const SizedBox(width: 2),
+              Text('${config.forks}', style: tt.labelSmall),
+              const SizedBox(width: 10),
+              Icon(Icons.chat_bubble_outline,
+                  size: 14, color: cs.outlineVariant),
+              const SizedBox(width: 2),
+              Text('${config.commentCount}', style: tt.labelSmall),
             ],
           ),
           const SizedBox(height: 12),
@@ -375,8 +569,263 @@ class _ConfigDetail extends StatelessWidget {
       ),
     );
   }
+}
 
-  // ignore: prefer_final_fields
+// ── Fork + Comments section (appended to detail) ──────────────────────────────
+
+class _SocialSection extends ConsumerStatefulWidget {
+  const _SocialSection({required this.config});
+  final HubConfig config;
+
+  @override
+  ConsumerState<_SocialSection> createState() => _SocialSectionState();
+}
+
+class _SocialSectionState extends ConsumerState<_SocialSection> {
+  final _commentCtrl = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final comments = ref.watch(commentsProvider(widget.config.id));
+    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+
+        // ── Fork row ──────────────────────────────────────────────────
+        Row(
+          children: [
+            Icon(Icons.call_split_outlined, size: 16, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text('${widget.config.forks} forks',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            const Spacer(),
+            if (isLoggedIn)
+              FilledButton.tonal(
+                onPressed: () => _showForkDialog(context),
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    textStyle: const TextStyle(fontSize: 12)),
+                child: const Text('Fork & Remix'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // ── Comments ──────────────────────────────────────────────────
+        Text('Comments (${widget.config.commentCount})',
+            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 10),
+
+        if (isLoggedIn) ...[
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _commentCtrl,
+                  decoration: const InputDecoration(
+                    hintText: 'Add a comment...',
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    isDense: true,
+                  ),
+                  maxLines: 1,
+                  onSubmitted: (_) => _submitComment(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: _submitting ? null : _submitComment,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send_outlined, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+
+        comments.when(
+          loading: () =>
+              const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          error: (e, _) => Text('Could not load comments',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+          data: (list) => list.isEmpty
+              ? Text('No comments yet. Be the first!',
+                  style: tt.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant))
+              : Column(
+                  children: list
+                      .map((c) => _CommentTile(
+                          comment: c, configId: widget.config.id))
+                      .toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _submitting = true);
+    try {
+      await addComment(widget.config.id, text);
+      _commentCtrl.clear();
+      ref.invalidate(commentsProvider(widget.config.id));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'),
+              behavior: SnackBarBehavior.floating));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _showForkDialog(BuildContext ctx) async {
+    String title = '${widget.config.title} (fork)';
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('Fork Config'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+                'Create a private copy of "${widget.config.title}" you can edit and publish.',
+                style: Theme.of(dCtx).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(
+                  labelText: 'Fork title', border: OutlineInputBorder()),
+              controller: TextEditingController(text: title),
+              onChanged: (v) => title = v,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: const Text('Fork')),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !ctx.mounted) return;
+
+    try {
+      final result = await forkConfig(
+          widget.config.id, title, [...widget.config.tags, 'fork']);
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: const Text('Forked! Find it in My Configs.'),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+                label: 'View',
+                onPressed: () => ctx.push('/explore/${result['id']}')),
+          ),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+              content: Text('Fork failed: $e'),
+              behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+}
+
+class _CommentTile extends ConsumerWidget {
+  const _CommentTile({required this.comment, required this.configId});
+  final HubComment comment;
+  final String configId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isOwn = currentUid == comment.authorUid;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: cs.primaryContainer,
+            child: Text(
+              comment.authorName.isNotEmpty
+                  ? comment.authorName[0].toUpperCase()
+                  : '?',
+              style: TextStyle(
+                  fontSize: 11, color: cs.onPrimaryContainer),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(comment.authorName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 12)),
+                    const SizedBox(width: 6),
+                    Text(
+                      DateFormat('MMM d').format(comment.createdAt),
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant),
+                    ),
+                    if (isOwn) ...[
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () async {
+                          await deleteComment(configId, comment.id);
+                          ref.invalidate(commentsProvider(configId));
+                        },
+                        child: Icon(Icons.delete_outline,
+                            size: 14, color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(comment.text,
+                    style: const TextStyle(fontSize: 13, height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _InstallCard extends StatelessWidget {

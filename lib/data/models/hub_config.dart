@@ -15,6 +15,10 @@ class HubConfig {
     required this.installs,
     this.content,
     this.robotRrn,
+    this.isPublic = true,
+    this.forkedFrom,
+    this.commentCount = 0,
+    this.forks = 0,
   });
 
   final String id;
@@ -31,6 +35,10 @@ class HubConfig {
   final int installs;
   final String? content;
   final String? robotRrn;
+  final bool isPublic;
+  final String? forkedFrom;
+  final int commentCount;
+  final int forks;
 
   String get installCmd => 'castor install opencastor.com/config/$id';
   String get webUrl => 'https://opencastor.com/config/$id';
@@ -50,5 +58,9 @@ class HubConfig {
         installs: (map['installs'] as num?)?.toInt() ?? 0,
         content: map['content'] as String?,
         robotRrn: map['robot_rrn'] as String?,
+        isPublic: map['public'] as bool? ?? true,
+        forkedFrom: map['forked_from'] as String?,
+        commentCount: (map['comment_count'] as num?)?.toInt() ?? 0,
+        forks: (map['forks'] as num?)?.toInt() ?? 0,
       );
 }
