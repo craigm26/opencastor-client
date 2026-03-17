@@ -2,9 +2,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants.dart';
 import '../../data/models/robot.dart';
 import 'fleet_view_model.dart'
-    show authStateProvider, estopCommandProvider, fleetProvider;
+    show estopCommandProvider, fleetProvider;
 import 'robot_card.dart';
 
 class FleetScreen extends ConsumerWidget {
@@ -18,6 +21,13 @@ class FleetScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Fleet'),
         actions: [
+          // Docs link
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Fleet Docs',
+            onPressed: () =>
+                launchUrl(Uri.parse(AppConstants.docsRoot)),
+          ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
             tooltip: 'Account',
@@ -26,7 +36,7 @@ class FleetScreen extends ConsumerWidget {
         ],
       ),
       body: fleet.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const _ShimmerFleetList(),
         error: (err, _) => _ErrorView(error: err.toString()),
         data: (robots) {
           if (robots.isEmpty) {
@@ -82,25 +92,45 @@ class _EmptyFleet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.precision_manufacturing_outlined,
-            size: 72,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 16),
-          Text('No robots yet',
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(
-            'Run  castor bridge  on a robot to add it to your fleet.',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.precision_manufacturing_outlined,
+                size: 48,
+                color: cs.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text('No robots yet',
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Run  castor bridge  on a robot to add it to your fleet.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () => launchUrl(Uri.parse(AppConstants.docsRoot)),
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('Add your first robot'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -143,20 +173,54 @@ class _FleetList extends StatelessWidget {
           const SizedBox(height: 8),
         ],
 
-        // Robot cards
-        for (int i = 0; i < robots.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          _RobotCardWithBadge(
-            robot: robots[i],
-            onTap: () => onTap(robots[i]),
-            onControl: robots[i].hasCapability(RobotCapability.control) &&
-                    !robots[i].isRevoked
-                ? () => onControl(robots[i])
-                : null,
-            onEstop:
-                robots[i].isOnline ? () => onEstop(robots[i]) : null,
-          ),
-        ],
+        // Responsive robot grid
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final cols = width >= 900 ? 3 : width >= 600 ? 2 : 1;
+            if (cols == 1) {
+              return Column(
+                children: [
+                  for (int i = 0; i < robots.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    _RobotCardWithBadge(
+                      robot: robots[i],
+                      onTap: () => onTap(robots[i]),
+                      onControl: robots[i].hasCapability(RobotCapability.control) &&
+                              !robots[i].isRevoked
+                          ? () => onControl(robots[i])
+                          : null,
+                      onEstop: robots[i].isOnline
+                          ? () => onEstop(robots[i])
+                          : null,
+                    ),
+                  ],
+                ],
+              );
+            }
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1.8,
+              ),
+              itemCount: robots.length,
+              itemBuilder: (_, i) => _RobotCardWithBadge(
+                robot: robots[i],
+                onTap: () => onTap(robots[i]),
+                onControl: robots[i].hasCapability(RobotCapability.control) &&
+                        !robots[i].isRevoked
+                    ? () => onControl(robots[i])
+                    : null,
+                onEstop:
+                    robots[i].isOnline ? () => onEstop(robots[i]) : null,
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -331,6 +395,29 @@ class _TrainingConsentBanner extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Shimmer loading skeleton ──────────────────────────────────────────────────
+
+class _ShimmerFleetList extends StatelessWidget {
+  const _ShimmerFleetList();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: 3,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, __) => Shimmer.fromColors(
+        baseColor: cs.surfaceContainerLow,
+        highlightColor: cs.surfaceContainer,
+        child: Card(
+          child: SizedBox(height: 120),
+        ),
       ),
     );
   }

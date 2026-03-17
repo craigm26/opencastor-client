@@ -76,6 +76,9 @@ class Robot {
   /// Registry tier: "root" | "authoritative" | "community" (GAP-14).
   final String registryTier;
 
+  /// OpenCastor runtime version reported by the robot bridge, e.g. "2026.3.17.1".
+  final String? opencastorVersion;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -100,6 +103,7 @@ class Robot {
     this.loaEnforcement = false,
     this.multimodalEnabled = true,
     this.registryTier = 'community',
+    this.opencastorVersion,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -137,6 +141,8 @@ class Robot {
       loaEnforcement: m['loa_enforcement'] as bool? ?? false,
       multimodalEnabled: m['multimodal_enabled'] as bool? ?? true,
       registryTier: m['registry_tier'] as String? ?? 'community',
+      opencastorVersion: m['opencastor_version'] as String?
+          ?? m['telemetry']?['opencastor_version'] as String?,
     );
   }
 

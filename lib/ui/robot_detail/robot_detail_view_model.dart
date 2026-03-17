@@ -35,6 +35,7 @@ class SendChatNotifier extends AutoDisposeAsyncNotifier<void> {
   Future<void> send({
     required String rrn,
     required String instruction,
+    String? mediaChunks,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(
@@ -42,6 +43,7 @@ class SendChatNotifier extends AutoDisposeAsyncNotifier<void> {
             rrn: rrn,
             instruction: instruction,
             scope: CommandScope.chat,
+            reason: mediaChunks != null ? 'media_chunks:$mediaChunks' : null,
           ),
     );
   }

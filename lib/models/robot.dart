@@ -77,6 +77,19 @@ class Robot {
 
   bool hasCapability(RobotCapability cap) => capabilities.contains(cap);
 
+  // RCAN v1.5/v1.6 stubs for legacy screen compatibility
+  String? get rcanVersion => telemetry['rcan_version'] as String?;
+  bool get loaEnforcement => telemetry['loa_enforcement'] as bool? ?? false;
+  int get minLoaForControl => telemetry['min_loa_for_control'] as int? ?? 1;
+  bool get isRcanV16 {
+    final v = rcanVersion;
+    if (v == null) return false;
+    final parts = v.split('.');
+    final major = int.tryParse(parts[0]) ?? 0;
+    final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return major > 1 || (major == 1 && minor >= 6);
+  }
+
   static RobotCapability? _parseCapability(String s) {
     return RobotCapability.values.where((c) => c.name == s).firstOrNull;
   }

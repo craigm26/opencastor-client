@@ -26,6 +26,12 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Used for secure authentication</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used for voice commands to your robot</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Used to attach photos to robot commands</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to take photos for robot commands</string>
 
 	<!-- FCM push notifications -->
 	<key>UIBackgroundModes</key>

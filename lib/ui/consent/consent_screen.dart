@@ -17,6 +17,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/consent_repository.dart';
 import '../../data/repositories/robot_repository.dart';
@@ -175,6 +177,12 @@ class ConsentScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Request Robot Access'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Consent Docs',
+            onPressed: () =>
+                launchUrl(Uri.parse(AppConstants.docsConsent)),
+          ),
           TextButton(
             onPressed: () =>
                 context.push('/consent/pending'),

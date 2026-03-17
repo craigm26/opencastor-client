@@ -3,6 +3,11 @@
 
     <!-- Internet access for Firebase + castor gateway -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Speech-to-text -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Image picker -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- FCM push notifications -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>

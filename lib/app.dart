@@ -13,18 +13,21 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import 'core/constants.dart';
 import 'data/services/auth_service.dart';
 import 'ui/account/account_screen.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
+import 'ui/login/ecosystem_section.dart';
+import 'ui/physical_control/physical_control_screen.dart';
+import 'ui/robot_capabilities/robot_capabilities_screen.dart';
+import 'ui/robot_detail/robot_detail_screen.dart' as new_detail;
+import 'ui/robot_status/robot_status_screen.dart';
 
 // Screens not yet migrated to ui/ — pending move
 import 'screens/alerts/alerts_screen.dart';
 import 'screens/consent/consent_screen.dart';
-import 'screens/control/control_screen.dart';
-import 'screens/robot_detail/robot_detail_screen.dart';
 import 'ui/consent/pending_consent_screen.dart';
 import 'ui/setup/setup_screen.dart';
 
@@ -106,12 +109,26 @@ final _routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/robot/:rrn',
             builder: (_, state) =>
-                RobotDetailScreen(rrn: state.pathParameters['rrn']!),
+                new_detail.RobotDetailScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/control',
             builder: (_, state) =>
-                ControlScreen(rrn: state.pathParameters['rrn']!),
+                PhysicalControlScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/status',
+            builder: (_, state) =>
+                RobotStatusScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities',
+            builder: (_, state) => RobotCapabilitiesScreen(
+              rrn: state.pathParameters['rrn']!,
+              anchor: state.uri.fragment.isNotEmpty
+                  ? state.uri.fragment
+                  : null,
+            ),
           ),
           GoRoute(
             path: '/consent',
@@ -272,132 +289,143 @@ class _LoginState extends State<_LoginScreen> {
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF0a0b1e) : const Color(0xFFF8FAFF),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Logo lockup
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset('assets/images/icon-128.png',
-                        height: 48, width: 48),
-                    const SizedBox(width: 14),
-                    Text(
-                      'OpenCastor',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF0ea5e9),
-                            letterSpacing: -0.5,
-                          ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Remote fleet management',
-                  style: TextStyle(
-                    color: cs.onSurfaceVariant,
-                    fontSize: 15,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                const SizedBox(height: 48),
-
-                // Sign-in card
-                Container(
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF12142b) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF0ea5e9).withOpacity(0.18)
-                          : const Color(0xFFe2e8f0),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black
-                            .withOpacity(isDark ? 0.4 : 0.06),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      if (_error != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppTheme.danger.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                                color: AppTheme.danger.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.error_outline,
-                                  color: AppTheme.danger, size: 16),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(_error!,
-                                    style: TextStyle(
-                                        color: AppTheme.danger,
-                                        fontSize: 13)),
-                              ),
-                            ],
-                          ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Big logo lockup ────────────────────────────────────────
+                  Image.asset('assets/images/icon-128.png',
+                      height: 200, width: 200),
+                  const SizedBox(height: 16),
+                  Text(
+                    'OpenCastor',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineLarge
+                        ?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0ea5e9),
+                          letterSpacing: -0.5,
                         ),
-                        const SizedBox(height: 20),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Open robot fleet management',
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 15,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // ── Sign-in card ───────────────────────────────────────────
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF12142b) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFF0ea5e9).withOpacity(0.18)
+                            : const Color(0xFFe2e8f0),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withOpacity(isDark ? 0.4 : 0.06),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
                       ],
-                      _loading
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: CircularProgressIndicator(),
-                            )
-                          : _GoogleSignInButton(onPressed: _signIn),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Access your registered robots.\nControl requires R2RAM consent.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: cs.onSurfaceVariant,
-                          fontSize: 12,
-                          height: 1.6,
+                    ),
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      children: [
+                        if (_error != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppTheme.danger.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: AppTheme.danger.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline,
+                                    color: AppTheme.danger, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(_error!,
+                                      style: TextStyle(
+                                          color: AppTheme.danger,
+                                          fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        _loading
+                            ? const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: CircularProgressIndicator(),
+                              )
+                            : _GoogleSignInButton(onPressed: _signIn),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Access your registered robots.\nControl requires R2RAM consent.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 12,
+                            height: 1.6,
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── Ecosystem section ──────────────────────────────────────
+                  const EcosystemSection(),
+
+                  const SizedBox(height: 32),
+
+                  // ── Footer ─────────────────────────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Powered by ',
+                          style: TextStyle(
+                              color: cs.onSurfaceVariant, fontSize: 12)),
+                      const Text('RCAN v${AppConstants.rcanVersion}',
+                          style: TextStyle(
+                            color: Color(0xFF0ea5e9),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          )),
+                      Text(' · Protocol 66 enforced',
+                          style: TextStyle(
+                              color: cs.onSurfaceVariant, fontSize: 12)),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 32),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Powered by ',
-                        style: TextStyle(
-                            color: cs.onSurfaceVariant, fontSize: 12)),
-                    const Text('RCAN v1.4',
-                        style: TextStyle(
-                          color: Color(0xFF0ea5e9),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        )),
-                    Text(' · Protocol 66 enforced',
-                        style: TextStyle(
-                            color: cs.onSurfaceVariant, fontSize: 12)),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  Text(
+                    AppConstants.versionLabel,
+                    style: TextStyle(
+                        color: cs.onSurfaceVariant.withOpacity(0.5),
+                        fontSize: 11),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
