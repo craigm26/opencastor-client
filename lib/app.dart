@@ -26,6 +26,7 @@ import 'screens/consent/consent_screen.dart';
 import 'screens/control/control_screen.dart';
 import 'screens/robot_detail/robot_detail_screen.dart';
 import 'ui/consent/pending_consent_screen.dart';
+import 'ui/setup/setup_screen.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
@@ -62,7 +63,7 @@ class _RouterNotifier extends ChangeNotifier {
 
     final user = authAsync.asData?.value;
     final isAuth = user != null;
-    final isPublic = loc == '/login' || loc == '/splash';
+    final isPublic = loc == '/login' || loc == '/splash' || loc.startsWith('/setup');
 
     if (!isAuth && !isPublic) return '/login';
     if (isAuth && isPublic) return '/fleet';
@@ -85,6 +86,15 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (_, __) => const _LoginScreen(),
+      ),
+      // Setup wizard landing page — reachable without auth
+      // (Firebase UID shown only after Google sign-in)
+      GoRoute(
+        path: '/setup',
+        builder: (_, state) => SetupScreen(
+          robotName: state.uri.queryParameters['robot'],
+          ownerName: state.uri.queryParameters['owner'],
+        ),
       ),
       ShellRoute(
         builder: (ctx, state, child) => _AppShell(child: child),

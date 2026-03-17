@@ -91,7 +91,7 @@ flutter run
 
 ## R2RAM Authorization
 
-Robot-to-robot communication follows the RCAN v1.5 R2RAM spec ([rcan-spec #160](https://github.com/continuonai/rcan-spec/issues/160)):
+Robot-to-robot communication follows the RCAN v1.6 R2RAM spec ([rcan-spec #160](https://github.com/continuonai/rcan-spec/issues/160)):
 
 | Tier | Default |
 |---|---|

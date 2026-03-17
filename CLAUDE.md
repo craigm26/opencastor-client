@@ -12,9 +12,9 @@ Deployed at **[app.opencastor.com](https://app.opencastor.com)** via Cloudflare 
 | [craigm26/OpenCastor](https://github.com/craigm26/OpenCastor) | Robot runtime (Python). `castor` CLI, Protocol 66 safety layer, RCAN router, `castor bridge` daemon. | `main` |
 | [craigm26/opencastor-client](https://github.com/craigm26/opencastor-client) | **This repo.** Flutter web fleet management app. | `master` |
 | [craigm26/opencastor-ops](https://github.com/craigm26/opencastor-ops) | Private. Business, legal, compliance, infrastructure docs. | `main` |
-| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification (v1.4). Astro site at rcan.dev. | `master` |
-| [continuonai/rcan-py](https://github.com/continuonai/rcan-py) | Python RCAN SDK (v0.4.2). `pip install rcan`. | `main` |
-| [continuonai/rcan-ts](https://github.com/continuonai/rcan-ts) | TypeScript RCAN SDK (v0.4.1). `npm install @continuonai/rcan`. | `master` |
+| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification (v1.6). Astro site at rcan.dev. | `master` |
+| [continuonai/rcan-py](https://github.com/continuonai/rcan-py) | Python RCAN SDK (v0.6.0). `pip install rcan`. | `main` |
+| [continuonai/rcan-ts](https://github.com/continuonai/rcan-ts) | TypeScript RCAN SDK (v0.6.0). `npm install @continuonai/rcan`. | `master` |
 | [continuonai/RobotRegistryFoundation](https://github.com/continuonai/RobotRegistryFoundation) | Robot Registry Foundation — canonical RRN records. | `main` |
 | [craigm26/personalsite](https://github.com/craigm26/personalsite) | craigmerry.com — Astro + Cloudflare Pages. | `main` |
 
