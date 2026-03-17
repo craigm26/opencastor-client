@@ -63,7 +63,7 @@ jobs:
         run: flutter test
 
       - name: Build web (debug check)
-        run: flutter build web --release --base-href "/" --web-renderer html
+        run: flutter build web --release --base-href "/"
 
       - name: Build APK (debug)
         run: flutter build apk --debug
