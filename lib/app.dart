@@ -20,6 +20,7 @@ import 'ui/alerts/alerts_screen.dart';
 import 'ui/consent/consent_screen.dart';
 import 'ui/consent/pending_consent_screen.dart';
 import 'ui/core/theme/app_theme.dart';
+import 'ui/explore/explore_screen.dart';
 import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
 import 'ui/login/ecosystem_section.dart';
@@ -95,6 +96,34 @@ final _routerProvider = Provider<GoRouter>((ref) {
               child: const FleetScreen(),
               transitionsBuilder: (ctx, animation, secondary, child) =>
                   FadeTransition(opacity: animation, child: child),
+            ),
+          ),
+          GoRoute(
+            path: '/explore',
+            builder: (_, __) => const ExploreScreen(),
+            pageBuilder: (_, state) => CustomTransitionPage(
+              key: state.pageKey,
+              child: const ExploreScreen(),
+              transitionsBuilder: (ctx, animation, secondary, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+          ),
+          GoRoute(
+            path: '/explore/:id',
+            pageBuilder: (_, state) => CustomTransitionPage(
+              key: state.pageKey,
+              child: ExploreDetailScreen(
+                  configId: state.pathParameters['id']!),
+              transitionsBuilder: (ctx, animation, secondary, child) {
+                final slide = Tween(
+                  begin: const Offset(0, 0.08),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                    parent: animation, curve: Curves.easeOutCubic));
+                return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child));
+              },
             ),
           ),
           GoRoute(
@@ -225,10 +254,12 @@ class _AppShell extends StatelessWidget {
     int selectedIndex = 0;
     if (location.startsWith('/fleet') || location.startsWith('/robot')) {
       selectedIndex = 0;
-    } else if (location.startsWith('/alerts')) {
+    } else if (location.startsWith('/explore')) {
       selectedIndex = 1;
-    } else if (location.startsWith('/settings')) {
+    } else if (location.startsWith('/alerts')) {
       selectedIndex = 2;
+    } else if (location.startsWith('/settings')) {
+      selectedIndex = 3;
     }
 
     const destinations = [
@@ -236,6 +267,11 @@ class _AppShell extends StatelessWidget {
         icon: Icon(Icons.precision_manufacturing_outlined),
         selectedIcon: Icon(Icons.precision_manufacturing),
         label: 'Fleet',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.explore_outlined),
+        selectedIcon: Icon(Icons.explore),
+        label: 'Explore',
       ),
       NavigationDestination(
         icon: Icon(Icons.notifications_outlined),
@@ -256,8 +292,10 @@ class _AppShell extends StatelessWidget {
           case 0:
             context.go('/fleet');
           case 1:
-            context.go('/alerts');
+            context.go('/explore');
           case 2:
+            context.go('/alerts');
+          case 3:
             context.go('/settings');
         }
       },
