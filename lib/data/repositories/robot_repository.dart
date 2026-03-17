@@ -30,11 +30,15 @@ abstract class RobotRepository {
 
   /// Enqueue a command via Cloud Functions (enforces R2RAM + rate limiting).
   /// Returns the new command ID.
+  ///
+  /// [mediaChunks] — optional list of media attachments; each map must have
+  /// `mime_type`, `data` (base64), and optionally `description`.
   Future<String> sendCommand({
     required String rrn,
     required String instruction,
     required CommandScope scope,
     String? reason,
+    List<Map<String, dynamic>>? mediaChunks,
   });
 
   /// Live stream of command history for [rrn] (most recent first).

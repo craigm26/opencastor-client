@@ -22,6 +22,7 @@ class AppConstants {
   static const String rcanDevUrl = 'https://rcan.dev/';
   static const String rrfUrl = 'https://robotregistry.org/';
   static const String rrfRegisterUrl = 'https://robotregistry.org/register/';
+  static const String rrfOpencastorUrl = 'https://rrf.opencastor.com';
   static const String rcanPyPypi = 'https://pypi.org/project/rcan/';
   static const String rcanPyGitHub =
       'https://github.com/continuonai/rcan-py';

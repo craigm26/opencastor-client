@@ -1,10 +1,11 @@
 /// Robot Detail Screen — RCAN v1.5/v1.6 status, chat, STT, media attachment.
 ///
 /// Features:
-///   - RCAN v1.5/v1.6 badge row with navigational chiplets
+///   - Status badge + OpenCastor version badge + single "Capabilities ▶" chip
 ///   - Speech-to-text chat input
+///   - WhatsApp-style image annotation before sending
 ///   - Photo attachment in chat (base64 media_chunks)
-///   - OpenCastor version badge in header
+///   - ESTOP always visible in app bar (Protocol 66 §4.1)
 ///   - Docs link in app bar
 library;
 
@@ -24,9 +25,9 @@ import '../../core/media_service.dart';
 import '../../core/speech_service.dart';
 import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
-import '../../ui/core/widgets/capability_badge.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
+import '../../ui/chat/image_annotation_screen.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'robot_detail_view_model.dart';
 
@@ -42,6 +43,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   final _ctrl = TextEditingController();
   bool _sending = false;
   Uint8List? _attachedImage;
+  String _imageAnnotation = '';
 
   @override
   void dispose() {
@@ -55,16 +57,39 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     setState(() => _sending = true);
     final capturedText = text;
     final capturedImage = _attachedImage;
+    final capturedAnnotation = _imageAnnotation;
     _ctrl.clear();
-    setState(() => _attachedImage = null);
+    setState(() {
+      _attachedImage = null;
+      _imageAnnotation = '';
+    });
     try {
-      // Build instruction; if image attached, append base64 note
       String instruction = capturedText;
-      String? mediaChunks;
+      List<Map<String, dynamic>>? mediaChunks;
+
       if (capturedImage != null) {
-        mediaChunks = base64Encode(capturedImage);
-        if (instruction.isEmpty) instruction = '[image attached]';
+        final base64img = base64Encode(capturedImage);
+        final mediaDesc = capturedAnnotation.isNotEmpty
+            ? capturedAnnotation
+            : 'an attached image';
+
+        // Prepend image context to instruction so the robot agent sees it
+        if (instruction.isEmpty) {
+          instruction =
+              "I'm sending you $mediaDesc. Please describe what you see.";
+        } else {
+          instruction = '$instruction [Image attached: $mediaDesc]';
+        }
+
+        mediaChunks = [
+          {
+            'mime_type': 'image/jpeg',
+            'data': base64img,
+            'description': mediaDesc,
+          }
+        ];
       }
+
       await ref.read(sendChatProvider.notifier).send(
             rrn: robot.rrn,
             instruction: instruction,
@@ -138,7 +163,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
           _RevocationBanner(robot: robot),
           _OfflineBanner(robot: robot),
 
-          // ── Telemetry + badges ─────────────────────────────────────────────
+          // ── Telemetry + condensed badge row ───────────────────────────────
           _TelemetryPanel(robot: robot),
           const Divider(height: 1),
 
@@ -174,7 +199,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
           if (_attachedImage != null)
             _ImagePreview(
               imageBytes: _attachedImage!,
-              onDismiss: () => setState(() => _attachedImage = null),
+              annotation: _imageAnnotation,
+              onDismiss: () => setState(() {
+                _attachedImage = null;
+                _imageAnnotation = '';
+              }),
             ),
 
           // ── Chat input with STT + attachment ──────────────────────────────
@@ -185,8 +214,10 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               ctrl: _ctrl,
               sending: _sending,
               onSend: () => _sendChat(robot),
-              onImagePicked: (bytes) =>
-                  setState(() => _attachedImage = bytes),
+              onImageAttached: (bytes, annotation) => setState(() {
+                _attachedImage = bytes;
+                _imageAnnotation = annotation;
+              }),
               hasAttachment: _attachedImage != null,
             ),
         ],
@@ -219,8 +250,8 @@ class _RevocationBanner extends StatelessWidget {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration:
-            BoxDecoration(border: Border(bottom: BorderSide(color: bg.withOpacity(0.4)))),
+        decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: bg.withOpacity(0.4)))),
         child: Row(
           children: [
             Icon(icon, size: 16, color: bg),
@@ -273,7 +304,7 @@ class _OfflineBanner extends StatelessWidget {
   }
 }
 
-// ── Telemetry panel ───────────────────────────────────────────────────────────
+// ── Telemetry panel — condensed 3-item header ─────────────────────────────────
 
 class _TelemetryPanel extends StatelessWidget {
   final Robot robot;
@@ -287,110 +318,80 @@ class _TelemetryPanel extends StatelessWidget {
     return Container(
       color: cs.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Version badge + metrics row
-          Row(
-            children: [
-              Expanded(
-                child:
-                    CapabilityRow(capabilities: robot.capabilities, compact: true),
-              ),
-              // OpenCastor version badge
-              if (robot.opencastorVersion != null)
-                _VersionBadge(version: robot.opencastorVersion!)
-              else
-                _VersionBadge(version: null),
-              if (t['cpu_temp'] != null)
-                _Metric(Icons.thermostat_outlined,
-                    '${(t['cpu_temp'] as num).toStringAsFixed(0)}°C'),
-              if (t['disk_pct'] != null)
-                _Metric(Icons.storage_outlined,
-                    '${(t['disk_pct'] as num).toStringAsFixed(0)}%'),
-              _Metric(Icons.tag_outlined, robot.version),
-            ],
+          // 1. Online/Offline status badge
+          _StatusBadge(isOnline: robot.isOnline),
+          const SizedBox(width: 10),
+
+          // 2. OpenCastor version badge
+          _VersionBadge(version: robot.opencastorVersion),
+          const SizedBox(width: 10),
+
+          // 3. Single Capabilities ActionChip
+          ActionChip(
+            label: const Text('Capabilities ▶'),
+            avatar: const Icon(Icons.tune_outlined, size: 14),
+            visualDensity: VisualDensity.compact,
+            onPressed: () =>
+                context.push('/robot/${robot.rrn}/capabilities'),
           ),
 
-          // RCAN v1.5 navigational chiplet row
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              // Online/Offline → status screen
-              _NavChiplet(
-                label: robot.isOnline ? 'Online' : 'Offline',
-                icon: robot.isOnline ? Icons.wifi : Icons.wifi_off,
-                color: AppTheme.onlineColor(robot.isOnline),
-                tooltip: 'View full status & telemetry',
-                onTap: () =>
-                    context.push('/robot/${robot.rrn}/status'),
-              ),
-              if (robot.isRcanV15) ...[
-                // RCAN version → capabilities screen
-                _NavChiplet(
-                  label: 'RCAN v${robot.rcanVersion}',
-                  icon: Icons.verified_outlined,
-                  color: Colors.purple,
-                  tooltip: 'View RCAN capabilities',
-                  onTap: () =>
-                      context.push('/robot/${robot.rrn}/capabilities'),
-                ),
-                _NavChiplet(
-                  label: 'Replay Protected',
-                  icon: Icons.shield_outlined,
-                  color: Colors.green,
-                  tooltip: 'Replay attack prevention (GAP-03)',
-                  onTap: () =>
-                      context.push('/robot/${robot.rrn}/capabilities'),
-                ),
-              ],
-              if (robot.supportsQos2)
-                _NavChiplet(
-                  label: 'ESTOP QoS ✓',
-                  icon: Icons.check_circle_outline,
-                  color: Colors.blue,
-                  tooltip: 'Exactly-once ESTOP delivery — tap for capabilities',
-                  onTap: () => context
-                      .push('/robot/${robot.rrn}/capabilities#qos'),
-                ),
-              if (robot.supportsDelegation)
-                _NavChiplet(
-                  label: 'Delegation',
-                  icon: Icons.account_tree_outlined,
-                  color: Colors.teal,
-                  tooltip: 'Command delegation supported (GAP-01)',
-                  onTap: () =>
-                      context.push('/robot/${robot.rrn}/capabilities'),
-                ),
-              if (robot.offlineCapable)
-                _NavChiplet(
-                  label: 'Offline Mode',
-                  icon: Icons.cloud_off_outlined,
-                  color: Colors.orange,
-                  tooltip: 'Operates offline with cached credentials',
-                  onTap: () =>
-                      context.push('/robot/${robot.rrn}/capabilities'),
-                ),
-              // Control chiplet
-              if (robot.hasCapability(RobotCapability.control))
-                _NavChiplet(
-                  label: 'Control',
-                  icon: Icons.gamepad_outlined,
-                  color: AppTheme.estop,
-                  tooltip: 'Physical D-pad control',
-                  onTap: () =>
-                      context.push('/robot/${robot.rrn}/control'),
-                ),
-            ],
-          ),
+          const Spacer(),
 
-          // RCAN v1.6 badge row
-          if (robot.isRcanV16) ...[
-            const SizedBox(height: 4),
-            _V16BadgeRow(robot: robot),
-          ],
+          // Telemetry metrics (right-aligned, unchanged)
+          if (t['cpu_temp'] != null)
+            _Metric(Icons.thermostat_outlined,
+                '${(t['cpu_temp'] as num).toStringAsFixed(0)}°C'),
+          if (t['disk_pct'] != null)
+            _Metric(Icons.storage_outlined,
+                '${(t['disk_pct'] as num).toStringAsFixed(0)}%'),
+          _Metric(Icons.tag_outlined, robot.version),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Status badge (dot + label) ────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  final bool isOnline;
+  const _StatusBadge({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = AppTheme.onlineColor(isOnline);
+    final label = isOnline ? 'Online' : 'Offline';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: isOnline
+                  ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)]
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: color),
+          ),
         ],
       ),
     );
@@ -411,7 +412,6 @@ class _VersionBadge extends StatelessWidget {
     return Tooltip(
       message: label,
       child: Container(
-        margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
           color: cs.primaryContainer,
@@ -426,200 +426,6 @@ class _VersionBadge extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// ── Navigational chiplet (tappable badge) ─────────────────────────────────────
-
-class _NavChiplet extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _NavChiplet({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withOpacity(0.25)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 11, color: color),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: color,
-                    fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 2),
-              Icon(Icons.chevron_right, size: 10, color: color.withOpacity(0.6)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── RCAN v1.6 badge row ───────────────────────────────────────────────────────
-
-class _V15Badge extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final String tooltip;
-  const _V15Badge({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.tooltip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.10),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: color.withOpacity(0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 11, color: color),
-            const SizedBox(width: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 10,
-                    color: color,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _V16BadgeRow extends StatelessWidget {
-  final Robot robot;
-  const _V16BadgeRow({required this.robot});
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: [
-        for (final t in robot.supportedTransports)
-          _V15Badge(
-            label: t.toUpperCase(),
-            icon: _transportIcon(t),
-            color: _transportColor(t),
-            tooltip: 'Transport encoding: $t (GAP-17)',
-          ),
-        _V15Badge(
-          label: robot.loaEnforcement
-              ? 'LoA enforcement: ON'
-              : 'LoA enforcement: OFF',
-          icon: robot.loaEnforcement
-              ? Icons.verified_user_outlined
-              : Icons.person_outline,
-          color: robot.loaEnforcement ? Colors.green : Colors.orange,
-          tooltip: robot.loaEnforcement
-              ? 'LoA policy enforced — min LoA ${robot.minLoaForControl} required (GAP-16)'
-              : 'LoA policy log-only — enforcement disabled (GAP-16)',
-        ),
-        _V15Badge(
-          label: _registryTierLabel(robot.registryTier),
-          icon: _registryTierIcon(robot.registryTier),
-          color: _registryTierColor(robot.registryTier),
-          tooltip: 'Registry tier: ${robot.registryTier} (GAP-14)',
-        ),
-      ],
-    );
-  }
-
-  IconData _transportIcon(String t) {
-    switch (t.toLowerCase()) {
-      case 'http':
-        return Icons.http_outlined;
-      case 'compact':
-        return Icons.compress_outlined;
-      case 'ble':
-        return Icons.bluetooth_outlined;
-      default:
-        return Icons.swap_horiz_outlined;
-    }
-  }
-
-  Color _transportColor(String t) {
-    switch (t.toLowerCase()) {
-      case 'http':
-        return Colors.indigo;
-      case 'compact':
-        return Colors.deepPurple;
-      case 'ble':
-        return Colors.lightBlue;
-      default:
-        return Colors.blueGrey;
-    }
-  }
-
-  String _registryTierLabel(String tier) {
-    switch (tier.toLowerCase()) {
-      case 'root':
-        return 'Root Registry';
-      case 'authoritative':
-        return 'Authoritative Registry';
-      default:
-        return 'Community Registry';
-    }
-  }
-
-  IconData _registryTierIcon(String tier) {
-    switch (tier.toLowerCase()) {
-      case 'root':
-        return Icons.star_outlined;
-      case 'authoritative':
-        return Icons.verified_outlined;
-      default:
-        return Icons.people_outline;
-    }
-  }
-
-  Color _registryTierColor(String tier) {
-    switch (tier.toLowerCase()) {
-      case 'root':
-        return Colors.amber;
-      case 'authoritative':
-        return Colors.cyan;
-      default:
-        return Colors.blueGrey;
-    }
   }
 }
 
@@ -694,7 +500,8 @@ class _CommandTile extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       cmd.result!['raw_text'].toString(),
-                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      style:
+                          TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                     ),
                   ),
                 if (cmd.error != null)
@@ -719,28 +526,42 @@ class _CommandTile extends StatelessWidget {
 
 class _ImagePreview extends StatelessWidget {
   final Uint8List imageBytes;
+  final String annotation;
   final VoidCallback onDismiss;
-  const _ImagePreview({required this.imageBytes, required this.onDismiss});
+
+  const _ImagePreview({
+    required this.imageBytes,
+    required this.annotation,
+    required this.onDismiss,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final displayAnnotation = annotation.isNotEmpty
+        ? (annotation.length > 40
+            ? '${annotation.substring(0, 40)}…'
+            : annotation)
+        : 'Image attached';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      color: cs.surfaceContainerLow,
       child: Row(
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.memory(imageBytes,
-                width: 56, height: 56, fit: BoxFit.cover),
+                width: 48, height: 48, fit: BoxFit.cover),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text('Image attached',
-                style: TextStyle(
-                    fontSize: 12,
-                    color:
-                        Theme.of(context).colorScheme.onSurfaceVariant)),
+            child: Text(
+              displayAnnotation,
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.close, size: 18),
@@ -759,14 +580,14 @@ class _ChatInput extends StatefulWidget {
   final TextEditingController ctrl;
   final bool sending;
   final VoidCallback onSend;
-  final void Function(Uint8List bytes) onImagePicked;
+  final void Function(Uint8List bytes, String annotation) onImageAttached;
   final bool hasAttachment;
 
   const _ChatInput({
     required this.ctrl,
     required this.sending,
     required this.onSend,
-    required this.onImagePicked,
+    required this.onImageAttached,
     required this.hasAttachment,
   });
 
@@ -802,8 +623,8 @@ class _ChatInputState extends State<_ChatInput>
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Speech recognition is not available on this platform'),
+          content:
+              Text('Speech recognition is not available on this platform'),
         ),
       );
       return;
@@ -839,9 +660,26 @@ class _ChatInputState extends State<_ChatInput>
     );
   }
 
+  /// Pick an image, then push the annotation screen.
+  /// Returns the annotated result (or null if cancelled).
+  Future<void> _pickAndAnnotate({required bool fromCamera}) async {
+    final bytes = await _mediaSvc.pickImage(fromCamera: fromCamera);
+    if (bytes == null || !mounted) return;
+
+    final result = await Navigator.of(context).push<ImageAnnotationResult>(
+      MaterialPageRoute(
+        builder: (_) => ImageAnnotationScreen(imageBytes: bytes),
+      ),
+    );
+
+    if (result != null && mounted) {
+      widget.onImageAttached(result.imageBytes, result.annotation);
+    }
+  }
+
   Future<void> _showAttachmentSheet() async {
     if (!kIsWeb) {
-      final result = await showModalBottomSheet<String>(
+      final choice = await showModalBottomSheet<String>(
         context: context,
         builder: (_) => SafeArea(
           child: Column(
@@ -866,13 +704,11 @@ class _ChatInputState extends State<_ChatInput>
           ),
         ),
       );
-      if (result == null) return;
-      final bytes = await _mediaSvc.pickImage(fromCamera: result == 'camera');
-      if (bytes != null && mounted) widget.onImagePicked(bytes);
+      if (choice == null) return;
+      await _pickAndAnnotate(fromCamera: choice == 'camera');
     } else {
-      // Web — file picker only
-      final bytes = await _mediaSvc.pickImage();
-      if (bytes != null && mounted) widget.onImagePicked(bytes);
+      // Web — file picker only, then annotation
+      await _pickAndAnnotate(fromCamera: false);
     }
   }
 
@@ -923,13 +759,9 @@ class _ChatInputState extends State<_ChatInput>
             AnimatedBuilder(
               animation: _pulseCtrl,
               builder: (_, child) {
-                final scale = _sttListening
-                    ? 1.0 + 0.15 * _pulseCtrl.value
-                    : 1.0;
-                return Transform.scale(
-                  scale: scale,
-                  child: child,
-                );
+                final scale =
+                    _sttListening ? 1.0 + 0.15 * _pulseCtrl.value : 1.0;
+                return Transform.scale(scale: scale, child: child);
               },
               child: Tooltip(
                 message: kIsWeb
