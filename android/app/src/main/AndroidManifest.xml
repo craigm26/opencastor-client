@@ -6,7 +6,11 @@
     <!-- Speech-to-text -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Image picker -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- Android 13+ granular media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- FCM push notifications -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>

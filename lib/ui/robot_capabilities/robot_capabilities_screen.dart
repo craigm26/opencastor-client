@@ -47,10 +47,10 @@ class RobotCapabilitiesScreen extends ConsumerWidget {
 
 int _conformanceScore(Robot robot) {
   int score = 0;
-  if (robot.supportsQos2) score += 20; // ESTOP QoS
-  if (robot.isRcanV15) score += 15; // Replay protection
+  if (robot.supportsQos2) score += 20; // ESTOP QoS (Protocol 66 §4)
+  if (robot.isRcanV15) score += 15; // Replay protection (RCAN v1.5+)
   if (robot.loaEnforcement) score += 15; // LoA enforcement ON
-  if (robot.isRcanV15) score += 15; // RCAN v1.5+
+  if (robot.isRcanV16) score += 10; // RCAN v1.6 (federation + multi-modal)
   if (robot.rrn.isNotEmpty) score += 10; // RRN assigned
   if (robot.hasCapability(RobotCapability.vision)) score += 10; // Vision
   final tier = robot.registryTier.toLowerCase();
