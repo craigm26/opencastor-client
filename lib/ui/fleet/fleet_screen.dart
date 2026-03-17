@@ -19,14 +19,12 @@ class FleetScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fleet'),
+        title: const Text('OpenCastor Fleet'),
         actions: [
-          // Docs link
           IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: 'Fleet Docs',
-            onPressed: () =>
-                launchUrl(Uri.parse(AppConstants.docsRoot)),
+            onPressed: () => launchUrl(Uri.parse(AppConstants.docsRoot)),
           ),
           IconButton(
             icon: const Icon(Icons.account_circle_outlined),
@@ -35,31 +33,97 @@ class FleetScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: fleet.when(
-        loading: () => const _ShimmerFleetList(),
-        error: (err, _) => _ErrorView(error: err.toString()),
-        data: (robots) {
-          if (robots.isEmpty) {
-            final user = FirebaseAuth.instance.currentUser;
-            return user == null ? const _SignInPrompt() : const _EmptyFleet();
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(fleetProvider),
-            child: _FleetList(
-              robots: robots,
-              onTap: (robot) => context.push('/robot/${robot.rrn}'),
-              onControl: (robot) =>
-                  context.push('/robot/${robot.rrn}/control'),
-              onEstop: (robot) =>
-                  ref.read(estopCommandProvider.notifier).send(robot.rrn),
+      body: Column(
+        children: [
+          // ── Summary strip ─────────────────────────────────────────────
+          fleet.whenData((robots) => robots).valueOrNull != null
+              ? _SummaryStrip(
+                  robots: fleet.value!,
+                  onRefresh: () => ref.invalidate(fleetProvider),
+                )
+              : const SizedBox.shrink(),
+
+          // ── Main content with AnimatedSwitcher ────────────────────────
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: fleet.when(
+                loading: () => const _ShimmerFleetList(),
+                error: (err, _) => _ErrorView(error: err.toString()),
+                data: (robots) {
+                  if (robots.isEmpty) {
+                    final user = FirebaseAuth.instance.currentUser;
+                    return user == null
+                        ? const _SignInPrompt()
+                        : const _EmptyFleet();
+                  }
+                  return RefreshIndicator(
+                    onRefresh: () async => ref.invalidate(fleetProvider),
+                    child: _FleetList(
+                      robots: robots,
+                      onTap: (robot) => context.push('/robot/${robot.rrn}'),
+                      onControl: (robot) =>
+                          context.push('/robot/${robot.rrn}/control'),
+                      onEstop: (robot) =>
+                          ref.read(estopCommandProvider.notifier).send(robot.rrn),
+                    ),
+                  );
+                },
+              ),
             ),
-          );
-        },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/consent'),
         icon: const Icon(Icons.handshake_outlined),
         label: const Text('Manage Access'),
+      ),
+    );
+  }
+}
+
+// ── Summary strip ─────────────────────────────────────────────────────────────
+
+class _SummaryStrip extends StatelessWidget {
+  final List<Robot> robots;
+  final VoidCallback onRefresh;
+  const _SummaryStrip({required this.robots, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final onlineCount = robots.where((r) => r.isOnline).length;
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      color: cs.surfaceContainerLow,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.circle, size: 8,
+              color: onlineCount > 0 ? const Color(0xFF146C2E) : cs.outline),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Online: $onlineCount / ${robots.length}',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+          ),
+          Semantics(
+            label: 'Refresh fleet',
+            button: true,
+            child: Tooltip(
+              message: 'Refresh',
+              child: InkWell(
+                onTap: onRefresh,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(Icons.refresh, size: 18, color: cs.onSurfaceVariant),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

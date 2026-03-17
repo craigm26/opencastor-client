@@ -23,12 +23,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../core/media_service.dart';
 import '../../core/speech_service.dart';
-import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../../ui/chat/image_annotation_screen.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import 'chat_bubble.dart';
 import 'robot_detail_view_model.dart';
 
 class RobotDetailScreen extends ConsumerStatefulWidget {
@@ -49,6 +49,57 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  /// Build list items for the chat ListView (reverse order):
+  /// each command → ChatBubble for instruction + ChatBubble for response.
+  /// Inserts DateSeparator when the date changes.
+  List<Widget> _buildChatItems(List<RobotCommand> cmds) {
+    final items = <Widget>[];
+    DateTime? lastDate;
+
+    // cmds are already ordered newest-first (watchCommands descending)
+    for (final cmd in cmds) {
+      final date = cmd.issuedAt.toLocal();
+      final dayKey = DateTime(date.year, date.month, date.day);
+
+      // Robot response bubble (shown first in reverse list = shown after command)
+      if (cmd.result?['raw_text'] != null) {
+        items.add(ChatBubble(
+          text: cmd.result!['raw_text'].toString(),
+          isUser: false,
+          timestamp: cmd.issuedAt,
+        ));
+      } else if (cmd.isFailed && cmd.error != null) {
+        items.add(ChatBubble(
+          text: '⚠ ${cmd.error}',
+          isUser: false,
+          timestamp: cmd.issuedAt,
+        ));
+      } else if (!cmd.isComplete && !cmd.isFailed) {
+        // Still processing
+        items.add(ChatBubble(
+          text: '',
+          isUser: false,
+          isLoading: true,
+          timestamp: cmd.issuedAt,
+        ));
+      }
+
+      // User command bubble
+      items.add(ChatBubble(
+        text: cmd.instruction,
+        isUser: true,
+        timestamp: cmd.issuedAt,
+      ));
+
+      // Date separator (inserted after the bubble, so visible above it in reverse list)
+      if (lastDate == null || lastDate != dayKey) {
+        items.add(DateSeparator(date: date));
+        lastDate = dayKey;
+      }
+    }
+    return items;
   }
 
   Future<void> _sendChat(Robot robot) async {
@@ -167,7 +218,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
           _TelemetryPanel(robot: robot),
           const Divider(height: 1),
 
-          // ── Command history ────────────────────────────────────────────────
+          // ── Chat history with ChatBubbles + date separators ───────────────
           Expanded(
             child: commandsAsync.when(
               loading: () =>
@@ -177,7 +228,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 if (cmds.isEmpty) {
                   return Center(
                     child: Text(
-                      'No commands yet',
+                      'No messages yet. Say hello!',
                       style: TextStyle(
                           color: Theme.of(context)
                               .colorScheme
@@ -185,11 +236,14 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                     ),
                   );
                 }
+                // Build flat list: messages in reverse + date separators
+                final items = _buildChatItems(cmds);
                 return ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: cmds.length,
-                  itemBuilder: (_, i) => _CommandTile(cmd: cmds[i]),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  itemCount: items.length,
+                  itemBuilder: (_, i) => items[i],
                 );
               },
             ),
@@ -318,35 +372,72 @@ class _TelemetryPanel extends StatelessWidget {
     return Container(
       color: cs.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Online/Offline status badge
-          _StatusBadge(isOnline: robot.isOnline),
-          const SizedBox(width: 10),
-
-          // 2. OpenCastor version badge
-          _VersionBadge(version: robot.opencastorVersion),
-          const SizedBox(width: 10),
-
-          // 3. Single Capabilities ActionChip
-          ActionChip(
-            label: const Text('Capabilities ▶'),
-            avatar: const Icon(Icons.tune_outlined, size: 14),
-            visualDensity: VisualDensity.compact,
-            onPressed: () =>
-                context.push('/robot/${robot.rrn}/capabilities'),
+          // ── Header card: avatar + name + status ────────────────────
+          Row(
+            children: [
+              // Hero-wrapped robot avatar (matches fleet card animation)
+              Hero(
+                tag: 'robot-avatar-${robot.rrn}',
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: cs.primaryContainer,
+                  child: Icon(
+                    Icons.precision_manufacturing_outlined,
+                    size: 18,
+                    color: cs.onPrimaryContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // 1. Online/Offline status badge
+                        _StatusBadge(isOnline: robot.isOnline),
+                        const SizedBox(width: 8),
+                        // 2. OpenCastor version badge
+                        _VersionBadge(version: robot.opencastorVersion),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // 3. Single Capabilities ActionChip
+              ActionChip(
+                label: const Text('Capabilities ▶'),
+                avatar: const Icon(Icons.tune_outlined, size: 14),
+                visualDensity: VisualDensity.compact,
+                onPressed: () =>
+                    context.push('/robot/${robot.rrn}/capabilities'),
+              ),
+            ],
           ),
 
-          const Spacer(),
-
-          // Telemetry metrics (right-aligned, unchanged)
-          if (t['cpu_temp'] != null)
-            _Metric(Icons.thermostat_outlined,
-                '${(t['cpu_temp'] as num).toStringAsFixed(0)}°C'),
-          if (t['disk_pct'] != null)
-            _Metric(Icons.storage_outlined,
-                '${(t['disk_pct'] as num).toStringAsFixed(0)}%'),
-          _Metric(Icons.tag_outlined, robot.version),
+          // ── Telemetry chips row ────────────────────────────────────
+          if (t['cpu_temp'] != null ||
+              t['disk_pct'] != null ||
+              robot.version.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              children: [
+                if (t['cpu_temp'] != null)
+                  _Metric(Icons.thermostat_outlined,
+                      '${(t['cpu_temp'] as num).toStringAsFixed(0)}°C'),
+                if (t['disk_pct'] != null)
+                  _Metric(Icons.storage_outlined,
+                      '${(t['disk_pct'] as num).toStringAsFixed(0)}%'),
+                if (robot.version.isNotEmpty)
+                  _Metric(Icons.tag_outlined, robot.version),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -446,76 +537,6 @@ class _Metric extends StatelessWidget {
           const SizedBox(width: 4),
           Text(value,
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Command tile ──────────────────────────────────────────────────────────────
-
-class _CommandTile extends StatelessWidget {
-  final RobotCommand cmd;
-  const _CommandTile({required this.cmd});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Color statusColor = cs.onSurfaceVariant;
-    IconData statusIcon = Icons.schedule_outlined;
-    if (cmd.isComplete) {
-      statusColor = AppTheme.online;
-      statusIcon = Icons.check_circle_outline;
-    } else if (cmd.isFailed) {
-      statusColor = AppTheme.danger;
-      statusIcon = Icons.error_outline;
-    } else if (cmd.isPending) {
-      statusIcon = Icons.hourglass_empty;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(statusIcon, size: 16, color: statusColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(cmd.instruction, style: const TextStyle(fontSize: 13)),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    'sender_type: ${cmd.senderType ?? "human via OpenCastor app"}',
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: cs.onSurfaceVariant.withOpacity(0.6),
-                        fontFamily: 'monospace'),
-                  ),
-                ),
-                if (cmd.result?['raw_text'] != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      cmd.result!['raw_text'].toString(),
-                      style:
-                          TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                    ),
-                  ),
-                if (cmd.error != null)
-                  Text(cmd.error!,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppTheme.danger)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            DateFormat('HH:mm:ss').format(cmd.issuedAt.toLocal()),
-            style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
-          ),
         ],
       ),
     );
