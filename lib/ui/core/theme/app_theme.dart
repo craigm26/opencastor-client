@@ -1,99 +1,151 @@
-import 'package:flex_color_scheme/flex_color_scheme.dart';
-import 'package:flutter/material.dart';
-
-/// OpenCastor app theme — brand colors from brand/USAGE.md
+/// OpenCastor app theme — M3 with brand seed color.
 ///
 /// Brand palette:
-///   Midnight Dark:   #0a0b1e   (main dark bg)
-///   Midnight Light:  #f8faff   (main light bg, soft indigo tint)
-///   Accent Blue:     #0ea5e9   (primary actions, gradients)
-///   Accent Teal:     #2dd4bf   (secondary gradients, glow)
-///   Dark Navy:       #12142b   (cards, inputs, borders in dark mode)
+///   Seed / primary:  #0ea5e9  (sky blue)
+///   Secondary:       #2dd4bf  (teal)
+///   Dark background: #0a0b1e  (midnight)
+///
+/// Design tokens: see [Spacing] and [AppRadius].
+library;
+
+import 'package:flutter/material.dart';
+
 class AppTheme {
   AppTheme._();
 
-  // Brand primaries
-  static const brandBlue = Color(0xFF0ea5e9);
-  static const brandTeal = Color(0xFF2dd4bf);
-  static const midnightDark = Color(0xFF0a0b1e);
-  static const midnightLight = Color(0xFFf8faff);
-  static const darkNavy = Color(0xFF12142b);
+  // ── Brand seed color ───────────────────────────────────────────────────────
+  static const seedColor = Color(0xFF0ea5e9); // sky blue
 
-  static ThemeData get light => FlexThemeData.light(
-        colors: const FlexSchemeColor(
-          primary: Color(0xFF0ea5e9),
-          primaryContainer: Color(0xFFe0f2fe),
-          secondary: Color(0xFF2dd4bf),
-          secondaryContainer: Color(0xFFccfbf1),
-          tertiary: Color(0xFF6366f1),
-          tertiaryContainer: Color(0xFFe0e7ff),
-          appBarColor: Color(0xFFf8faff),
-          error: Color(0xFFef4444),
-        ),
-        surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
-        blendLevel: 7,
-        subThemesData: const FlexSubThemesData(
-          blendOnLevel: 8,
-          blendOnColors: false,
-          useTextTheme: true,
-          useM2StyleDividerInM3: true,
-          elevatedButtonSchemeColor: SchemeColor.onPrimaryContainer,
-          elevatedButtonSecondarySchemeColor: SchemeColor.primaryContainer,
-          chipSchemeColor: SchemeColor.primaryContainer,
-          cardRadius: 16,
-          popupMenuRadius: 12,
-          dialogRadius: 20,
-          bottomSheetRadius: 24,
-          inputDecoratorRadius: 10,
-          inputDecoratorBorderType: FlexInputBorderType.outline,
-        ),
-        visualDensity: FlexColorScheme.comfortablePlatformDensity,
+  // ── Font ───────────────────────────────────────────────────────────────────
+  static const _fontFamily = 'Inter';
+
+  // ── Light theme ────────────────────────────────────────────────────────────
+  static ThemeData get light => ThemeData(
         useMaterial3: true,
-        fontFamily: 'Inter',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: Brightness.light,
+        ),
+        fontFamily: _fontFamily,
+        cardTheme: const CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          centerTitle: false,
+          elevation: 0,
+          scrolledUnderElevation: 3,
+        ),
+        chipTheme: const ChipThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+        ),
       );
 
-  static ThemeData get dark => FlexThemeData.dark(
-        colors: const FlexSchemeColor(
-          primary: Color(0xFF38bdf8),
-          primaryContainer: Color(0xFF0369a1),
-          secondary: Color(0xFF2dd4bf),
-          secondaryContainer: Color(0xFF0f766e),
-          tertiary: Color(0xFF818cf8),
-          tertiaryContainer: Color(0xFF3730a3),
-          appBarColor: Color(0xFF0a0b1e),
-          error: Color(0xFFf87171),
-        ),
-        scaffoldBackground: midnightDark,
-        surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
-        blendLevel: 18,
-        subThemesData: const FlexSubThemesData(
-          blendOnLevel: 22,
-          useTextTheme: true,
-          useM2StyleDividerInM3: true,
-          elevatedButtonSchemeColor: SchemeColor.onPrimaryContainer,
-          elevatedButtonSecondarySchemeColor: SchemeColor.primaryContainer,
-          chipSchemeColor: SchemeColor.primaryContainer,
-          cardRadius: 16,
-          popupMenuRadius: 12,
-          dialogRadius: 20,
-          bottomSheetRadius: 24,
-          inputDecoratorRadius: 10,
-          inputDecoratorBorderType: FlexInputBorderType.outline,
-        ),
-        visualDensity: FlexColorScheme.comfortablePlatformDensity,
+  // ── Dark theme ─────────────────────────────────────────────────────────────
+  static ThemeData get dark => ThemeData(
         useMaterial3: true,
-        fontFamily: 'Inter',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: seedColor,
+          brightness: Brightness.dark,
+        ),
+        fontFamily: _fontFamily,
+        scaffoldBackgroundColor: const Color(0xFF0a0b1e),
+        cardTheme: const CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(12)),
+            ),
+          ),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(10)),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          centerTitle: false,
+          elevation: 0,
+          scrolledUnderElevation: 3,
+        ),
+        chipTheme: const ChipThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+        ),
       );
 
-  // Semantic colors
-  static const online = Color(0xFF22c55e);
-  static const offline = Color(0xFF6b7280);
-  static const warning = Color(0xFFf59e0b);
-  static const danger = Color(0xFFef4444);
-  static const estop = Color(0xFFdc2626);
+  // ── Semantic / status colors ───────────────────────────────────────────────
+  static const online  = Color(0xFF146C2E);  // M3 success green
+  static const offline = Color(0xFF49454F);  // M3 outline
+  static const warning = Color(0xFF7D5700);  // M3 warning amber
+  static const danger  = Color(0xFFB3261E);  // M3 error red
+  static const estop   = Color(0xFFB3261E);  // same as danger (Protocol 66)
 
   static Color onlineColor(bool isOnline) => isOnline ? online : offline;
 
-  // Monospace text style for telemetry, RRNs, payloads
+  // ── Monospace text style ───────────────────────────────────────────────────
   static const mono = TextStyle(fontFamily: 'JetBrainsMono');
+}
+
+// ── Design tokens ──────────────────────────────────────────────────────────────
+
+/// Spacing scale (dp).
+class Spacing {
+  const Spacing._();
+  static const xs  = 4.0;
+  static const sm  = 8.0;
+  static const md  = 16.0;
+  static const lg  = 24.0;
+  static const xl  = 32.0;
+  static const xxl = 48.0;
+}
+
+/// Consistent border radius values.
+class AppRadius {
+  const AppRadius._();
+  static const sm   = Radius.circular(8);
+  static const md   = Radius.circular(12);
+  static const lg   = Radius.circular(16);
+  static const xl   = Radius.circular(28);
+  static const full = Radius.circular(999);
 }

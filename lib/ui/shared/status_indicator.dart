@@ -1,34 +1,33 @@
+/// Reusable online/offline status dot + optional label.
+library;
+
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../core/theme/app_theme.dart';
 
-/// Pulsing dot + label showing online/offline state.
-class HealthIndicator extends StatelessWidget {
+/// Animated pulse dot + label chip indicating robot online/offline status.
+class StatusIndicator extends StatelessWidget {
   final bool isOnline;
-  final DateTime? lastSeen;
-  final double size;
   final bool showLabel;
+  final double dotSize;
 
-  const HealthIndicator({
+  const StatusIndicator({
     super.key,
     required this.isOnline,
-    this.lastSeen,
-    this.size = 10,
     this.showLabel = true,
+    this.dotSize = 8.0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = AppTheme.onlineColor(isOnline);
-    final label = isOnline ? 'Online' : 'Offline';
-
+    final color = isOnline ? AppTheme.online : AppTheme.offline;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _Dot(color: color, size: size, pulse: isOnline),
+        _PulseDot(color: color, size: dotSize, pulse: isOnline),
         if (showLabel) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           Text(
-            label,
+            isOnline ? 'Online' : 'Offline',
             style: TextStyle(
               color: color,
               fontSize: 12,
@@ -41,19 +40,25 @@ class HealthIndicator extends StatelessWidget {
   }
 }
 
-class _Dot extends StatefulWidget {
+class _PulseDot extends StatefulWidget {
   final Color color;
   final double size;
   final bool pulse;
-  const _Dot({required this.color, required this.size, required this.pulse});
+
+  const _PulseDot({
+    required this.color,
+    required this.size,
+    required this.pulse,
+  });
 
   @override
-  State<_Dot> createState() => _DotState();
+  State<_PulseDot> createState() => _PulseDotState();
 }
 
-class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
+class _PulseDotState extends State<_PulseDot>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
-  late final Animation<double> _anim;
+  late final Animation<double> _opacity;
 
   @override
   void initState() {
@@ -62,20 +67,21 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _anim = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _opacity = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
     );
     if (widget.pulse) _ctrl.repeat(reverse: true);
   }
 
   @override
-  void didUpdateWidget(_Dot old) {
+  void didUpdateWidget(_PulseDot old) {
     super.didUpdateWidget(old);
     if (widget.pulse && !_ctrl.isAnimating) {
       _ctrl.repeat(reverse: true);
     } else if (!widget.pulse && _ctrl.isAnimating) {
-      _ctrl.stop();
-      _ctrl.value = 1.0;
+      _ctrl
+        ..stop()
+        ..value = 1.0;
     }
   }
 
@@ -88,9 +94,9 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _anim,
+      animation: _opacity,
       builder: (_, __) => Opacity(
-        opacity: _anim.value,
+        opacity: _opacity.value,
         child: Container(
           width: widget.size,
           height: widget.size,

@@ -2,7 +2,7 @@
 ///
 /// This file contains ONLY:
 ///   - [OpenCastorApp] — MaterialApp wrapper
-///   - [_AppShell]     — bottom nav shell
+///   - [_AppShell]     — adaptive navigation shell
 ///   - [_LoginScreen]  — authentication entry point
 ///   - The [GoRouter] configuration
 ///
@@ -13,43 +13,31 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import 'core/constants.dart';
 import 'data/services/auth_service.dart';
-import 'ui/account/account_screen.dart';
+import 'ui/alerts/alerts_screen.dart';
+import 'ui/consent/consent_screen.dart';
+import 'ui/consent/pending_consent_screen.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
 import 'ui/login/ecosystem_section.dart';
 import 'ui/physical_control/physical_control_screen.dart';
 import 'ui/robot_capabilities/robot_capabilities_screen.dart';
-import 'ui/robot_detail/robot_detail_screen.dart' as new_detail;
+import 'ui/robot_detail/robot_detail_screen.dart';
 import 'ui/robot_status/robot_status_screen.dart';
-
-// Screens not yet migrated to ui/ — pending move
-import 'screens/alerts/alerts_screen.dart';
-import 'screens/consent/consent_screen.dart';
-import 'ui/consent/pending_consent_screen.dart';
+import 'ui/settings/settings_screen.dart';
+import 'ui/settings/theme_mode_provider.dart';
 import 'ui/setup/setup_screen.dart';
+import 'ui/shared/adaptive_navigation.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
-//
-// Firebase docs (manage-users): "currentUser can be null because the auth
-// object has not finished initializing." — we must NOT redirect to /login
-// before authStateChanges() has emitted its first value.
-//
-// Pattern: RouterNotifier listens to authStateProvider via Riverpod.
-// - isLoading (first event not yet received) → stay on /splash
-// - user == null (definitively signed out)   → go to /login
-// - user != null (signed in)                 → go to /fleet
-//
-// The router Provider is cached by Riverpod so GoRouter is not recreated
-// on each rebuild — only refreshListenable triggers a re-evaluation.
 // ---------------------------------------------------------------------------
 
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
-    // Listen to auth state changes and notify GoRouter to re-run redirect
     _ref.listen<AsyncValue>(authStateProvider, (_, __) => notifyListeners());
   }
 
@@ -59,14 +47,14 @@ class _RouterNotifier extends ChangeNotifier {
     final authAsync = _ref.read(authStateProvider);
     final loc = state.matchedLocation;
 
-    // Auth not yet initialized — wait on splash, don't redirect elsewhere
     if (authAsync.isLoading || authAsync.hasError) {
       return loc == '/splash' ? null : '/splash';
     }
 
     final user = authAsync.asData?.value;
     final isAuth = user != null;
-    final isPublic = loc == '/login' || loc == '/splash' || loc.startsWith('/setup');
+    final isPublic =
+        loc == '/login' || loc == '/splash' || loc.startsWith('/setup');
 
     if (!isAuth && !isPublic) return '/login';
     if (isAuth && isPublic) return '/fleet';
@@ -81,7 +69,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: notifier.redirect,
     routes: [
-      // Splash — shown while Firebase Auth initializes from persisted state
       GoRoute(
         path: '/splash',
         builder: (_, __) => const _SplashScreen(),
@@ -90,8 +77,6 @@ final _routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (_, __) => const _LoginScreen(),
       ),
-      // Setup wizard landing page — reachable without auth
-      // (Firebase UID shown only after Google sign-in)
       GoRoute(
         path: '/setup',
         builder: (_, state) => SetupScreen(
@@ -105,11 +90,35 @@ final _routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/fleet',
             builder: (_, __) => const FleetScreen(),
+            pageBuilder: (_, state) => CustomTransitionPage(
+              key: state.pageKey,
+              child: const FleetScreen(),
+              transitionsBuilder: (ctx, animation, secondary, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
           ),
           GoRoute(
             path: '/robot/:rrn',
-            builder: (_, state) =>
-                new_detail.RobotDetailScreen(rrn: state.pathParameters['rrn']!),
+            pageBuilder: (_, state) {
+              final rrn = state.pathParameters['rrn']!;
+              return CustomTransitionPage(
+                key: state.pageKey,
+                child: RobotDetailScreen(rrn: rrn),
+                transitionsBuilder: (ctx, animation, secondary, child) {
+                  final slide = Tween(
+                    begin: const Offset(0, 0.08),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ));
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
+                  );
+                },
+              );
+            },
           ),
           GoRoute(
             path: '/robot/:rrn/control',
@@ -143,8 +152,8 @@ final _routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const AlertsScreen(),
           ),
           GoRoute(
-            path: '/account',
-            builder: (_, __) => const AccountScreen(),
+            path: '/settings',
+            builder: (_, __) => const SettingsScreen(),
           ),
         ],
       ),
@@ -162,11 +171,12 @@ class OpenCastorApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(_routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'OpenCastor',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
     );
@@ -174,7 +184,7 @@ class OpenCastorApp extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Splash screen — shown while Firebase Auth restores persisted state
+// Splash screen
 // ---------------------------------------------------------------------------
 
 class _SplashScreen extends StatelessWidget {
@@ -201,7 +211,7 @@ class _SplashScreen extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// App shell — bottom navigation
+// App shell — adaptive navigation (Fleet · Alerts · Settings)
 // ---------------------------------------------------------------------------
 
 class _AppShell extends StatelessWidget {
@@ -213,48 +223,52 @@ class _AppShell extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
 
     int selectedIndex = 0;
-    if (location.startsWith('/fleet')) selectedIndex = 0;
-    if (location.startsWith('/consent')) selectedIndex = 1;
-    if (location.startsWith('/alerts')) selectedIndex = 2;
+    if (location.startsWith('/fleet') || location.startsWith('/robot')) {
+      selectedIndex = 0;
+    } else if (location.startsWith('/alerts')) {
+      selectedIndex = 1;
+    } else if (location.startsWith('/settings')) {
+      selectedIndex = 2;
+    }
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (i) {
-          switch (i) {
-            case 0:
-              context.go('/fleet');
-            case 1:
-              context.go('/consent');
-            case 2:
-              context.go('/alerts');
-          }
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.precision_manufacturing_outlined),
-            selectedIcon: Icon(Icons.precision_manufacturing),
-            label: 'Fleet',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.handshake_outlined),
-            selectedIcon: Icon(Icons.handshake),
-            label: 'Access',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-        ],
+    const destinations = [
+      NavigationDestination(
+        icon: Icon(Icons.precision_manufacturing_outlined),
+        selectedIcon: Icon(Icons.precision_manufacturing),
+        label: 'Fleet',
       ),
+      NavigationDestination(
+        icon: Icon(Icons.notifications_outlined),
+        selectedIcon: Icon(Icons.notifications),
+        label: 'Alerts',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.settings_outlined),
+        selectedIcon: Icon(Icons.settings),
+        label: 'Settings',
+      ),
+    ];
+
+    return AdaptiveScaffold(
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (i) {
+        switch (i) {
+          case 0:
+            context.go('/fleet');
+          case 1:
+            context.go('/alerts');
+          case 2:
+            context.go('/settings');
+        }
+      },
+      destinations: destinations,
+      body: child,
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Login screen — entry point for unauthenticated users
+// Login screen
 // ---------------------------------------------------------------------------
 
 class _LoginScreen extends StatefulWidget {
@@ -294,20 +308,18 @@ class _LoginState extends State<_LoginScreen> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ── Big logo lockup ────────────────────────────────────────
+                  // ── Logo ───────────────────────────────────────────────
                   Image.asset('assets/images/icon-128.png',
                       height: 200, width: 200),
                   const SizedBox(height: 16),
                   Text(
                     'OpenCastor',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineLarge
-                        ?.copyWith(
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF0ea5e9),
                           letterSpacing: -0.5,
@@ -324,10 +336,12 @@ class _LoginState extends State<_LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // ── Sign-in card ───────────────────────────────────────────
+                  // ── Sign-in card ───────────────────────────────────────
                   Container(
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF12142b) : Colors.white,
+                      color: isDark
+                          ? const Color(0xFF12142b)
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isDark
@@ -354,7 +368,8 @@ class _LoginState extends State<_LoginScreen> {
                               color: AppTheme.danger.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                  color: AppTheme.danger.withOpacity(0.3)),
+                                  color:
+                                      AppTheme.danger.withOpacity(0.3)),
                             ),
                             child: Row(
                               children: [
@@ -374,7 +389,8 @@ class _LoginState extends State<_LoginScreen> {
                         ],
                         _loading
                             ? const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    EdgeInsets.symmetric(vertical: 12),
                                 child: CircularProgressIndicator(),
                               )
                             : _GoogleSignInButton(onPressed: _signIn),
@@ -393,19 +409,17 @@ class _LoginState extends State<_LoginScreen> {
                   ),
 
                   const SizedBox(height: 24),
-
-                  // ── Ecosystem section ──────────────────────────────────────
                   const EcosystemSection(),
-
                   const SizedBox(height: 32),
 
-                  // ── Footer ─────────────────────────────────────────────────
+                  // ── Footer ─────────────────────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('Powered by ',
                           style: TextStyle(
-                              color: cs.onSurfaceVariant, fontSize: 12)),
+                              color: cs.onSurfaceVariant,
+                              fontSize: 12)),
                       const Text('RCAN v${AppConstants.rcanVersion}',
                           style: TextStyle(
                             color: Color(0xFF0ea5e9),
@@ -414,7 +428,8 @@ class _LoginState extends State<_LoginScreen> {
                           )),
                       Text(' · Protocol 66 enforced',
                           style: TextStyle(
-                              color: cs.onSurfaceVariant, fontSize: 12)),
+                              color: cs.onSurfaceVariant,
+                              fontSize: 12)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -435,7 +450,6 @@ class _LoginState extends State<_LoginScreen> {
 }
 
 // Official Google branding button
-// https://developers.google.com/identity/branding-guidelines
 class _GoogleSignInButton extends StatelessWidget {
   const _GoogleSignInButton({required this.onPressed});
   final VoidCallback onPressed;
@@ -490,7 +504,9 @@ class _GoogleLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-        width: 18, height: 18, child: CustomPaint(painter: _GoogleLogoPainter()));
+        width: 18,
+        height: 18,
+        child: CustomPaint(painter: _GoogleLogoPainter()));
   }
 }
 
@@ -507,16 +523,20 @@ class _GoogleLogoPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = s * 0.22;
     paint.color = _red;
-    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+    canvas.drawArc(
+        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         -1.5708, 1.5708, false, paint);
     paint.color = _yellow;
-    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+    canvas.drawArc(
+        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         0, 1.5708, false, paint);
     paint.color = _green;
-    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+    canvas.drawArc(
+        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         1.5708, 1.5708, false, paint);
     paint.color = _blue;
-    canvas.drawArc(Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
+    canvas.drawArc(
+        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
         3.14159, 1.5708, false, paint);
     paint
       ..style = PaintingStyle.fill
