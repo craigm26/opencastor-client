@@ -61,63 +61,60 @@ class _DiscoverTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: Column(children: [
-      body: Column(
-        children: [
-          // ── Filter chips ────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                spacing: 8,
-                children: ExploreFilter.values.map((f) {
-                  final selected = filter == f;
-                  return FilterChip(
-                    label: Text(f.name[0].toUpperCase() + f.name.substring(1)),
-                    selected: selected,
-                    onSelected: (_) =>
-                        ref.read(exploreFilterProvider.notifier).state = f,
-                    selectedColor: cs.primaryContainer,
-                    checkmarkColor: cs.primary,
-                  );
-                }).toList(),
-              ),
+    return Column(
+      children: [
+        // ── Filter chips ────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              spacing: 8,
+              children: ExploreFilter.values.map((f) {
+                final selected = filter == f;
+                return FilterChip(
+                  label: Text(f.name[0].toUpperCase() + f.name.substring(1)),
+                  selected: selected,
+                  onSelected: (_) =>
+                      ref.read(exploreFilterProvider.notifier).state = f,
+                  selectedColor: cs.primaryContainer,
+                  checkmarkColor: cs.primary,
+                );
+              }).toList(),
             ),
           ),
+        ),
 
-          // ── Config grid ─────────────────────────────────────────────
-          Expanded(
-            child: configs.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _ErrorState(
-                message: e.toString(),
-                onRetry: () => ref.invalidate(exploreConfigsProvider(filter)),
-              ),
-              data: (items) => items.isEmpty
-                  ? _EmptyState(filter: filter)
-                  : RefreshIndicator(
-                      onRefresh: () async =>
-                          ref.invalidate(exploreConfigsProvider(filter)),
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 320,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.78,
-                        ),
-                        itemCount: items.length,
-                        itemBuilder: (ctx, i) =>
-                            _ConfigCard(config: items[i]),
-                      ),
-                    ),
+        // ── Config grid ─────────────────────────────────────────────
+        Expanded(
+          child: configs.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => _ErrorState(
+              message: e.toString(),
+              onRetry: () => ref.invalidate(exploreConfigsProvider(filter)),
             ),
+            data: (items) => items.isEmpty
+                ? _EmptyState(filter: filter)
+                : RefreshIndicator(
+                    onRefresh: () async =>
+                        ref.invalidate(exploreConfigsProvider(filter)),
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 320,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 0.78,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (ctx, i) =>
+                          _ConfigCard(config: items[i]),
+                    ),
+                  ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
