@@ -228,7 +228,7 @@ Robot (castor bridge) ──outbound──▶ Firestore ◀── Flutter app
 
 ## RCAN Protocol
 
-This client implements the consumer side of [RCAN v1.4](https://rcan.dev):
+This client implements the consumer side of [RCAN v1.6](https://rcan.dev):
 
 - **RRN** (Robot Resource Name): `RRN-000000000001` format — unique robot identifier
 - **RURI** (Robot URI): `rcan://[org].[model].[instance]` — routing address
