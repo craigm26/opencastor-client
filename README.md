@@ -60,7 +60,7 @@ Robot API tokens are stored in Cloud Functions environment variables — never i
 - Flutter 3.22+
 - Firebase project with Firestore, Auth (Google), Functions, and Messaging enabled
 - Node.js 18+ (for Cloud Functions)
-- OpenCastor ≥ 2026.4.1.0 on each robot
+- OpenCastor ≥ 2026.3.17.1 on each robot
 
 ### 1. Configure Firebase
 
@@ -96,7 +96,7 @@ flutter run               # or any connected device
 On each robot:
 
 ```bash
-pip install opencastor[cloud]==2026.4.1.0
+pip install opencastor[cloud]==2026.3.17.1
 castor bridge --config bob.rcan.yaml
 ```
 
@@ -131,7 +131,7 @@ For self-hosting, point any static host at the `build/web/` directory after `flu
 | Project | Version | Purpose |
 |---|---|---|
 | **Fleet UI** (this) | live | Web fleet dashboard |
-| [OpenCastor](https://github.com/craigm26/OpenCastor) | v2026.4.1.0 | Robot runtime |
+| [OpenCastor](https://github.com/craigm26/OpenCastor) | v2026.3.17.1 | Robot runtime |
 | [RCAN Protocol](https://rcan.dev/spec/) | v1.6.0 | Open robot communication standard |
 | [rcan-py](https://github.com/continuonai/rcan-py) | v0.6.0 | Python RCAN SDK |
 | [rcan-ts](https://github.com/continuonai/rcan-ts) | v0.6.0 | TypeScript RCAN SDK |
