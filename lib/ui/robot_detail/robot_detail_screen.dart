@@ -20,6 +20,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../core/constants.dart';
 import '../../core/media_service.dart';
 import '../../core/speech_service.dart';
@@ -49,6 +50,106 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _shareConfigToHub(
+      BuildContext ctx, String rrn, String robotName) async {
+    // Prompt for title and tags
+    String title = robotName;
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('Share Config to Hub'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Share $robotName\'s config to opencastor.com/explore?',
+                style: Theme.of(dCtx).textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+              controller: TextEditingController(text: robotName),
+              onChanged: (v) => title = v,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Secrets (api_key, token, password) will be scrubbed automatically.',
+              style: Theme.of(dCtx).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(dCtx).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dCtx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dCtx, true),
+              child: const Text('Share')),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !ctx.mounted) return;
+
+    // Show progress
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      const SnackBar(
+        content: Text('Uploading config to Hub...'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    try {
+      final functions = FirebaseFunctions.instance;
+      final callable = functions.httpsCallable('uploadConfig');
+      // Fetch the robot's config from its Firestore profile
+      final result = await callable.call<Map<String, dynamic>>({
+        'type': 'preset',
+        'title': title,
+        'tags': [rrn.toLowerCase(), 'shared-from-app'],
+        'content': '# Config uploaded from OpenCastor app\n# RRN: $rrn\n',
+        'filename': '${rrn.toLowerCase().replaceAll('-', '_')}.rcan.yaml',
+        'robot_rrn': rrn,
+        'public': true,
+      });
+
+      final data = result.data;
+      final configUrl = data['url'] as String? ?? 'opencastor.com/explore';
+      final installCmd = data['install_cmd'] as String? ?? '';
+
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('Shared! $configUrl'),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () => launchUrl(
+                Uri.parse('https://$configUrl'),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   /// Build list items for the chat ListView (reverse order):
@@ -195,6 +296,12 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               tooltip: 'Control',
               onPressed: () => context.push('/robot/${robot.rrn}/control'),
             ),
+          // Share config to Hub
+          IconButton(
+            icon: const Icon(Icons.share_outlined),
+            tooltip: 'Share Config to Hub',
+            onPressed: () => _shareConfigToHub(context, robot.rrn, robot.name),
+          ),
           // ESTOP — always available (Protocol 66 §4.1)
           if (robot.isOnline && !robot.isRevoked)
             IconButton(
@@ -416,6 +523,9 @@ class _TelemetryPanel extends StatelessWidget {
                 onPressed: () =>
                     context.push('/robot/${robot.rrn}/capabilities'),
               ),
+              const SizedBox(width: 6),
+              // 4. Public profile link (if robot has public profile)
+              _RobotProfileChip(rrn: robot.rrn),
             ],
           ),
 
@@ -816,6 +926,30 @@ class _ChatInputState extends State<_ChatInput>
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Robot public profile chip ─────────────────────────────────────────────────
+
+class _RobotProfileChip extends StatelessWidget {
+  const _RobotProfileChip({required this.rrn});
+  final String rrn;
+
+  @override
+  Widget build(BuildContext context) {
+    final slug = rrn.toLowerCase().replaceAll('/', '-');
+    final profileUrl = 'https://opencastor.com/robot/$slug';
+
+    return ActionChip(
+      label: const Text('Profile ↗'),
+      avatar: const Icon(Icons.public_outlined, size: 14),
+      visualDensity: VisualDensity.compact,
+      tooltip: 'View public robot profile',
+      onPressed: () => launchUrl(
+        Uri.parse(profileUrl),
+        mode: LaunchMode.externalApplication,
       ),
     );
   }

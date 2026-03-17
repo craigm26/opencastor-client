@@ -21,6 +21,7 @@ import 'ui/consent/consent_screen.dart';
 import 'ui/consent/pending_consent_screen.dart';
 import 'ui/core/theme/app_theme.dart';
 import 'ui/explore/explore_screen.dart';
+import 'ui/explore/qr_scanner_screen.dart';
 import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
 import 'ui/login/ecosystem_section.dart';
@@ -107,6 +108,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
               transitionsBuilder: (ctx, animation, secondary, child) =>
                   FadeTransition(opacity: animation, child: child),
             ),
+          ),
+          GoRoute(
+            path: '/explore/scan',
+            builder: (_, __) => const QrScannerScreen(),
           ),
           GoRoute(
             path: '/explore/:id',
