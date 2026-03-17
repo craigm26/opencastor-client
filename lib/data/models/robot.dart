@@ -59,6 +59,23 @@ class Robot {
   /// Whether this robot can operate offline with cached credentials (GAP-06).
   final bool offlineCapable;
 
+  // ── RCAN v1.6 fields ──────────────────────────────────────────────────────
+
+  /// Supported transport encodings, e.g. ["http", "compact"] (GAP-17).
+  final List<String> supportedTransports;
+
+  /// Minimum Level of Assurance required for control-scope commands (GAP-16).
+  final int minLoaForControl;
+
+  /// Whether LoA policy is enforced (false = log-only, true = enforce) (GAP-16).
+  final bool loaEnforcement;
+
+  /// Whether this robot accepts multi-modal (image/audio) commands (GAP-18).
+  final bool multimodalEnabled;
+
+  /// Registry tier: "root" | "authoritative" | "community" (GAP-14).
+  final String registryTier;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -77,6 +94,12 @@ class Robot {
     this.supportsQos2 = false,
     this.supportsDelegation = false,
     this.offlineCapable = false,
+    // v1.6 fields — all have safe defaults
+    this.supportedTransports = const ['http'],
+    this.minLoaForControl = 1,
+    this.loaEnforcement = false,
+    this.multimodalEnabled = true,
+    this.registryTier = 'community',
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -107,6 +130,13 @@ class Robot {
       supportsQos2: m['supports_qos_2'] as bool? ?? false,
       supportsDelegation: m['supports_delegation'] as bool? ?? false,
       offlineCapable: m['offline_capable'] as bool? ?? false,
+      // ── RCAN v1.6 fields — safe defaults preserve v1.5 behaviour ──────────
+      supportedTransports: ((m['supported_transports'] as List<dynamic>?) ?? ['http'])
+          .cast<String>(),
+      minLoaForControl: (m['min_loa_for_control'] as int?) ?? 1,
+      loaEnforcement: m['loa_enforcement'] as bool? ?? false,
+      multimodalEnabled: m['multimodal_enabled'] as bool? ?? true,
+      registryTier: m['registry_tier'] as String? ?? 'community',
     );
   }
 
@@ -125,6 +155,22 @@ class Robot {
     final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
     return major > 1 || (major == 1 && minor >= 5);
   }
+
+  /// True if this robot supports RCAN v1.6 or later.
+  bool get isRcanV16 {
+    if (rcanVersion == null) return false;
+    final parts = rcanVersion!.split('.');
+    if (parts.isEmpty) return false;
+    final major = int.tryParse(parts[0]) ?? 0;
+    final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return major > 1 || (major == 1 && minor >= 6);
+  }
+
+  /// True if LoA enforcement is active (loa_enforcement=true).
+  bool get isLoaEnforced => loaEnforcement;
+
+  /// True if the robot supports compact transport encoding (GAP-17).
+  bool get supportsCompactTransport => supportedTransports.contains('compact');
 
   bool hasCapability(RobotCapability cap) => capabilities.contains(cap);
 

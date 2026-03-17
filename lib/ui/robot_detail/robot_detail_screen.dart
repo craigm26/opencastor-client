@@ -332,6 +332,11 @@ class _TelemetryPanel extends StatelessWidget {
                 ),
             ],
           ),
+          // ── RCAN v1.6 badge row ─────────────────────────────────────────
+          if (robot.isRcanV16) ...[
+            const SizedBox(height: 4),
+            _V16BadgeRow(robot: robot),
+          ],
         ],
       ),
     );
@@ -379,6 +384,119 @@ class _V15Badge extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── RCAN v1.6 badge row ───────────────────────────────────────────────────
+
+class _V16BadgeRow extends StatelessWidget {
+  final Robot robot;
+  const _V16BadgeRow({required this.robot});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        // Transport chips: show each supported transport
+        for (final t in robot.supportedTransports)
+          _V15Badge(
+            label: t.toUpperCase(),
+            icon: _transportIcon(t),
+            color: _transportColor(t),
+            tooltip: 'Transport encoding: $t (GAP-17)',
+          ),
+
+        // LoA enforcement indicator
+        _V15Badge(
+          label: robot.loaEnforcement
+              ? 'LoA enforcement: ON'
+              : 'LoA enforcement: OFF',
+          icon: robot.loaEnforcement
+              ? Icons.verified_user_outlined
+              : Icons.person_outline,
+          color: robot.loaEnforcement ? Colors.green : Colors.orange,
+          tooltip: robot.loaEnforcement
+              ? 'LoA policy enforced — min LoA ${robot.minLoaForControl} required for control (GAP-16)'
+              : 'LoA policy log-only — enforcement disabled (GAP-16)',
+        ),
+
+        // Registry tier badge
+        _V15Badge(
+          label: _registryTierLabel(robot.registryTier),
+          icon: _registryTierIcon(robot.registryTier),
+          color: _registryTierColor(robot.registryTier),
+          tooltip: 'Registry tier: ${robot.registryTier} (GAP-14)',
+        ),
+      ],
+    );
+  }
+
+  IconData _transportIcon(String t) {
+    switch (t.toLowerCase()) {
+      case 'http':
+        return Icons.http_outlined;
+      case 'compact':
+        return Icons.compress_outlined;
+      case 'ble':
+        return Icons.bluetooth_outlined;
+      case 'minimal':
+        return Icons.minimize_outlined;
+      default:
+        return Icons.swap_horiz_outlined;
+    }
+  }
+
+  Color _transportColor(String t) {
+    switch (t.toLowerCase()) {
+      case 'http':
+        return Colors.indigo;
+      case 'compact':
+        return Colors.deepPurple;
+      case 'ble':
+        return Colors.lightBlue;
+      case 'minimal':
+        return Colors.grey;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  String _registryTierLabel(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'root':
+        return 'Root Registry';
+      case 'authoritative':
+        return 'Authoritative Registry';
+      case 'community':
+      default:
+        return 'Community Registry';
+    }
+  }
+
+  IconData _registryTierIcon(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'root':
+        return Icons.star_outlined;
+      case 'authoritative':
+        return Icons.verified_outlined;
+      case 'community':
+      default:
+        return Icons.people_outline;
+    }
+  }
+
+  Color _registryTierColor(String tier) {
+    switch (tier.toLowerCase()) {
+      case 'root':
+        return Colors.amber;
+      case 'authoritative':
+        return Colors.cyan;
+      case 'community':
+      default:
+        return Colors.blueGrey;
+    }
   }
 }
 

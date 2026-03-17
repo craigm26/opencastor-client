@@ -14,6 +14,13 @@
 ///     by the Cloud Function and read back by the UI in [ControlSuccess].
 ///   - The [lastSenderType] field exposes the sender_type for the most recent
 ///     command, allowing the control screen to display it in the history.
+///
+/// RCAN v1.6 additions:
+///   - [effectiveLoa]: Current user's effective Level of Assurance.
+///     Always LoA 1 (email-verified baseline) until auth is wired.
+///   - [loaLabel]: Human-readable LoA description for display in command panel.
+///   - [requiresLoaUpgrade]: True if the robot enforces LoA and user LoA is
+///     below the robot's minimum requirement.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,6 +65,33 @@ class ControlSuccess extends ControlState {
 class ControlError extends ControlState {
   final String message;
   const ControlError(this.message);
+}
+
+// ── v1.6: LoA helpers ────────────────────────────────────────────────────────
+
+/// The current user's effective Level of Assurance.
+///
+/// Always LoA 1 (email-verified baseline) until full auth flow is wired.
+/// When wired: retrieve from Firebase auth custom claims or JWT.
+const int kEffectiveLoa = 1;
+
+/// Human-readable label for the current LoA level.
+String loaLabelFor(int loa) {
+  switch (loa) {
+    case 1:
+      return 'LoA: Email Verified';
+    case 2:
+      return 'LoA: 2FA Verified';
+    case 3:
+      return 'LoA: Hardware Key';
+    default:
+      return 'LoA: Unknown';
+  }
+}
+
+/// True if [robot] enforces LoA and the current user's LoA is insufficient.
+bool requiresLoaUpgrade(Robot robot) {
+  return robot.loaEnforcement && robot.minLoaForControl > kEffectiveLoa;
 }
 
 /// Notifier for control command execution.

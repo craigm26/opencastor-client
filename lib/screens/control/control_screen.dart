@@ -152,8 +152,19 @@ class _State extends ConsumerState<ControlScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // v1.6: LoA enforcement warning banner
+                  if (robot.loaEnforcement && robot.minLoaForControl > 1)
+                    _LoaEnforcementBanner(
+                        minLoa: robot.minLoaForControl),
+                  if (robot.loaEnforcement && robot.minLoaForControl > 1)
+                    const SizedBox(height: 8),
+
                   // Warning banner
                   _SafetyBanner(),
+                  const SizedBox(height: 8),
+
+                  // v1.6: LoA indicator row
+                  _LoaIndicatorRow(robot: robot),
                   const SizedBox(height: 16),
 
                   // Quick-action buttons
@@ -172,6 +183,20 @@ class _State extends ConsumerState<ControlScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
+                      // v1.6: Attach Image button (multi-modal stub)
+                      IconButton(
+                        onPressed: _busy ? null : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Multi-modal commands coming soon',
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.attach_file_outlined),
+                        tooltip: 'Attach Image',
+                      ),
                       Expanded(
                         child: TextField(
                           controller: _instrCtrl,
@@ -213,6 +238,76 @@ class _State extends ConsumerState<ControlScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+// ── v1.6: LoA enforcement warning banner ────────────────────────────────────
+
+class _LoaEnforcementBanner extends StatelessWidget {
+  final int minLoa;
+  const _LoaEnforcementBanner({required this.minLoa});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.verified_user_outlined,
+              color: Colors.orange, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'This robot requires email-verified identity for control commands'
+              ' (LoA $minLoa required).',
+              style: const TextStyle(fontSize: 12, color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── v1.6: LoA indicator row ──────────────────────────────────────────────────
+
+class _LoaIndicatorRow extends StatelessWidget {
+  final Robot robot;
+  const _LoaIndicatorRow({required this.robot});
+
+  @override
+  Widget build(BuildContext context) {
+    // Current user's effective LoA: always LoA 1 until auth is wired.
+    // Display "LoA: Email Verified" once auth is wired.
+    const int effectiveLoa = 1;
+    const String loaLabel = 'LoA: Email Verified';
+
+    return Row(
+      children: [
+        const Icon(Icons.shield_outlined, size: 14, color: Colors.grey),
+        const SizedBox(width: 4),
+        Text(
+          loaLabel,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey,
+              ),
+        ),
+        const Spacer(),
+        if (robot.isRcanV16)
+          Text(
+            'RCAN v${robot.rcanVersion ?? "1.6"}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.purple,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+      ],
     );
   }
 }
