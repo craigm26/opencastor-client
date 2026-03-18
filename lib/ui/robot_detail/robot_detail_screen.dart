@@ -30,10 +30,13 @@ import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../../ui/chat/image_annotation_screen.dart';
-import '../../data/models/command.dart' show CommandScope;
+import '../../data/models/command.dart' hide CommandScope;
+import '../../data/models/slash_command.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import 'robot_detail_view_model.dart';
+import 'slash_command_palette.dart';
+import 'slash_command_provider.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -51,8 +54,99 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   Uint8List? _attachedImage;
   String _imageAnnotation = '';
 
+  // Slash command palette state
+  bool _showPalette = false;
+  String _paletteQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    final text = _ctrl.text;
+    if (text.startsWith('/')) {
+      // Show palette with query = everything after the leading /
+      final query = text.substring(1);
+      // Don't show palette if there's a space (user is typing args, not selecting cmd)
+      final hasArgs = query.contains(' ');
+      if (!hasArgs) {
+        if (!_showPalette || _paletteQuery != query) {
+          setState(() {
+            _showPalette = true;
+            _paletteQuery = query;
+          });
+        }
+        return;
+      }
+    }
+    if (_showPalette) {
+      setState(() => _showPalette = false);
+    }
+  }
+
+  void _dismissPalette() {
+    if (mounted && _showPalette) {
+      setState(() => _showPalette = false);
+    }
+  }
+
+  /// Called when user selects a command from the palette.
+  void _onCommandSelected(SlashCommand cmd, Robot robot) {
+    _dismissPalette();
+    if (cmd.args.isEmpty && cmd.instant) {
+      // Send immediately
+      _ctrl.clear();
+      _sendSlashCommand(cmd.cmd, [], robot);
+    } else {
+      // Fill input with command and space for args
+      _ctrl.text = '${cmd.cmd} ';
+      _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+    }
+  }
+
+  /// Send a slash command by mapping to RCAN instruction + scope.
+  Future<void> _sendSlashCommand(
+      String cmd, List<String> args, Robot robot) async {
+    setState(() => _sending = true);
+    try {
+      // Map slash command to RCAN instruction + scope
+      final (instruction, scope) = _mapSlashCommand(cmd, args);
+      await ref.read(robotRepositoryProvider).sendCommand(
+            rrn: robot.rrn,
+            instruction: instruction,
+            scope: scope,
+          );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// Map a slash command to (instruction, CommandScope).
+  static (String, CommandScope) _mapSlashCommand(String cmd, List<String> args) {
+    return switch (cmd) {
+      '/status' => ('STATUS', CommandScope.status),
+      '/skills' => ('LIST_SKILLS', CommandScope.status),
+      '/optimize' => ('OPTIMIZE', CommandScope.system),
+      '/upgrade' => (
+          args.isNotEmpty ? 'UPGRADE: ${args.first}' : 'UPGRADE',
+          CommandScope.system
+        ),
+      '/reboot' => ('REBOOT', CommandScope.system),
+      '/reload-config' => ('RELOAD_CONFIG', CommandScope.system),
+      '/share' => ('SHARE_CONFIG', CommandScope.system),
+      '/install' => ('INSTALL: ${args.isNotEmpty ? args.first : ''}', CommandScope.system),
+      _ when cmd.startsWith('/') => (cmd.substring(1).toUpperCase() +
+            (args.isNotEmpty ? ': ${args.join(' ')}' : ''),
+          CommandScope.chat),
+      _ => (cmd, CommandScope.chat),
+    };
+  }
+
   @override
   void dispose() {
+    _ctrl.removeListener(_onTextChanged);
     _ctrl.dispose();
     super.dispose();
   }
@@ -270,6 +364,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   Future<void> _sendChat(Robot robot) async {
     final text = _ctrl.text.trim();
     if (text.isEmpty && _attachedImage == null) return;
+    _dismissPalette();
     setState(() => _sending = true);
     final capturedText = text;
     final capturedImage = _attachedImage;
@@ -279,6 +374,20 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
       _attachedImage = null;
       _imageAnnotation = '';
     });
+
+    // Handle slash commands typed directly into the input field
+    if (capturedText.startsWith('/') && capturedImage == null) {
+      try {
+        final parts = capturedText.trim().split(' ');
+        final cmd = parts.first;
+        final args = parts.skip(1).toList();
+        await _sendSlashCommand(cmd, args, robot);
+      } finally {
+        if (mounted) setState(() => _sending = false);
+      }
+      return;
+    }
+
     try {
       String instruction = capturedText;
       List<Map<String, dynamic>>? mediaChunks;
@@ -480,11 +589,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               }),
             ),
 
-          // ── Chat input with STT + attachment ──────────────────────────────
+          // ── Chat input with slash command palette ─────────────────────────
           if (robot.hasCapability(RobotCapability.chat) &&
               robot.isOnline &&
               !robot.isRevoked)
-            _ChatInput(
+            _ChatInputWithPalette(
               ctrl: _ctrl,
               sending: _sending,
               onSend: () => _sendChat(robot),
@@ -493,6 +602,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 _imageAnnotation = annotation;
               }),
               hasAttachment: _attachedImage != null,
+              showPalette: _showPalette,
+              paletteQuery: _paletteQuery,
+              onPaletteSelect: (cmd) => _onCommandSelected(cmd, robot),
+              onPaletteDismiss: _dismissPalette,
+              rrn: widget.rrn,
             ),
         ],
       ),
@@ -990,6 +1104,67 @@ class _ImagePreview extends StatelessWidget {
         ],
       ),
     ).animate().fadeIn(duration: 200.ms);
+  }
+}
+
+// ── Chat input wrapper with slash command palette ─────────────────────────────
+
+class _ChatInputWithPalette extends ConsumerWidget {
+  final TextEditingController ctrl;
+  final bool sending;
+  final VoidCallback onSend;
+  final void Function(Uint8List, String) onImageAttached;
+  final bool hasAttachment;
+  final bool showPalette;
+  final String paletteQuery;
+  final void Function(SlashCommand) onPaletteSelect;
+  final VoidCallback onPaletteDismiss;
+  final String rrn;
+
+  const _ChatInputWithPalette({
+    required this.ctrl,
+    required this.sending,
+    required this.onSend,
+    required this.onImageAttached,
+    required this.hasAttachment,
+    required this.showPalette,
+    required this.paletteQuery,
+    required this.onPaletteSelect,
+    required this.onPaletteDismiss,
+    required this.rrn,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final commandsAsync = ref.watch(slashCommandsProvider(rrn));
+    final commands = commandsAsync.maybeWhen(
+      data: (cmds) => cmds,
+      orElse: () => kStaticBuiltinCommands,
+    );
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Palette shown above the text field
+        if (showPalette)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: SlashCommandPalette(
+              commands: commands,
+              query: paletteQuery,
+              onSelect: onPaletteSelect,
+              onDismiss: onPaletteDismiss,
+            ),
+          ),
+        _ChatInput(
+          ctrl: ctrl,
+          sending: sending,
+          onSend: onSend,
+          onImageAttached: onImageAttached,
+          hasAttachment: hasAttachment,
+        ),
+      ],
+    );
   }
 }
 

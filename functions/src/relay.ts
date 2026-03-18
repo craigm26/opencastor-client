@@ -97,6 +97,35 @@ export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "
     }
   }
 
+  // ---------------------------------------------------------------------------
+// Slash command mapping (mirrors SLASH_COMMAND_MAP in Flutter)
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps slash command strings to their canonical RCAN instruction text.
+ * Used when instruction.startsWith('/') to normalize before queuing.
+ * Unknown slash commands are passed through unchanged.
+ */
+const SLASH_COMMAND_MAP: Record<string, (args: string[]) => string> = {
+  "/status": () => "STATUS",
+  "/skills": () => "LIST_SKILLS",
+  "/optimize": () => "OPTIMIZE",
+  "/upgrade": (args) => (args[0] ? `UPGRADE: ${args[0]}` : "UPGRADE"),
+  "/reboot": () => "REBOOT",
+  "/reload-config": () => "RELOAD_CONFIG",
+  "/share": () => "SHARE_CONFIG",
+  "/install": (args) => `INSTALL: ${args[0] || ""}`,
+};
+
+  // Map slash commands to RCAN instructions
+  let resolvedInstruction = data.instruction;
+  if (data.instruction.startsWith("/")) {
+    const [cmd, ...argParts] = data.instruction.split(" ");
+    resolvedInstruction = SLASH_COMMAND_MAP[cmd]
+      ? SLASH_COMMAND_MAP[cmd](argParts)
+      : data.instruction; // pass through unknown slash commands
+  }
+
   const cmdId = uuid.v4();
   const now = new Date().toISOString();
 
@@ -104,7 +133,7 @@ export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "
     data.scope === "safety" && data.instruction.toLowerCase().includes("estop");
 
   const cmd: CommandDoc = {
-    instruction: data.instruction,
+    instruction: resolvedInstruction,
     scope: data.scope,
     issued_by_uid: auth.uid,
     issued_by_owner: `uid:${auth.uid}`, // resolved to rrn:// if owner robot
