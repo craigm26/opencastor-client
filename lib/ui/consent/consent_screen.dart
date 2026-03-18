@@ -22,17 +22,15 @@ import '../explore/qr_scanner_screen.dart' show parseRrnFromScan;
 import '../../core/constants.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/consent_repository.dart';
+import '../../data/repositories/consent_repository_provider.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _consentRepositoryProvider = Provider<ConsentRepository>((ref) {
-  // Resolved via DI — same pattern as robotRepositoryProvider
-  throw UnimplementedError(
-      'consentRepositoryProvider must be overridden in ProviderScope');
-});
+// Use the global wired-up provider
+final _consentRepositoryProvider = consentRepositoryProvider;
 
 final _myFleetProvider = StreamProvider<List<Robot>>((ref) {
   final uid = FirebaseAuth.instance.currentUser?.uid ?? '';

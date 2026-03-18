@@ -202,22 +202,31 @@ export const searchConfigs = functions.onCall(
     const rcan_version = params.rcan_version as string | undefined;
     const limit = Math.min(Number(params.limit) || 20, 50);
 
+    // Use a simple public==true query to avoid composite index requirements.
+    // Filtering and sorting happen in memory — collection stays small (<500 docs).
     let query: admin.firestore.Query = db()
       .collection("configs")
       .where("public", "==", true)
-      .orderBy("created_at", "desc")
-      .limit(limit);
-
-    if (type) query = query.where("type", "==", type);
-    if (hardware) query = query.where("hardware", "==", hardware);
-    if (provider) query = query.where("provider", "==", provider);
-    if (rcan_version) query = query.where("rcan_version", "==", rcan_version);
+      .limit(200); // over-fetch, filter in memory
 
     const snaps = await query.get();
-    const results = snaps.docs.map((doc) => {
-      const d = doc.data();
-      // Don't return full content in search results (too large)
-      const { content: _content, ...rest } = d;
+    let docs = snaps.docs.map((doc) => doc.data());
+
+    // Apply filters in memory
+    if (type) docs = docs.filter((d) => d.type === type);
+    if (hardware) docs = docs.filter((d) => d.hardware === hardware);
+    if (provider) docs = docs.filter((d) => d.provider === provider);
+    if (rcan_version) docs = docs.filter((d) => d.rcan_version === rcan_version);
+
+    // Sort by stars desc, then installs desc (no created_at index needed)
+    docs.sort((a, b) => {
+      const starDiff = (b.stars || 0) - (a.stars || 0);
+      if (starDiff !== 0) return starDiff;
+      return (b.installs || 0) - (a.installs || 0);
+    });
+
+    const results = docs.slice(0, limit).map((d) => {
+      const { content: _content, ...rest } = d as Record<string, unknown>;
       return { ...rest, has_content: true };
     });
 

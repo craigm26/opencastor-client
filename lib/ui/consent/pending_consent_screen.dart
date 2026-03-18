@@ -20,16 +20,15 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../data/models/consent_request.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/consent_repository.dart';
+import '../../data/repositories/consent_repository_provider.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _consentRepositoryProvider = Provider<ConsentRepository>((ref) {
-  throw UnimplementedError(
-      'consentRepositoryProvider must be overridden in ProviderScope');
-});
+// Use the global wired-up provider
+final _consentRepositoryProvider = consentRepositoryProvider;
 
 /// All pending consent requests across all robots owned by the current user.
 final pendingConsentProvider =

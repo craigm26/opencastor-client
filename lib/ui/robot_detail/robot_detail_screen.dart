@@ -11,6 +11,7 @@ library;
 
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../../ui/chat/image_annotation_screen.dart';
+import '../../data/models/command.dart' show CommandScope;
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import 'robot_detail_view_model.dart';
@@ -576,7 +578,7 @@ class _TelemetryPanel extends StatelessWidget {
                         _StatusBadge(isOnline: robot.isOnline),
                         const SizedBox(width: 8),
                         // 2. OpenCastor version badge
-                        _VersionBadge(version: robot.opencastorVersion),
+                        _VersionBadge(version: robot.opencastorVersion, rrn: robot.rrn),
                       ],
                     ),
                   ],
@@ -666,19 +668,47 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-// ── OpenCastor version badge ──────────────────────────────────────────────────
+// ── OpenCastor version badge + latest version check ──────────────────────────
 
-class _VersionBadge extends StatelessWidget {
+/// Fetches the latest opencastor version from PyPI (cached for session).
+final _latestVersionProvider = FutureProvider<String?>((ref) async {
+  try {
+    final resp = await http.get(
+      Uri.parse('https://pypi.org/pypi/opencastor/json'),
+      headers: {'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 6));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return (data['info'] as Map<String, dynamic>)['version'] as String?;
+    }
+  } catch (_) {}
+  return null;
+});
+
+class _VersionBadge extends ConsumerWidget {
   final String? version;
-  const _VersionBadge({required this.version});
+  final String rrn;
+  const _VersionBadge({required this.version, required this.rrn});
+
+  /// Compares two date-based versions like 2026.3.14.6 and 2026.3.17.13.
+  bool _isOutdated(String current, String latest) {
+    final c = current.split('.').map(int.tryParse).whereType<int>().toList();
+    final l = latest.split('.').map(int.tryParse).whereType<int>().toList();
+    for (var i = 0; i < l.length && i < c.length; i++) {
+      if (l[i] > c[i]) return true;
+      if (l[i] < c[i]) return false;
+    }
+    return l.length > c.length;
+  }
 
   @override
-  Widget build(BuildContext context) {
-    final label =
-        version != null ? 'OpenCastor v$version' : 'Version unknown';
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: label,
+    final latestAsync = ref.watch(_latestVersionProvider);
+    final current = version;
+
+    final currentBadge = Tooltip(
+      message: current != null ? 'OpenCastor v$current (installed)' : 'Version unknown',
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
@@ -686,7 +716,7 @@ class _VersionBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text(
-          version != null ? 'v$version' : 'v?',
+          current != null ? 'v$current' : 'v?',
           style: TextStyle(
               fontSize: 10,
               color: cs.onPrimaryContainer,
@@ -694,6 +724,144 @@ class _VersionBadge extends StatelessWidget {
         ),
       ),
     );
+
+    return latestAsync.when(
+      loading: () => currentBadge,
+      error: (_, __) => currentBadge,
+      data: (latest) {
+        if (latest == null || current == null) return currentBadge;
+        final outdated = _isOutdated(current, latest);
+        if (!outdated) return currentBadge;
+
+        // Show update available badge next to current version
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            currentBadge,
+            const SizedBox(width: 4),
+            Tooltip(
+              message: 'Update available: v$latest — tap to update this robot',
+              child: GestureDetector(
+                onTap: () => _confirmUpdate(context, ref, latest),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.tertiaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: cs.tertiary.withOpacity(0.4), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.arrow_upward,
+                          size: 9, color: cs.onTertiaryContainer),
+                      const SizedBox(width: 3),
+                      Text(
+                        'v$latest',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onTertiaryContainer,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmUpdate(
+      BuildContext context, WidgetRef ref, String latest) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Update OpenCastor?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Update robot $rrn to the latest release:'),
+            const SizedBox(height: 8),
+            Row(children: [
+              Text('Installed: ',
+                  style: TextStyle(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      fontSize: 13)),
+              Text('v$version',
+                  style: const TextStyle(
+                      fontFamily: 'monospace', fontSize: 13)),
+            ]),
+            Row(children: [
+              Text('Latest:    ',
+                  style: TextStyle(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      fontSize: 13)),
+              Text('v$latest',
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(ctx).colorScheme.tertiary)),
+            ]),
+            const SizedBox(height: 12),
+            Text(
+              'This sends a pip install --upgrade opencastor command to the robot via RCAN chat scope.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Update')),
+        ],
+      ),
+    );
+
+    if (ok != true || !context.mounted) return;
+
+    // Send update command via RCAN chat scope
+    try {
+      final repo = ref.read(robotRepositoryProvider);
+      await repo.sendCommand(
+        rrn: rrn,
+        instruction:
+            'SYSTEM_UPDATE: pip install --upgrade opencastor==$latest',
+        scope: CommandScope.chat,
+        reason: 'OTA update to v$latest requested from OpenCastor app',
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Update command sent to $rrn — robot will upgrade to v$latest'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        // Invalidate latest version cache so the badge refreshes
+        ref.invalidate(_latestVersionProvider);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send update: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 }
 
