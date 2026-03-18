@@ -192,3 +192,54 @@ class _ManualEntry extends StatelessWidget {
     );
   }
 }
+
+// ── Shared RRN parser (used by QrScannerScreen and ConsentScreen) ─────────────
+
+/// Parses an RRN from a raw QR scan string.
+///
+/// Accepted formats:
+///   - Bare RRN:          `RRN-000000000005`
+///   - RCAN URI:          `rcan://craigm26/robot/opencastor/.../alex-001`
+///   - opencastor.com URL: `https://opencastor.com/robot/RRN-000000000005`
+///   - castor CLI format:  `castor connect RRN-000000000005`
+///
+/// Returns the normalised RRN string (uppercase, e.g. `RRN-000000000005`),
+/// or `null` if no RRN can be found.
+String? parseRrnFromScan(String raw) {
+  if (raw.isEmpty) return null;
+  final s = raw.trim();
+
+  // 1. Bare RRN pattern
+  final bareRrn = RegExp(r'RRN-\d{12}', caseSensitive: false);
+  var m = bareRrn.firstMatch(s);
+  if (m != null) return m.group(0)!.toUpperCase();
+
+  // 2. opencastor.com/robot/<RRN> URL
+  final urlPattern =
+      RegExp(r'opencastor\.com/robot/(RRN-\d{12})', caseSensitive: false);
+  m = urlPattern.firstMatch(s);
+  if (m != null) return m.group(1)!.toUpperCase();
+
+  // 3. rcan:// URI — last path segment or rrn query param
+  if (s.startsWith('rcan://')) {
+    final rrnInPath =
+        RegExp(r'RRN-\d{12}', caseSensitive: false).firstMatch(s);
+    if (rrnInPath != null) return rrnInPath.group(0)!.toUpperCase();
+  }
+
+  // 4. castor connect / castor access <RRN>
+  final castorCmd =
+      RegExp(r'castor\s+(?:connect|access)\s+(RRN-\d{12})',
+          caseSensitive: false);
+  m = castorCmd.firstMatch(s);
+  if (m != null) return m.group(1)!.toUpperCase();
+
+  // 5. rrn= query parameter
+  try {
+    final uri = Uri.parse(s);
+    final q = uri.queryParameters['rrn'];
+    if (q != null && bareRrn.hasMatch(q)) return q.toUpperCase();
+  } catch (_) {}
+
+  return null;
+}

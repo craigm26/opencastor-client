@@ -14,7 +14,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -50,6 +52,65 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   void dispose() {
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _showRrnQrCode(BuildContext context, String rrn, String robotName) {
+    final qrData = rrn; // bare RRN — parseable by parseRrnFromScan
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(robotName,
+                  style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Scan to connect or request access',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 20),
+              QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 220,
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.all(12),
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                rrn,
+                style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15),
+              ),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                icon: const Icon(Icons.copy, size: 14),
+                label: const Text('Copy RRN'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: rrn));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('RRN copied'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _shareConfigToHub(
@@ -296,6 +357,12 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               tooltip: 'Control',
               onPressed: () => context.push('/robot/${robot.rrn}/control'),
             ),
+          // Show QR code for this robot's RRN
+          IconButton(
+            icon: const Icon(Icons.qr_code_outlined),
+            tooltip: 'Show Robot QR Code',
+            onPressed: () => _showRrnQrCode(context, robot.rrn, robot.name),
+          ),
           // Share config to Hub
           IconButton(
             icon: const Icon(Icons.share_outlined),

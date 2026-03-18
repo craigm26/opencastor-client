@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../explore/qr_scanner_screen.dart' show parseRrnFromScan;
 import '../../core/constants.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/consent_repository.dart';
@@ -216,6 +217,31 @@ class _ConsentRequestFormState
     super.dispose();
   }
 
+  /// Open a bottom sheet with the QR scanner to read a robot's RRN.
+  /// Parses formats: QR shows bare RRN, rcan:// URI, or opencastor.com URL.
+  Future<void> _scanRrn(
+      BuildContext context, _ConsentFormNotifier notifier) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _RrnScannerSheet(),
+    );
+    if (result != null && result.isNotEmpty && mounted) {
+      _rrnCtrl.text = result;
+      notifier.setTargetRrn(result);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('RRN set: $result'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final formState = ref.watch(_consentFormProvider);
@@ -265,11 +291,17 @@ class _ConsentRequestFormState
         const SizedBox(height: 8),
         TextField(
           controller: _rrnCtrl,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'RRN-000000000005',
             labelText: 'Target Robot RRN',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.precision_manufacturing_outlined),
+            border: const OutlineInputBorder(),
+            prefixIcon:
+                const Icon(Icons.precision_manufacturing_outlined),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.qr_code_scanner_outlined),
+              tooltip: 'Scan robot QR code',
+              onPressed: () => _scanRrn(context, notifier),
+            ),
           ),
           onChanged: notifier.setTargetRrn,
         ),
@@ -536,6 +568,143 @@ class _RobotPickerDropdownState
               ))
           .toList(),
       onChanged: (r) => setState(() => _selected = r),
+    );
+  }
+}
+
+// ── RRN Scanner bottom sheet ──────────────────────────────────────────────────
+
+class _RrnScannerSheet extends StatefulWidget {
+  const _RrnScannerSheet();
+
+  @override
+  State<_RrnScannerSheet> createState() => _RrnScannerSheetState();
+}
+
+class _RrnScannerSheetState extends State<_RrnScannerSheet> {
+  final _manualCtrl = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _manualCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit(String raw) {
+    final rrn = parseRrnFromScan(raw.trim());
+    if (rrn != null) {
+      Navigator.of(context).pop(rrn);
+    } else {
+      setState(() => _error = 'Could not find an RRN in "$raw"');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
+          Text('Scan Robot QR Code',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(
+            'Point your camera at the robot\'s QR code display, '
+            'or enter the RRN manually below.',
+            style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 20),
+
+          // Camera scan placeholder (TODO: mobile_scanner)
+          Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: cs.outlineVariant, style: BorderStyle.solid),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.qr_code_scanner,
+                    size: 56, color: cs.onSurfaceVariant),
+                const SizedBox(height: 10),
+                Text(
+                  'Camera scanner',
+                  style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Coming in next update — use manual entry below',
+                  style: TextStyle(
+                      fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Manual entry fallback
+          TextField(
+            controller: _manualCtrl,
+            autofocus: false,
+            decoration: InputDecoration(
+              labelText: 'Or enter RRN / URL manually',
+              hintText: 'RRN-000000000005',
+              border: const OutlineInputBorder(),
+              errorText: _error,
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.check_circle_outline),
+                tooltip: 'Use this RRN',
+                onPressed: () => _submit(_manualCtrl.text),
+              ),
+            ),
+            onSubmitted: _submit,
+            textInputAction: TextInputAction.done,
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.check),
+              label: const Text('Use This RRN'),
+              onPressed: () => _submit(_manualCtrl.text),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
