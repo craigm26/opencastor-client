@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,9 +12,11 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Complete any pending redirect sign-in (web browsers use
-  // signInWithRedirect; result is captured here on return).
-  await AuthService.handleRedirectResult();
+  // Complete any pending redirect sign-in (web only).
+  // Guarded by a 5s timeout — getRedirectResult() can hang if the Firebase
+  // auth domain is slow or unreachable, which would block runApp() forever.
+  await AuthService.handleRedirectResult()
+      .timeout(const Duration(seconds: 5), onTimeout: () {});
 
   runApp(const ProviderScope(child: OpenCastorApp()));
 }
