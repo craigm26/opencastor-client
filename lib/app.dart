@@ -32,6 +32,7 @@ import 'ui/robot_status/robot_status_screen.dart';
 import 'ui/settings/settings_screen.dart';
 import 'ui/settings/theme_mode_provider.dart';
 import 'ui/setup/setup_screen.dart';
+import 'ui/account/account_screen.dart';
 import 'ui/shared/adaptive_navigation.dart';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: notifier.redirect,
     routes: [
+      // Redirect bare "/" to splash (handles web deep-links and deferred navigations)
+      GoRoute(
+        path: '/',
+        redirect: (_, __) => '/splash',
+      ),
       GoRoute(
         path: '/splash',
         builder: (_, __) => const _SplashScreen(),
@@ -188,6 +194,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/settings',
             builder: (_, __) => const SettingsScreen(),
+          ),
+          GoRoute(
+            path: '/account',
+            builder: (_, __) => const AccountScreen(),
           ),
         ],
       ),
