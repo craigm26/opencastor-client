@@ -59,7 +59,9 @@ class _RouterNotifier extends ChangeNotifier {
     final isPublic =
         loc == '/login' || loc == '/splash' || loc.startsWith('/setup');
 
-    if (!isAuth && !isPublic) return '/login';
+    // Not signed in: redirect to login (including from splash)
+    if (!isAuth) return isPublic ? (loc == '/splash' ? '/login' : null) : '/login';
+    // Signed in: leave protected pages alone; bounce off public pages to fleet
     if (isAuth && isPublic) return '/fleet';
     return null;
   }
