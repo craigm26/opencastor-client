@@ -10,6 +10,10 @@ import 'fleet_view_model.dart'
     show estopCommandProvider, fleetProvider;
 import 'robot_card.dart';
 
+/// Maximum robots a free account may register. Matches MAX_ROBOTS in
+/// functions/src/registration.ts — update both when pricing launches.
+const int _kMaxRobots = 2;
+
 class FleetScreen extends ConsumerWidget {
   const FleetScreen({super.key});
 
@@ -71,13 +75,95 @@ class FleetScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/consent'),
-        icon: const Icon(Icons.handshake_outlined),
-        label: const Text('Manage Access'),
+      floatingActionButton: fleet.when(
+        loading: () => FloatingActionButton.extended(
+          onPressed: () => context.push('/consent'),
+          icon: const Icon(Icons.handshake_outlined),
+          label: const Text('Manage Access'),
+        ),
+        error: (_, __) => FloatingActionButton.extended(
+          onPressed: () => context.push('/consent'),
+          icon: const Icon(Icons.handshake_outlined),
+          label: const Text('Manage Access'),
+        ),
+        data: (robots) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Add Robot button — locked when fleet limit reached
+            _AddRobotFab(robotCount: robots.length),
+            const SizedBox(height: 12),
+            FloatingActionButton.extended(
+              heroTag: 'manageAccess',
+              onPressed: () => context.push('/consent'),
+              icon: const Icon(Icons.handshake_outlined),
+              label: const Text('Manage Access'),
+            ),
+          ],
+        ),
       ),
     );
   }
+}
+
+// ── Add Robot FAB with fleet-limit enforcement ────────────────────────────────
+
+/// FAB that links to the robot setup docs, but shows an upgrade prompt
+/// when the user has already reached [_kMaxRobots].
+class _AddRobotFab extends StatelessWidget {
+  final int robotCount;
+  const _AddRobotFab({required this.robotCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final atLimit = robotCount >= _kMaxRobots;
+    return FloatingActionButton.extended(
+      heroTag: 'addRobot',
+      backgroundColor: atLimit
+          ? Theme.of(context).colorScheme.surfaceContainerHighest
+          : null,
+      foregroundColor: atLimit
+          ? Theme.of(context).colorScheme.onSurfaceVariant
+          : null,
+      onPressed: () {
+        if (atLimit) {
+          _showFleetLimitDialog(context);
+        } else {
+          launchUrl(Uri.parse(AppConstants.docsRoot));
+        }
+      },
+      icon: Icon(atLimit ? Icons.lock_outline : Icons.add_circle_outline),
+      label: Text(atLimit ? 'Fleet limit reached' : 'Add Robot'),
+    );
+  }
+}
+
+void _showFleetLimitDialog(BuildContext context) {
+  showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Fleet limit reached'),
+      content: const Text(
+        'Free accounts support up to $_kMaxRobots robots.\n\n'
+        'Pricing plans are coming soon — contact us to get early access '
+        'to expanded fleets.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('OK'),
+        ),
+        TextButton(
+          onPressed: () => launchUrl(
+            Uri.parse(
+              'mailto:hello@opencastor.com?subject=Fleet%20upgrade',
+            ),
+          ),
+          child: const Text('Contact Us'),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── Summary strip ─────────────────────────────────────────────────────────────

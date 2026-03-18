@@ -19,3 +19,6 @@ export { uploadConfig, getConfig, searchConfigs, starConfig, importCommunityConf
 
 // Phase 4 social layer
 export { forkConfig, addComment, getComments, deleteComment, getMyStars, getMyConfigs, publishFork } from "./social";
+
+// Fleet registration limit (MAX_ROBOTS = 2 per user, free tier)
+export { registerRobot, enforceRobotLimit } from "./registration";
