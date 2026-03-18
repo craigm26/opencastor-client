@@ -47,11 +47,13 @@ class HubComment {
 final commentsProvider =
     FutureProvider.family<List<HubComment>, String>((ref, configId) async {
   final fn = FirebaseFunctions.instance.httpsCallable('getComments');
-  final result = await fn.call<Map<String, dynamic>>({'config_id': configId});
-  final list = result.data['comments'] as List? ?? [];
+  final result = await fn.call<dynamic>({'config_id': configId});
+  final raw = result.data;
+  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final list = (map['comments'] as List?) ?? [];
   return list
       .whereType<Map>()
-      .map((m) => HubComment.fromMap(Map<String, dynamic>.from(m)))
+      .map((m) => HubComment.fromMap(_deepCastMap(m)))
       .toList();
 });
 
@@ -89,11 +91,13 @@ Future<void> publishFork(String configId) async {
 
 final myStarsProvider = FutureProvider<List<HubConfig>>((ref) async {
   final fn = FirebaseFunctions.instance.httpsCallable('getMyStars');
-  final result = await fn.call<Map<String, dynamic>>({});
-  final list = result.data['configs'] as List? ?? [];
+  final result = await fn.call<dynamic>({});
+  final raw = result.data;
+  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final list = (map['configs'] as List?) ?? [];
   return list
       .whereType<Map>()
-      .map((m) => HubConfig.fromMap(Map<String, dynamic>.from(m)))
+      .map((m) => HubConfig.fromMap(_deepCastMap(m)))
       .toList();
 });
 
@@ -101,10 +105,25 @@ final myStarsProvider = FutureProvider<List<HubConfig>>((ref) async {
 
 final myConfigsProvider = FutureProvider<List<HubConfig>>((ref) async {
   final fn = FirebaseFunctions.instance.httpsCallable('getMyConfigs');
-  final result = await fn.call<Map<String, dynamic>>({});
-  final list = result.data['configs'] as List? ?? [];
+  final result = await fn.call<dynamic>({});
+  final raw = result.data;
+  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final list = (map['configs'] as List?) ?? [];
   return list
       .whereType<Map>()
-      .map((m) => HubConfig.fromMap(Map<String, dynamic>.from(m)))
+      .map((m) => HubConfig.fromMap(_deepCastMap(m)))
       .toList();
 });
+
+/// Deep-cast a Map<Object?, Object?> → Map<String, dynamic>.
+/// Firebase Functions returns untyped maps; this normalises nested values.
+Map<String, dynamic> _deepCastMap(Map m) => m.map(
+      (k, v) => MapEntry(
+        k?.toString() ?? '',
+        v is Map
+            ? _deepCastMap(v)
+            : v is List
+                ? v.map((e) => e is Map ? _deepCastMap(e) : e).toList()
+                : v,
+      ),
+    );

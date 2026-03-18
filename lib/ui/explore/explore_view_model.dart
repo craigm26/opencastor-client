@@ -23,12 +23,13 @@ final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFil
     }
 
     try {
-      final result = await callable.call<Map<String, dynamic>>(params);
-      final data = result.data;
-      final results = data['results'] as List? ?? [];
+      final result = await callable.call<dynamic>(params);
+      final raw = result.data;
+      final data = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+      final results = (data['results'] as List?) ?? [];
       return results
           .whereType<Map>()
-          .map((m) => HubConfig.fromMap(Map<String, dynamic>.from(m)))
+          .map((m) => HubConfig.fromMap(_deepCast(m)))
           .toList();
     } catch (e) {
       // Return empty on error — user sees empty state with retry
@@ -43,8 +44,10 @@ final hubConfigDetailProvider = FutureProvider.family<HubConfig, String>(
   (ref, configId) async {
     final functions = FirebaseFunctions.instance;
     final callable = functions.httpsCallable('getConfig');
-    final result = await callable.call<Map<String, dynamic>>({'id': configId});
-    return HubConfig.fromMap(Map<String, dynamic>.from(result.data));
+    final result = await callable.call<dynamic>({'id': configId});
+    final raw = result.data;
+    final map = raw is Map ? _deepCast(raw as Map) : <String, dynamic>{};
+    return HubConfig.fromMap(map);
   },
 );
 
@@ -56,8 +59,10 @@ Future<bool> toggleStar(String configId, WidgetRef ref) async {
   try {
     final functions = FirebaseFunctions.instance;
     final callable = functions.httpsCallable('starConfig');
-    final result = await callable.call<Map<String, dynamic>>({'id': configId});
-    final starred = result.data['starred'] as bool? ?? false;
+    final result = await callable.call<dynamic>({'id': configId});
+    final raw = result.data;
+    final rmap = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+    final starred = rmap['starred'] as bool? ?? false;
 
     ref.read(starredConfigsProvider.notifier).update((s) {
       final updated = Set<String>.from(s);
@@ -73,3 +78,15 @@ Future<bool> toggleStar(String configId, WidgetRef ref) async {
     return false;
   }
 }
+
+/// Deep-cast Map<Object?, Object?> → Map<String, dynamic> for Firebase responses.
+Map<String, dynamic> _deepCast(Map m) => m.map(
+      (k, v) => MapEntry(
+        k?.toString() ?? '',
+        v is Map
+            ? _deepCast(v)
+            : v is List
+                ? v.map((e) => e is Map ? _deepCast(e) : e).toList()
+                : v,
+      ),
+    );
