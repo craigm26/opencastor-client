@@ -23,6 +23,7 @@ const SCOPE_LEVEL: Record<string, number> = {
   control: 3,
   safety: 99,
   transparency: 0,
+  system: 3,   // same level as control — requires admin role on the robot side
 };
 
 /**

@@ -18,6 +18,7 @@ const LIMITS: Record<CommandScope, number | null> = {
   control: 10,
   safety: null,       // never rate-limit ESTOP
   transparency: 60,
+  system: 5,          // low limit — upgrade/reboot are infrequent ops
 };
 
 const WINDOW_MS = 60_000; // 1 minute rolling window

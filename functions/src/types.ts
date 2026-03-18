@@ -9,7 +9,8 @@ export type CommandScope =
   | "chat"
   | "control"
   | "safety"
-  | "transparency";
+  | "transparency"
+  | "system";
 
 export type CommandStatus =
   | "pending"
