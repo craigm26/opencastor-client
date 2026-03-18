@@ -146,16 +146,16 @@ export const deleteComment = functions.onCall({ cors: CORS }, async (request: Ca
 export const getMyStars = functions.onCall({ cors: CORS }, async (request: CallableRequest<unknown>) => {
   if (!request.auth) throw new functions.HttpsError("unauthenticated", "Login required");
 
+  // No orderBy — avoids composite index requirement; sort in memory instead
   const snaps = await db().collection("stars")
     .where("uid", "==", request.auth.uid)
-    .orderBy("created_at", "desc")
     .limit(50)
     .get();
 
   const configIds = snaps.docs.map(d => d.data().config_id as string);
   if (configIds.length === 0) return { configs: [] };
 
-  // Batch fetch configs
+  // Batch fetch configs (Firestore in-queries limited to 10)
   const chunks: string[][] = [];
   for (let i = 0; i < configIds.length; i += 10) chunks.push(configIds.slice(i, i + 10));
 
@@ -170,6 +170,8 @@ export const getMyStars = functions.onCall({ cors: CORS }, async (request: Calla
     }
   }
 
+  // Sort by stars desc in memory
+  configs.sort((a, b) => (b.stars || 0) - (a.stars || 0));
   return { configs };
 });
 
@@ -178,18 +180,20 @@ export const getMyStars = functions.onCall({ cors: CORS }, async (request: Calla
 export const getMyConfigs = functions.onCall({ cors: CORS }, async (request: CallableRequest<unknown>) => {
   if (!request.auth) throw new functions.HttpsError("unauthenticated", "Login required");
 
+  // No orderBy — avoids composite index requirement; sort in memory instead
   const snaps = await db().collection("configs")
     .where("author_uid", "==", request.auth.uid)
-    .orderBy("created_at", "desc")
     .limit(50)
     .get();
 
-  return {
-    configs: snaps.docs.map(d => {
-      const { content: _, ...rest } = d.data();
-      return rest;
-    }),
-  };
+  const configs = snaps.docs.map(d => {
+    const { content: _, ...rest } = d.data();
+    return rest;
+  });
+
+  // Sort by installs desc in memory (newest uploads tend to have fewer installs)
+  configs.sort((a, b) => (b.installs || 0) - (a.installs || 0));
+  return { configs };
 });
 
 // ── Publish fork (make public) ────────────────────────────────────────────────
