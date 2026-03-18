@@ -36,6 +36,8 @@ import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import 'robot_detail_view_model.dart';
 
+enum _RobotAction { control, share, docs, capabilities }
+
 class RobotDetailScreen extends ConsumerStatefulWidget {
   final String rrn;
   const RobotDetailScreen({super.key, required this.rrn});
@@ -345,33 +347,14 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
         title: Text(robot.name),
         actions: [
           HealthIndicator(isOnline: robot.isOnline, size: 8),
-          const SizedBox(width: 8),
-          // Docs link
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'Fleet UI Docs',
-            onPressed: () =>
-                launchUrl(Uri.parse(AppConstants.docsFleetUi)),
-          ),
-          if (robot.hasCapability(RobotCapability.control))
-            IconButton(
-              icon: const Icon(Icons.precision_manufacturing_outlined),
-              tooltip: 'Control',
-              onPressed: () => context.push('/robot/${robot.rrn}/control'),
-            ),
-          // Show QR code for this robot's RRN
+          const SizedBox(width: 4),
+          // QR code — always visible (primary scan action)
           IconButton(
             icon: const Icon(Icons.qr_code_outlined),
             tooltip: 'Show Robot QR Code',
             onPressed: () => _showRrnQrCode(context, robot.rrn, robot.name),
           ),
-          // Share config to Hub
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share Config to Hub',
-            onPressed: () => _shareConfigToHub(context, robot.rrn, robot.name),
-          ),
-          // ESTOP — always available (Protocol 66 §4.1)
+          // ESTOP — always visible on mobile (Protocol 66 §4.1)
           if (robot.isOnline && !robot.isRevoked)
             IconButton(
               icon: const Icon(Icons.stop_circle_outlined,
@@ -382,6 +365,58 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 if (ok && context.mounted) await repo.sendEstop(robot.rrn);
               },
             ),
+          // Overflow menu — secondary actions that don't need top-bar real estate
+          PopupMenuButton<_RobotAction>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More',
+            onSelected: (action) {
+              switch (action) {
+                case _RobotAction.control:
+                  context.push('/robot/${robot.rrn}/control');
+                case _RobotAction.share:
+                  _shareConfigToHub(context, robot.rrn, robot.name);
+                case _RobotAction.docs:
+                  launchUrl(Uri.parse(AppConstants.docsFleetUi));
+                case _RobotAction.capabilities:
+                  context.push('/robot/${robot.rrn}/capabilities');
+              }
+            },
+            itemBuilder: (_) => [
+              if (robot.hasCapability(RobotCapability.control))
+                const PopupMenuItem(
+                  value: _RobotAction.control,
+                  child: ListTile(
+                    leading: Icon(Icons.precision_manufacturing_outlined),
+                    title: Text('Control'),
+                    dense: true,
+                  ),
+                ),
+              const PopupMenuItem(
+                value: _RobotAction.capabilities,
+                child: ListTile(
+                  leading: Icon(Icons.tune_outlined),
+                  title: Text('Capabilities'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: _RobotAction.share,
+                child: ListTile(
+                  leading: Icon(Icons.share_outlined),
+                  title: Text('Share Config to Hub'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: _RobotAction.docs,
+                child: ListTile(
+                  leading: Icon(Icons.info_outline),
+                  title: Text('Docs'),
+                  dense: true,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(

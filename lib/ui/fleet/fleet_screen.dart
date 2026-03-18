@@ -26,11 +26,8 @@ class FleetScreen extends ConsumerWidget {
             tooltip: 'Fleet Docs',
             onPressed: () => launchUrl(Uri.parse(AppConstants.docsRoot)),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined),
-            tooltip: 'Account',
-            onPressed: () => context.push('/account'),
-          ),
+          // Profile avatar — shows photo if signed in, fallback icon if not
+          _ProfileAvatarButton(),
         ],
       ),
       body: Column(
@@ -511,5 +508,53 @@ class _ErrorView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Profile avatar button ─────────────────────────────────────────────────────
+
+class _ProfileAvatarButton extends StatelessWidget {
+  const _ProfileAvatarButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => context.push('/account'),
+        child: Tooltip(
+          message: user?.displayName ?? user?.email ?? 'Account',
+          child: CircleAvatar(
+            radius: 16,
+            backgroundColor: cs.primaryContainer,
+            backgroundImage: user?.photoURL != null
+                ? NetworkImage(user!.photoURL!)
+                : null,
+            child: user?.photoURL == null
+                ? Text(
+                    _initials(user?.displayName ?? user?.email),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onPrimaryContainer,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String? name) {
+    if (name == null || name.isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name[0].toUpperCase();
   }
 }
