@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum CommandScope { discover, status, chat, control, safety, transparency }
+enum CommandScope { discover, status, chat, control, safety, transparency, system }
 
 enum CommandStatus { pending, processing, complete, failed, denied, expired, pendingConsent }
 

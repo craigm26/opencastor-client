@@ -864,33 +864,33 @@ class _VersionBadge extends ConsumerWidget {
 
     if (ok != true || !context.mounted) return;
 
-    // Send update command via RCAN chat scope
+    // Send UPGRADE via system scope — bridge routes to /api/system/upgrade
     try {
       final repo = ref.read(robotRepositoryProvider);
       await repo.sendCommand(
         rrn: rrn,
-        instruction:
-            'SYSTEM_UPDATE: pip install --upgrade opencastor==$latest',
-        scope: CommandScope.chat,
+        instruction: 'UPGRADE: $latest',
+        scope: CommandScope.system,
         reason: 'OTA update to v$latest requested from OpenCastor app',
       );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                'Update command sent to $rrn — robot will upgrade to v$latest'),
+            content: Text('Upgrading $rrn to v$latest — takes ~30s'),
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 5),
           ),
         );
-        // Invalidate latest version cache so the badge refreshes
-        ref.invalidate(_latestVersionProvider);
+        // Refresh badge after delay (pip takes ~20–30s)
+        Future.delayed(const Duration(seconds: 35), () {
+          if (context.mounted) ref.invalidate(_latestVersionProvider);
+        });
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to send update: $e'),
+            content: Text('Failed to send upgrade: $e'),
             behavior: SnackBarBehavior.floating,
           ),
         );
