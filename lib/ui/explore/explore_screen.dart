@@ -276,9 +276,21 @@ class _ConfigCard extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Type badge + star
+              // Official badge + type badge + star
               Row(
                 children: [
+                  if (config.isOfficial) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade700,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('⭐ Official',
+                          style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   _TypeBadge(type: config.type),
                   const Spacer(),
                   GestureDetector(

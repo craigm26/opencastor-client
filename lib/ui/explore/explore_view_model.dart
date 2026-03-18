@@ -27,10 +27,17 @@ final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFil
       final raw = result.data;
       final data = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
       final results = (data['results'] as List?) ?? [];
-      return results
+      final configs = results
           .whereType<Map>()
           .map((m) => HubConfig.fromMap(_deepCast(m)))
           .toList();
+      // Official configs always sorted first
+      configs.sort((a, b) {
+        if (a.isOfficial && !b.isOfficial) return -1;
+        if (!a.isOfficial && b.isOfficial) return 1;
+        return b.stars.compareTo(a.stars);
+      });
+      return configs;
     } catch (e) {
       // Return empty on error — user sees empty state with retry
       throw Exception('Could not load hub configs: $e');

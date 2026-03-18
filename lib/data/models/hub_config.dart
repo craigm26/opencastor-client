@@ -19,6 +19,7 @@ class HubConfig {
     this.forkedFrom,
     this.commentCount = 0,
     this.forks = 0,
+    this.isOfficial = false,
   });
 
   final String id;
@@ -39,6 +40,7 @@ class HubConfig {
   final String? forkedFrom;
   final int commentCount;
   final int forks;
+  final bool isOfficial;
 
   String get installCmd => 'castor install opencastor.com/config/$id';
   String get webUrl => 'https://opencastor.com/config/$id';
@@ -62,5 +64,6 @@ class HubConfig {
         forkedFrom: map['forked_from'] as String?,
         commentCount: (map['comment_count'] as num?)?.toInt() ?? 0,
         forks: (map['forks'] as num?)?.toInt() ?? 0,
+        isOfficial: map['official'] as bool? ?? false,
       );
 }
