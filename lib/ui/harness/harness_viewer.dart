@@ -152,7 +152,7 @@ class _HarnessViewerState extends State<HarnessViewer> {
     final layer = item.layer!;
     return _LayerCard(
       layer: layer,
-      onEdit: widget.onEditLayer != null
+      onEdit: widget.onEditLayer != null && layer.canDisable
           ? () => widget.onEditLayer!(layer)
           : null,
       expanded: _isExpanded(layer.id),
