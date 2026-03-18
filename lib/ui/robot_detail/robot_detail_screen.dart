@@ -20,7 +20,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:cloud_functions/cloud_functions.dart';
@@ -36,7 +35,7 @@ import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import 'robot_detail_view_model.dart';
 
-enum _RobotAction { control, share, docs, capabilities }
+enum _RobotAction { control, share, docs, capabilities, harness }
 
 class RobotDetailScreen extends ConsumerStatefulWidget {
   final String rrn;
@@ -379,6 +378,8 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                   launchUrl(Uri.parse(AppConstants.docsFleetUi));
                 case _RobotAction.capabilities:
                   context.push('/robot/${robot.rrn}/capabilities');
+                case _RobotAction.harness:
+                  context.push('/robot/${robot.rrn}/harness');
               }
             },
             itemBuilder: (_) => [
@@ -396,6 +397,14 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 child: ListTile(
                   leading: Icon(Icons.tune_outlined),
                   title: Text('Capabilities'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: _RobotAction.harness,
+                child: ListTile(
+                  leading: Icon(Icons.account_tree_outlined),
+                  title: Text('Harness'),
                   dense: true,
                 ),
               ),
@@ -624,6 +633,15 @@ class _TelemetryPanel extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       onPressed: () =>
                           context.push('/robot/${robot.rrn}/capabilities'),
+                    ),
+                    // 3b. Harness chip
+                    ActionChip(
+                      label: const Text('Harness'),
+                      avatar: const Icon(Icons.account_tree_outlined,
+                          size: 14),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          context.push('/robot/${robot.rrn}/harness'),
                     ),
                     // 4. Public profile chip (if available)
                     _RobotProfileChip(rrn: robot.rrn),

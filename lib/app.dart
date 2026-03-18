@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/constants.dart';
+import 'data/models/harness_config.dart';
 import 'data/services/auth_service.dart';
 import 'ui/alerts/alerts_screen.dart';
 import 'ui/consent/consent_screen.dart';
@@ -26,6 +27,8 @@ import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
 import 'ui/login/ecosystem_section.dart';
 import 'ui/physical_control/physical_control_screen.dart';
+import 'ui/harness/harness_editor.dart';
+import 'ui/harness/harness_viewer.dart';
 import 'ui/robot_capabilities/robot_capabilities_screen.dart';
 import 'ui/robot_detail/robot_detail_screen.dart';
 import 'ui/robot_status/robot_status_screen.dart';
@@ -182,6 +185,26 @@ final _routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: '/robot/:rrn/harness',
+            builder: (_, state) {
+              final rrn = state.pathParameters['rrn']!;
+              return _HarnessViewerPage(rrn: rrn);
+            },
+          ),
+          GoRoute(
+            path: '/robot/:rrn/harness/edit',
+            builder: (_, state) {
+              final rrn = state.pathParameters['rrn']!;
+              final extra = state.extra as _HarnessEditorArgs?;
+              return HarnessEditorScreen(
+                rrn: rrn,
+                robotName: extra?.robotName ?? rrn,
+                initialConfig: extra?.config ??
+                    HarnessConfig.defaults(robotRrn: rrn),
+              );
+            },
+          ),
+          GoRoute(
             path: '/consent',
             builder: (_, __) => const ConsentScreen(),
           ),
@@ -225,6 +248,48 @@ class OpenCastorApp extends ConsumerWidget {
       themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Harness route helpers
+// ---------------------------------------------------------------------------
+
+/// Arguments for the harness editor route (/robot/:rrn/harness/edit).
+class _HarnessEditorArgs {
+  final String robotName;
+  final HarnessConfig config;
+  const _HarnessEditorArgs({required this.robotName, required this.config});
+}
+
+/// Standalone harness viewer page — wraps HarnessViewer + Edit Harness button.
+class _HarnessViewerPage extends StatelessWidget {
+  final String rrn;
+  const _HarnessViewerPage({required this.rrn});
+
+  @override
+  Widget build(BuildContext context) {
+    final config = HarnessConfig.defaults(robotRrn: rrn);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Harness'),
+        actions: [
+          FilledButton.icon(
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Edit Harness'),
+            onPressed: () => context.push(
+              '/robot/$rrn/harness/edit',
+              extra: _HarnessEditorArgs(
+                robotName: rrn,
+                config: config,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
+      body: HarnessViewer(config: config),
     );
   }
 }

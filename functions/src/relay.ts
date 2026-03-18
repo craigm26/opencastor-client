@@ -62,6 +62,14 @@ export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "
   const robot = robotDoc.data()!;
   const isOwner = robot.firebase_uid === auth.uid;
 
+  // system scope is owner-only — no peer delegation for safety-critical ops
+  if (!isOwner && data.scope === "system") {
+    throw new https.HttpsError(
+      "permission-denied",
+      "system scope commands can only be sent by the robot owner — peer delegation is not permitted"
+    );
+  }
+
   // Cross-owner scope check
   if (!isOwner) {
     const authorized = await checkCrossOwnerScope(
