@@ -218,8 +218,10 @@ export const searchConfigs = functions.onCall(
     if (provider) docs = docs.filter((d) => d.provider === provider);
     if (rcan_version) docs = docs.filter((d) => d.rcan_version === rcan_version);
 
-    // Sort by stars desc, then installs desc (no created_at index needed)
+    // Sort: official first, then by stars desc, then installs desc
     docs.sort((a, b) => {
+      if (a.official && !b.official) return -1;
+      if (!a.official && b.official) return 1;
       const starDiff = (b.stars || 0) - (a.stars || 0);
       if (starDiff !== 0) return starDiff;
       return (b.installs || 0) - (a.installs || 0);
