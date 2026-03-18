@@ -615,7 +615,8 @@ class _TelemetryPanel extends StatelessWidget {
                     _StatusBadge(isOnline: robot.isOnline),
                     // 2. OpenCastor version badge (+ update arrow if outdated)
                     _VersionBadge(
-                        version: robot.opencastorVersion, rrn: robot.rrn),
+                        version: robot.opencastorVersion ?? robot.version,
+                        rrn: robot.rrn),
                     // 3. Capabilities chip
                     ActionChip(
                       label: const Text('Capabilities'),
