@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/hub_config.dart';
+import '../../data/models/harness_config.dart';
+import '../../ui/harness/harness_viewer.dart';
 import 'explore_view_model.dart';
 import 'social_view_model.dart';
 
@@ -73,7 +75,7 @@ class _DiscoverTab extends StatelessWidget {
               children: ExploreFilter.values.map((f) {
                 final selected = filter == f;
                 return FilterChip(
-                  label: Text(f.name[0].toUpperCase() + f.name.substring(1)),
+                  label: Text(_filterLabel(f)),
                   selected: selected,
                   onSelected: (_) =>
                       ref.read(exploreFilterProvider.notifier).state = f,
@@ -519,6 +521,21 @@ class _ConfigDetail extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
+          // ── Inline visual for harness / skill / preset ───────────────
+          if (config.type == 'harness') ...[
+            Text('Pipeline',
+                style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _HarnessPreview(config: config),
+            const SizedBox(height: 16),
+          ] else if (config.type == 'skill') ...[
+            _SkillInfoCard(config: config),
+            const SizedBox(height: 16),
+          ] else ...[
+            _PresetSummaryCard(config: config),
+            const SizedBox(height: 16),
+          ],
+
           // Metadata cards
           _MetaRow(items: [
             ('Provider', config.provider),
@@ -916,7 +933,7 @@ class _TypeBadge extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.4)),
       ),
       child: Text(
-        type.toUpperCase(),
+        _typeDisplayLabel(type),
         style: TextStyle(
             fontSize: 10, fontWeight: FontWeight.w700, color: color,
             letterSpacing: 0.5),
@@ -1038,6 +1055,333 @@ class _ErrorState extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Display helpers ───────────────────────────────────────────────────────────
+
+/// Human-readable label for the type badge (display only — Firestore value unchanged).
+String _typeDisplayLabel(String type) {
+  switch (type) {
+    case 'preset':
+      return 'CONFIG';
+    case 'skill':
+      return 'SKILL';
+    case 'harness':
+      return 'HARNESS';
+    default:
+      return type.toUpperCase();
+  }
+}
+
+/// Human-readable label for filter chips.
+String _filterLabel(ExploreFilter f) {
+  switch (f) {
+    case ExploreFilter.all:
+      return 'All';
+    case ExploreFilter.preset:
+      return 'Community Configs';
+    case ExploreFilter.skill:
+      return 'Skills';
+    case ExploreFilter.harness:
+      return 'Harnesses';
+  }
+}
+
+// ── Inline harness preview ────────────────────────────────────────────────────
+
+class _HarnessPreview extends StatelessWidget {
+  const _HarnessPreview({required this.config});
+  final HubConfig config;
+
+  HarnessConfig _buildHarnessConfig() {
+    // yaml package not available — use defaults visual (same pipeline for all
+    // harness configs). The visual pipeline is what matters for exploration.
+    return HarnessConfig.defaults(robotRrn: config.robotRrn ?? config.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final harnessConfig = _buildHarnessConfig();
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+        borderRadius: BorderRadius.circular(12),
+        color: cs.surfaceContainerLowest,
+      ),
+      constraints: const BoxConstraints(maxHeight: 480),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: HarnessViewer(
+          config: harnessConfig,
+          // readOnly: no onEditLayer callback passed → edit buttons hidden
+        ),
+      ),
+    );
+  }
+}
+
+// ── Skill info card ───────────────────────────────────────────────────────────
+
+class _SkillInfoCard extends StatelessWidget {
+  const _SkillInfoCard({required this.config});
+  final HubConfig config;
+
+  static String _scope(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('navigate') || t.contains('arm') || t.contains('manipulat')) {
+      return 'control';
+    }
+    if (t.contains('camera') || t.contains('describe') || t.contains('vision')) {
+      return 'status';
+    }
+    return 'chat';
+  }
+
+  static Color _scopeColor(String scope) {
+    switch (scope) {
+      case 'control':
+        return const Color(0xFFef4444);
+      case 'status':
+        return const Color(0xFF0ea5e9);
+      default:
+        return const Color(0xFF7c3aed);
+    }
+  }
+
+  static IconData _scopeIcon(String scope) {
+    switch (scope) {
+      case 'control':
+        return Icons.gamepad_outlined;
+      case 'status':
+        return Icons.monitor_heart_outlined;
+      default:
+        return Icons.chat_bubble_outline;
+    }
+  }
+
+  static String _slashCommand(String title) {
+    // Derive slash command from skill title/tags
+    final slug = title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    return '/$slug';
+  }
+
+  static List<String> _bullets(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('navigate')) {
+      return [
+        'Sends robot to a named waypoint or coordinates',
+        'Supports obstacle-aware pathfinding',
+        'Returns navigation status in real time',
+      ];
+    }
+    if (t.contains('camera') || t.contains('describe')) {
+      return [
+        'Captures current camera frame',
+        'Runs vision model to describe the scene',
+        'Returns a natural-language description',
+      ];
+    }
+    if (t.contains('arm') || t.contains('manipulat')) {
+      return [
+        'Moves arm to specified joint angles or pose',
+        'Controls gripper open/close',
+        'Supports pick-and-place primitives',
+      ];
+    }
+    if (t.contains('web') || t.contains('lookup')) {
+      return [
+        'Searches the web for up-to-date information',
+        'Returns summarised results to the agent',
+      ];
+    }
+    if (t.contains('peer') || t.contains('coordinate')) {
+      return [
+        'Discovers other robots on the RCAN mesh',
+        'Delegates sub-tasks to peer agents',
+      ];
+    }
+    if (t.contains('code') || t.contains('review')) {
+      return [
+        'Analyses code files for bugs and style issues',
+        'Outputs structured review comments',
+      ];
+    }
+    return [
+      'Extends robot capabilities via slash command',
+      'Integrates with the RCAN skill pipeline',
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final scope = _scope(config.title);
+    final scopeColor = _scopeColor(scope);
+    final cmd = _slashCommand(config.title);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Scope badge row
+          Row(
+            children: [
+              Icon(_scopeIcon(scope), size: 16, color: scopeColor),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scopeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: scopeColor.withOpacity(0.35)),
+                ),
+                child: Text(
+                  'RCAN scope: $scope',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: scopeColor,
+                      letterSpacing: 0.4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // What this skill does
+          Text('What this skill does',
+              style: tt.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          ..._bullets(config.title).map((b) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ',
+                        style: TextStyle(
+                            color: scopeColor, fontWeight: FontWeight.w700)),
+                    Expanded(
+                        child: Text(b,
+                            style: tt.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant))),
+                  ],
+                ),
+              )),
+          const SizedBox(height: 12),
+
+          // Example slash command
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.terminal, size: 13, color: cs.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '$cmd <args>',
+                  style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Preset / community-config summary card ────────────────────────────────────
+
+class _PresetSummaryCard extends StatelessWidget {
+  const _PresetSummaryCard({required this.config});
+  final HubConfig config;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    final chips = <(String, String, Color)>[
+      if (config.provider.isNotEmpty)
+        ('Provider', config.provider, const Color(0xFF0ea5e9)),
+      if (config.hardware.isNotEmpty)
+        ('Hardware', config.hardware, const Color(0xFF22c55e)),
+      if (config.rcanVersion.isNotEmpty)
+        ('RCAN', config.rcanVersion, const Color(0xFFa855f7)),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Robot Config',
+              style:
+                  tt.labelSmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: chips.map((chip) {
+              final (label, value, color) = chip;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color.withOpacity(0.35)),
+                ),
+                child: RichText(
+                  text: TextSpan(
+                    style: DefaultTextStyle.of(context).style,
+                    children: [
+                      TextSpan(
+                          text: '$label: ',
+                          style: TextStyle(
+                              fontSize: 10,
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w500)),
+                      TextSpan(
+                          text: value,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: color,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
