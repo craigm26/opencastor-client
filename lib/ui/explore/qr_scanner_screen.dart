@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// QR scanner screen for scanning castor install QR codes.
 ///
@@ -68,22 +70,24 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           ),
         ],
       ),
-      body: _useManual ? _ManualEntry(
-        controller: _manualCtrl,
-        error: _error,
-        onSubmit: _handleScanned,
-      ) : _CameraPlaceholder(
-        onManualFallback: () => setState(() => _useManual = true),
-        // TODO: swap this placeholder with mobile_scanner MobileScanner widget
-        // when mobile_scanner is added to pubspec.yaml:
-        //
-        //   MobileScanner(
-        //     onDetect: (capture) {
-        //       final barcode = capture.barcodes.firstOrNull;
-        //       if (barcode?.rawValue != null) _handleScanned(barcode!.rawValue!);
-        //     },
-        //   )
-      ),
+      body: _useManual
+          ? _ManualEntry(
+              controller: _manualCtrl,
+              error: _error,
+              onSubmit: _handleScanned,
+            )
+          : kIsWeb
+              ? _CameraPlaceholder(
+                  onManualFallback: () => setState(() => _useManual = true),
+                )
+              : MobileScanner(
+                  onDetect: (capture) {
+                    final barcode = capture.barcodes.firstOrNull;
+                    if (barcode?.rawValue != null) {
+                      _handleScanned(barcode!.rawValue!);
+                    }
+                  },
+                ),
     );
   }
 }

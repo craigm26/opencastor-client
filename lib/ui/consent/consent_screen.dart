@@ -14,7 +14,9 @@
 library;
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -638,35 +640,50 @@ class _RrnScannerSheetState extends State<_RrnScannerSheet> {
           ),
           const SizedBox(height: 20),
 
-          // Camera scan placeholder (TODO: mobile_scanner)
-          Container(
+          // Camera scanner (mobile_scanner on native, placeholder on web)
+          SizedBox(
             width: double.infinity,
             height: 200,
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
+            child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: cs.outlineVariant, style: BorderStyle.solid),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.qr_code_scanner,
-                    size: 56, color: cs.onSurfaceVariant),
-                const SizedBox(height: 10),
-                Text(
-                  'Camera scanner',
-                  style: TextStyle(
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Coming in next update — use manual entry below',
-                  style: TextStyle(
-                      fontSize: 11, color: cs.onSurfaceVariant),
-                ),
-              ],
+              child: kIsWeb
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: cs.outlineVariant,
+                            style: BorderStyle.solid),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.qr_code_scanner,
+                              size: 56, color: cs.onSurfaceVariant),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Camera scanner unavailable on web',
+                            style: TextStyle(
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Use manual entry below',
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    )
+                  : MobileScanner(
+                      onDetect: (capture) {
+                        final barcode = capture.barcodes.firstOrNull;
+                        if (barcode?.rawValue != null) {
+                          _submit(barcode!.rawValue!);
+                        }
+                      },
+                    ),
             ),
           ),
 
