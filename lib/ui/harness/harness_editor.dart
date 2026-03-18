@@ -442,8 +442,12 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
                 )
               else
                 Tooltip(
-                  message: 'P66 layer cannot be disabled',
+                  message: widget.layer.type == 'trajectory'
+                      ? 'Trajectory logging is always on — required for RCAN audit compliance'
+                      : 'P66 layer cannot be disabled',
                   child: Chip(
+                    avatar: Icon(Icons.lock_outline,
+                        size: 12, color: AppTheme.danger),
                     label: const Text('always-on'),
                     backgroundColor: AppTheme.danger.withOpacity(0.12),
                     labelStyle:
@@ -487,10 +491,8 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
 
       case 'trajectory':
         return _TrajectoryEditor(
-          layer: widget.layer,
           config: _config,
           onUpdate: _updateConfig,
-          onToggle: () => widget.onToggle(widget.layer),
         );
 
       case 'hook':
@@ -698,35 +700,19 @@ class _ModelEditorState extends State<_ModelEditor> {
 }
 
 class _TrajectoryEditor extends StatelessWidget {
-  final HarnessLayer layer;
   final Map<String, dynamic> config;
   final void Function(String, dynamic) onUpdate;
-  final VoidCallback onToggle;
 
   const _TrajectoryEditor({
-    required this.layer,
     required this.config,
     required this.onUpdate,
-    required this.onToggle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text('Enabled',
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-            Switch(
-              value: layer.enabled,
-              onChanged: (_) => onToggle(),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ],
-        ),
         TextFormField(
           initialValue:
               config['sqlite_path'] as String? ?? 'trajectory.db',

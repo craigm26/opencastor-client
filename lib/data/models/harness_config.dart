@@ -223,13 +223,16 @@ class HarnessConfig {
             enabled: true,
             config: {'drift_threshold': 0.15},
           ),
-          // 6. Trajectory Logger — always last
+          // 6. Trajectory Logger — always on, always last
           const HarnessLayer(
             id: 'trajectory-logger',
             type: 'trajectory',
             label: 'Trajectory Logger',
-            description: 'Records every P66 decision to SQLite audit trail',
+            description:
+                'Always-on audit trail — every run logged to SQLite. '
+                'Required for autoresearch and RCAN compliance.',
             enabled: true,
+            canDisable: false,
             canReorder: false,
             config: {
               'sqlite_path': 'trajectory.db',
@@ -341,15 +344,16 @@ class HarnessConfig {
       },
     ));
 
-    // Trajectory logger — always last
+    // Trajectory logger — always on, always last
     layers.add(HarnessLayer(
       id: 'trajectory-logger',
       type: 'trajectory',
       label: 'Trajectory Logger',
-      description: 'Records every P66 decision to SQLite audit trail',
-      enabled: trajectorySection['enabled'] as bool? ??
-          harnessSection['enabled'] as bool? ??
-          true,
+      description:
+          'Always-on audit trail — every run logged to SQLite. '
+          'Required for autoresearch and RCAN compliance.',
+      enabled: true,
+      canDisable: false,
       canReorder: false,
       config: {
         'sqlite_path':
