@@ -553,8 +553,9 @@ class _TelemetryPanel extends StatelessWidget {
         children: [
           // ── Header card: avatar + name + status ────────────────────
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero-wrapped robot avatar (matches fleet card animation)
+              // Hero-wrapped robot avatar
               Hero(
                 tag: 'robot-avatar-${robot.rrn}',
                 child: CircleAvatar(
@@ -567,34 +568,32 @@ class _TelemetryPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
+              // All pills/chips in a Wrap — flows to next line on small screens
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Row(
-                      children: [
-                        // 1. Online/Offline status badge
-                        _StatusBadge(isOnline: robot.isOnline),
-                        const SizedBox(width: 8),
-                        // 2. OpenCastor version badge
-                        _VersionBadge(version: robot.opencastorVersion, rrn: robot.rrn),
-                      ],
+                    // 1. Online/Offline status badge
+                    _StatusBadge(isOnline: robot.isOnline),
+                    // 2. OpenCastor version badge (+ update arrow if outdated)
+                    _VersionBadge(
+                        version: robot.opencastorVersion, rrn: robot.rrn),
+                    // 3. Capabilities chip
+                    ActionChip(
+                      label: const Text('Capabilities'),
+                      avatar: const Icon(Icons.tune_outlined, size: 14),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          context.push('/robot/${robot.rrn}/capabilities'),
                     ),
+                    // 4. Public profile chip (if available)
+                    _RobotProfileChip(rrn: robot.rrn),
                   ],
                 ),
               ),
-              // 3. Single Capabilities ActionChip
-              ActionChip(
-                label: const Text('Capabilities ▶'),
-                avatar: const Icon(Icons.tune_outlined, size: 14),
-                visualDensity: VisualDensity.compact,
-                onPressed: () =>
-                    context.push('/robot/${robot.rrn}/capabilities'),
-              ),
-              const SizedBox(width: 6),
-              // 4. Public profile link (if robot has public profile)
-              _RobotProfileChip(rrn: robot.rrn),
             ],
           ),
 
