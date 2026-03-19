@@ -213,6 +213,17 @@ class MissionMessage {
     }
   }
 
+  /// Strips raw Python dict repr that leaked before bridge fix (e.g.
+  /// "{'raw_text': 'Hello', 'action': None, 'model_used': 'unknown', ...}")
+  static String _cleanContent(String raw) {
+    final s = raw.trim();
+    // Looks like a Python dict with raw_text key — extract the value
+    final match = RegExp(r"'raw_text'\s*:\s*'([^']*)'").firstMatch(s);
+    if (match != null) return match.group(1)!.trim();
+    // Looks like a generic dict/map dump — return as-is (best effort)
+    return s;
+  }
+
   factory MissionMessage.fromMap(String docId, Map<String, dynamic> m) {
     final rawMentions = (m['mentions'] as List<dynamic>?) ?? [];
     return MissionMessage(
@@ -222,7 +233,7 @@ class MissionMessage {
       fromRrn: m['from_rrn'] as String?,
       fromName: m['from_name'] as String? ?? 'Unknown',
       fromRole: humanRoleFromStr(m['from_role'] as String?),
-      content: m['content'] as String? ?? '',
+      content: _cleanContent(m['content'] as String? ?? ''),
       mentions: rawMentions.map((e) => e as String).toList(),
       timestamp: _parseTs(m['timestamp']),
       status: _statusFromStr(m['status'] as String?),
