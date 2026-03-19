@@ -28,28 +28,32 @@ final commandsProvider =
 });
 
 /// Notifier for the "send chat" action — tracks loading state per robot.
-class SendChatNotifier extends AutoDisposeAsyncNotifier<void> {
+/// Returns the newly-created command ID so the caller can track it.
+class SendChatNotifier extends AutoDisposeAsyncNotifier<String?> {
   @override
-  Future<void> build() async {}
+  Future<String?> build() async => null;
 
-  Future<void> send({
+  Future<String?> send({
     required String rrn,
     required String instruction,
     List<Map<String, dynamic>>? mediaChunks,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => ref.read(robotRepositoryProvider).sendCommand(
+    String? cmdId;
+    state = await AsyncValue.guard(() async {
+      cmdId = await ref.read(robotRepositoryProvider).sendCommand(
             rrn: rrn,
             instruction: instruction,
             scope: CommandScope.chat,
             mediaChunks: mediaChunks,
-          ),
-    );
+          );
+      return cmdId;
+    });
+    return cmdId;
   }
 }
 
 final sendChatProvider =
-    AsyncNotifierProvider.autoDispose<SendChatNotifier, void>(
+    AsyncNotifierProvider.autoDispose<SendChatNotifier, String?>(
   SendChatNotifier.new,
 );

@@ -53,6 +53,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   final _ctrl = TextEditingController();
   bool _sending = false;
   bool _thinking = false;
+  String? _pendingCmdId; // command we're waiting on; null = not waiting
   Uint8List? _attachedImage;
   String _imageAnnotation = '';
 
@@ -118,11 +119,12 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     try {
       // Map slash command to RCAN instruction + scope
       final (instruction, scope) = _mapSlashCommand(cmd, args);
-      await ref.read(robotRepositoryProvider).sendCommand(
+      final cmdId = await ref.read(robotRepositoryProvider).sendCommand(
             rrn: robot.rrn,
             instruction: instruction,
             scope: scope,
           );
+      if (mounted) setState(() => _pendingCmdId = cmdId);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -471,7 +473,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
     // 30-second hard timeout for thinking indicator.
     Future.delayed(const Duration(seconds: 30), () {
-      if (mounted && _thinking) setState(() => _thinking = false);
+      if (mounted && _thinking) setState(() { _thinking = false; _pendingCmdId = null; });
     });
 
     // Normalize bare command names to slash form (e.g. "status" → "/status")
@@ -522,11 +524,12 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
         ];
       }
 
-      await ref.read(sendChatProvider.notifier).send(
+      final cmdId = await ref.read(sendChatProvider.notifier).send(
             rrn: robot.rrn,
             instruction: instruction,
             mediaChunks: mediaChunks,
           );
+      if (mounted && cmdId != null) setState(() => _pendingCmdId = cmdId);
     } finally {
       final elapsed = DateTime.now().difference(sendTime).inMilliseconds;
       final remaining = 1500 - elapsed;
@@ -560,15 +563,19 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     Robot robot,
     AsyncValue<List<RobotCommand>> commandsAsync,
   ) {
-    // Clear thinking indicator when the robot responds (command becomes complete).
+    // Clear thinking indicator only when OUR specific pending command completes.
+    // Checking cmds.first was a race: it matched the PREVIOUS completed command
+    // before the new one appeared in Firestore, clearing thinking immediately.
     ref.listen<AsyncValue<List<RobotCommand>>>(
       commandsProvider(widget.rrn),
       (prev, next) {
         next.whenData((cmds) {
-          if (!_thinking || cmds.isEmpty) return;
-          final latest = cmds.first; // newest command (list is newest-first)
-          if (latest.isComplete || latest.isFailed) {
-            if (mounted) setState(() => _thinking = false);
+          if (!_thinking) return;
+          final id = _pendingCmdId;
+          if (id == null) return; // no specific command to wait for
+          final match = cmds.where((c) => c.id == id).firstOrNull;
+          if (match != null && (match.isComplete || match.isFailed)) {
+            if (mounted) setState(() { _thinking = false; _pendingCmdId = null; });
           }
         });
       },
