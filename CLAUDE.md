@@ -3,6 +3,8 @@
 Flutter web app for remote fleet management of OpenCastor robots.
 Deployed at **[app.opencastor.com](https://app.opencastor.com)** via Cloudflare Pages.
 
+> **Design system:** Read `DESIGN.md` before making any UI changes. It defines colors, typography, spacing tokens, and component conventions. Never use magic numbers — always reference `AppTheme`, `Spacing`, and `AppRadius`.
+
 ---
 
 ## Ecosystem Repositories
