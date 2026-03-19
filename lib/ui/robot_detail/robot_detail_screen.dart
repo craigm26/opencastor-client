@@ -128,6 +128,23 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     }
   }
 
+  /// Normalize bare command names to slash form.
+  /// e.g. "status", "STATUS", "/status" → "/status"
+  static const _knownCommands = {
+    'status', 'skills', 'optimize', 'upgrade', 'reboot',
+    'stop', 'help', 'navigate', 'arm', 'camera',
+  };
+  static String _normalizeCommand(String text) {
+    final lower = text.trim().toLowerCase();
+    final bare = lower.startsWith('/') ? lower.substring(1).split(' ').first : lower.split(' ').first;
+    if (_knownCommands.contains(bare)) {
+      // Re-attach any arguments after the command name
+      final rest = text.trim().split(' ').skip(1).join(' ');
+      return rest.isEmpty ? '/$bare' : '/$bare $rest';
+    }
+    return text;
+  }
+
   /// Map a slash command to (instruction, CommandScope).
   static (String, CommandScope) _mapSlashCommand(String cmd, List<String> args) {
     return switch (cmd) {
@@ -381,7 +398,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
             _showHideCmdSheet(context, cmd.id);
           },
           child: ChatBubble(
-            text: cmd.result!['raw_text'].toString(),
+            text: (cmd.result?['raw_text'] ?? cmd.result?['response'] ?? cmd.result?['thought'] ?? '').toString(),
             isUser: false,
             timestamp: cmd.issuedAt,
           ),
@@ -419,6 +436,8 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
         child: ChatBubble(
           text: cmd.instruction,
           isUser: true,
+          isCommand: cmd.instruction.startsWith('/') ||
+              _knownCommands.contains(cmd.instruction.toLowerCase().split(' ').first),
           timestamp: cmd.issuedAt,
         ),
       ));
@@ -455,10 +474,13 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
       if (mounted && _thinking) setState(() => _thinking = false);
     });
 
+    // Normalize bare command names to slash form (e.g. "status" → "/status")
+    final normalizedText = _normalizeCommand(capturedText);
+
     // Handle slash commands typed directly into the input field
-    if (capturedText.startsWith('/') && capturedImage == null) {
+    if (normalizedText.startsWith('/') && capturedImage == null) {
       try {
-        final parts = capturedText.trim().split(' ');
+        final parts = normalizedText.trim().split(' ');
         final cmd = parts.first;
         final args = parts.skip(1).toList();
         await _sendSlashCommand(cmd, args, robot);

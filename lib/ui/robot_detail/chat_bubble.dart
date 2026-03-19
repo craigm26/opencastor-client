@@ -13,6 +13,7 @@ class ChatBubble extends StatelessWidget {
   final String text;
   final bool isUser;
   final bool isLoading;
+  final bool isCommand;
   final DateTime timestamp;
   final List<Map<String, dynamic>>? mediaChunks;
 
@@ -21,6 +22,7 @@ class ChatBubble extends StatelessWidget {
     required this.text,
     required this.isUser,
     this.isLoading = false,
+    this.isCommand = false,
     required this.timestamp,
     this.mediaChunks,
   });
@@ -70,6 +72,24 @@ class ChatBubble extends StatelessWidget {
               // ── Text / typing indicator ───────────────────────────────
               if (isLoading)
                 ThinkingIndicator(robotName: '', compact: true, color: textColor)
+              else if (isCommand && text.isNotEmpty)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.terminal_rounded,
+                        size: 14, color: textColor.withOpacity(0.85)),
+                    const SizedBox(width: 6),
+                    Text(
+                      text,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: textColor,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                )
               else if (text.isNotEmpty)
                 Text(
                   text,
