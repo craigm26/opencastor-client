@@ -80,7 +80,15 @@ class FirestoreRobotService implements RobotRepository {
         .orderBy('issued_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map(RobotCommand.fromDoc).toList());
+        .map((snap) => snap.docs
+            // Exclude mission_thread commands — those belong in the Mission screen,
+            // not the individual robot chat history.
+            .where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return data['context'] != 'mission_thread';
+            })
+            .map(RobotCommand.fromDoc)
+            .toList());
   }
 
   @override
