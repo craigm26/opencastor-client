@@ -16,8 +16,6 @@ class MissionListScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: Text('Not signed in')));
     }
 
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Missions'),
@@ -29,9 +27,10 @@ class MissionListScreen extends StatelessWidget {
         label: const Text('New Mission'),
       ),
       body: StreamBuilder<QuerySnapshot>(
+        // participant_uids array-contains covers both owned + invited missions
         stream: FirebaseFirestore.instance
             .collection('missions')
-            .where('created_by', isEqualTo: uid)
+            .where('participant_uids', arrayContains: uid)
             .orderBy('last_message_at', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -54,6 +53,7 @@ class MissionListScreen extends StatelessWidget {
               final mission = Mission.fromDocument(docs[i]);
               return _MissionCard(
                 mission: mission,
+                currentUid: uid,
                 onTap: () => context.push('/missions/${mission.id}'),
               );
             },
@@ -92,9 +92,10 @@ class _EmptyState extends StatelessWidget {
               size: 64, color: cs.onSurfaceVariant.withOpacity(0.4)),
           const SizedBox(height: 16),
           Text('No missions yet',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  )),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 8),
           Text(
             'Start a multi-robot mission to coordinate\nyour fleet in a shared chat thread.',
@@ -119,16 +120,27 @@ class _EmptyState extends StatelessWidget {
 
 class _MissionCard extends StatelessWidget {
   final Mission mission;
+  final String currentUid;
   final VoidCallback onTap;
-  const _MissionCard({required this.mission, required this.onTap});
+  const _MissionCard({
+    required this.mission,
+    required this.currentUid,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final robots = mission.robotParticipants;
-    final humans = mission.humanParticipants;
+    final humanCount = mission.humanCount;
+    final robotCount = mission.robotCount;
+    final myRole = mission.roleOf(currentUid);
+    final rolePart = myRole != null ? ' · ${myRole.label}' : '';
+
+    // Summary line: "3 humans · 2 robots"
+    final summary =
+        '$humanCount human${humanCount != 1 ? "s" : ""} · $robotCount robot${robotCount != 1 ? "s" : ""}$rolePart';
 
     return Card(
       elevation: 0,
@@ -148,10 +160,11 @@ class _MissionCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Title row
               Row(
                 children: [
-                  const Icon(Icons.track_changes, size: 18,
-                      color: Color(0xFF0ea5e9)),
+                  const Icon(Icons.track_changes,
+                      size: 18, color: Color(0xFF0ea5e9)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -165,27 +178,26 @@ class _MissionCard extends StatelessWidget {
                   _StatusBadge(status: mission.status),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Participant avatars
-              Row(
-                children: [
-                  ...robots.map((r) => _ParticipantChip(
-                        label: r.name,
-                        isRobot: true,
-                      )),
-                  ...humans.map((h) => _ParticipantChip(
-                        label: h.name,
-                        isRobot: false,
-                      )),
-                ],
+              const SizedBox(height: 6),
+
+              // "N humans · M robots · My Role" summary
+              Text(
+                summary,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 8),
+
+              // Participant avatar row
+              _ParticipantAvatarRow(
+                participants: mission.participants,
+                maxVisible: 6,
+              ),
+              const SizedBox(height: 8),
+
+              // Time ago
               Text(
                 _timeAgo(mission.lastMessageAt),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: cs.onSurfaceVariant,
-                ),
+                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
               ),
             ],
           ),
@@ -203,29 +215,103 @@ class _MissionCard extends StatelessWidget {
   }
 }
 
-class _ParticipantChip extends StatelessWidget {
-  final String label;
-  final bool isRobot;
-  const _ParticipantChip({required this.label, required this.isRobot});
+// ---------------------------------------------------------------------------
+// Participant avatar row — small stacked icons
+// ---------------------------------------------------------------------------
+
+class _ParticipantAvatarRow extends StatelessWidget {
+  final List<MissionParticipant> participants;
+  final int maxVisible;
+  const _ParticipantAvatarRow(
+      {required this.participants, this.maxVisible = 6});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Chip(
-        avatar: Icon(
-          isRobot ? Icons.smart_toy_outlined : Icons.person_outline,
-          size: 14,
-          color: isRobot ? const Color(0xFF0ea5e9) : const Color(0xFF8b5cf6),
-        ),
-        label: Text(label, style: const TextStyle(fontSize: 11)),
-        padding: EdgeInsets.zero,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
+    final visible = participants.take(maxVisible).toList();
+    final overflow = participants.length - maxVisible;
+    const size = 24.0;
+    const overlap = 10.0;
+
+    return SizedBox(
+      height: size,
+      child: Stack(
+        children: [
+          for (int i = 0; i < visible.length; i++)
+            Positioned(
+              left: i * (size - overlap),
+              child: _MiniAvatar(
+                  participant: visible[i], size: size),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: visible.length * (size - overlap),
+              child: Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 1),
+                ),
+                child: Center(
+                  child: Text('+$overflow',
+                      style: const TextStyle(fontSize: 9)),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
+
+class _MiniAvatar extends StatelessWidget {
+  final MissionParticipant participant;
+  final double size;
+  const _MiniAvatar({required this.participant, this.size = 24});
+
+  Color get _color {
+    final id = participant.rrn ?? participant.uid ?? participant.name;
+    const colors = [
+      Color(0xFF0ea5e9),
+      Color(0xFF8b5cf6),
+      Color(0xFF22c55e),
+      Color(0xFFf59e0b),
+      Color(0xFFef4444),
+      Color(0xFF06b6d4),
+      Color(0xFFec4899),
+    ];
+    final hash = id.codeUnits.fold(0, (a, b) => a + b);
+    return colors[hash % colors.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: _color.withOpacity(0.2),
+        shape: BoxShape.circle,
+        border: Border.all(
+            color: Theme.of(context).colorScheme.surface, width: 1.5),
+      ),
+      child: Icon(
+        participant.isRobot
+            ? Icons.smart_toy_outlined
+            : Icons.person_outline,
+        size: size * 0.55,
+        color: _color,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Status badge
+// ---------------------------------------------------------------------------
 
 class _StatusBadge extends StatelessWidget {
   final MissionStatus status;
@@ -252,11 +338,9 @@ class _StatusBadge extends StatelessWidget {
         color: color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-            fontSize: 11, color: color, fontWeight: FontWeight.w600),
-      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
     );
   }
 }

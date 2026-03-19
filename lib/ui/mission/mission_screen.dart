@@ -6,10 +6,10 @@ import 'package:flutter/material.dart';
 import '../../data/models/mission.dart';
 
 // ---------------------------------------------------------------------------
-// Robot color palette — consistent color per RRN across messages
+// Consistent color palette — shared by robots (by RRN) and humans (by uid)
 // ---------------------------------------------------------------------------
 
-const _robotColors = [
+const _participantColors = [
   Color(0xFF0ea5e9), // sky
   Color(0xFF8b5cf6), // violet
   Color(0xFF22c55e), // green
@@ -17,11 +17,13 @@ const _robotColors = [
   Color(0xFFef4444), // red
   Color(0xFF06b6d4), // cyan
   Color(0xFFec4899), // pink
+  Color(0xFF84cc16), // lime
+  Color(0xFFf97316), // orange
 ];
 
-Color _colorForRrn(String rrn) {
-  final hash = rrn.codeUnits.fold(0, (a, b) => a + b);
-  return _robotColors[hash % _robotColors.length];
+Color _colorForId(String id) {
+  final hash = id.codeUnits.fold(0, (a, b) => a + b);
+  return _participantColors[hash % _participantColors.length];
 }
 
 // ---------------------------------------------------------------------------
@@ -40,11 +42,11 @@ class _MissionScreenState extends State<MissionScreen> {
   final _textCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   bool _sending = false;
+  bool _panelExpanded = false;
   String? _error;
 
-  // @mention auto-suggest state
+  // @mention suggestions
   List<String> _mentionSuggestions = [];
-  List<MissionParticipant> _robotParticipants = [];
 
   @override
   void dispose() {
@@ -53,29 +55,31 @@ class _MissionScreenState extends State<MissionScreen> {
     super.dispose();
   }
 
+  /// Build @mention suggestions from all participants (robots by name/RRN, humans by name).
   void _onTextChanged(String value, Mission mission) {
-    _robotParticipants = mission.robotParticipants;
     final atIdx = value.lastIndexOf('@');
     if (atIdx == -1) {
-      if (_mentionSuggestions.isNotEmpty) {
-        setState(() => _mentionSuggestions = []);
-      }
+      if (_mentionSuggestions.isNotEmpty) setState(() => _mentionSuggestions = []);
       return;
     }
     final prefix = value.substring(atIdx + 1).toLowerCase();
-    final suggestions = _robotParticipants
-        .where((r) => r.name.toLowerCase().startsWith(prefix) ||
-            (r.rrn ?? '').toLowerCase().contains(prefix))
-        .map((r) => r.name)
-        .toList();
-    setState(() => _mentionSuggestions = suggestions);
+    final suggestions = <String>[];
+    for (final p in mission.participants) {
+      if (p.name.toLowerCase().startsWith(prefix)) {
+        suggestions.add(p.name);
+      }
+      if (p.rrn != null && p.rrn!.toLowerCase().contains(prefix)) {
+        suggestions.add(p.rrn!);
+      }
+    }
+    setState(() => _mentionSuggestions = suggestions.toSet().toList());
   }
 
-  void _insertMention(String robotName) {
+  void _insertMention(String token) {
     final text = _textCtrl.text;
     final atIdx = text.lastIndexOf('@');
     if (atIdx == -1) return;
-    final newText = '${text.substring(0, atIdx)}@$robotName ';
+    final newText = '${text.substring(0, atIdx)}@$token ';
     _textCtrl.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(offset: newText.length),
@@ -83,7 +87,17 @@ class _MissionScreenState extends State<MissionScreen> {
     setState(() => _mentionSuggestions = []);
   }
 
-  Future<void> _sendMessage(String missionId) async {
+  Future<void> _sendMessage(String missionId, Mission mission) async {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+    final myRole = myUid != null ? mission.roleOf(myUid) : null;
+
+    // Client-side guard: observers can't send
+    if (myRole == HumanRole.observer) {
+      setState(() =>
+          _error = 'You are an observer in this mission — read only.');
+      return;
+    }
+
     final content = _textCtrl.text.trim();
     if (content.isEmpty) return;
 
@@ -98,8 +112,6 @@ class _MissionScreenState extends State<MissionScreen> {
       final fn =
           FirebaseFunctions.instance.httpsCallable('sendMissionMessage');
       await fn.call({'missionId': missionId, 'content': content});
-
-      // Scroll to bottom
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollCtrl.hasClients) {
           _scrollCtrl.animateTo(
@@ -134,74 +146,64 @@ class _MissionScreenState extends State<MissionScreen> {
         }
 
         final mission = Mission.fromDocument(missionSnap.data!);
+        final myUid = FirebaseAuth.instance.currentUser?.uid;
+        final myRole = myUid != null ? mission.roleOf(myUid) : null;
+        final canSend = myRole != HumanRole.observer;
 
         return Scaffold(
-          appBar: _MissionAppBar(mission: mission),
+          appBar: _MissionAppBar(
+            mission: mission,
+            panelExpanded: _panelExpanded,
+            onTogglePanel: () =>
+                setState(() => _panelExpanded = !_panelExpanded),
+          ),
           body: Column(
             children: [
-              // Messages list
+              // Participants panel (expandable)
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: _panelExpanded
+                    ? _ParticipantsPanel(
+                        mission: mission, currentUid: myUid ?? '')
+                    : const SizedBox.shrink(),
+              ),
+
+              // Messages
               Expanded(
                 child: _MessagesList(
                   missionId: widget.missionId,
                   mission: mission,
                   scrollCtrl: _scrollCtrl,
+                  currentUid: myUid ?? '',
                 ),
               ),
 
               // Error banner
-              if (_error != null)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          color: Theme.of(context).colorScheme.error,
-                          size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                              fontSize: 12),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 16),
-                        onPressed: () => setState(() => _error = null),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                ),
+              if (_error != null) _ErrorBanner(
+                message: _error!,
+                onDismiss: () => setState(() => _error = null),
+              ),
 
               // @mention suggestions
               if (_mentionSuggestions.isNotEmpty)
-                Container(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                  child: Column(
-                    children: _mentionSuggestions
-                        .map((name) => ListTile(
-                              dense: true,
-                              leading: const Icon(Icons.smart_toy_outlined,
-                                  size: 16),
-                              title: Text('@$name'),
-                              onTap: () => _insertMention(name),
-                            ))
-                        .toList(),
-                  ),
+                _MentionSuggestions(
+                  suggestions: _mentionSuggestions,
+                  mission: mission,
+                  onSelect: _insertMention,
                 ),
 
-              // Input bar
-              _InputBar(
-                controller: _textCtrl,
-                sending: _sending,
-                mission: mission,
-                onChanged: (v) => _onTextChanged(v, mission),
-                onSend: () => _sendMessage(widget.missionId),
-              ),
+              // Input bar (hidden / read-only label for observers)
+              if (!canSend)
+                _ObserverBanner()
+              else
+                _InputBar(
+                  controller: _textCtrl,
+                  sending: _sending,
+                  mission: mission,
+                  onChanged: (v) => _onTextChanged(v, mission),
+                  onSend: () => _sendMessage(widget.missionId, mission),
+                ),
             ],
           ),
         );
@@ -216,14 +218,24 @@ class _MissionScreenState extends State<MissionScreen> {
 
 class _MissionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Mission mission;
-  const _MissionAppBar({required this.mission});
+  final bool panelExpanded;
+  final VoidCallback onTogglePanel;
+  const _MissionAppBar({
+    required this.mission,
+    required this.panelExpanded,
+    required this.onTogglePanel,
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
-    final robots = mission.robotParticipants;
+    final humanCount = mission.humanCount;
+    final robotCount = mission.robotCount;
+    final subtitle =
+        '$humanCount human${humanCount != 1 ? "s" : ""} · $robotCount robot${robotCount != 1 ? "s" : ""}';
+
     return AppBar(
       title: Row(
         children: [
@@ -237,15 +249,122 @@ class _MissionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Text(mission.title,
                     style: const TextStyle(fontSize: 15),
                     overflow: TextOverflow.ellipsis),
-                if (robots.isNotEmpty)
-                  Text(
-                    robots.map((r) => r.name).join(', '),
-                    style: const TextStyle(
-                        fontSize: 11, color: Color(0xFF0ea5e9)),
-                  ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                      fontSize: 11, color: Color(0xFF0ea5e9)),
+                ),
               ],
             ),
           ),
+        ],
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(panelExpanded
+              ? Icons.group
+              : Icons.group_outlined),
+          tooltip: 'Participants',
+          onPressed: onTogglePanel,
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Participants panel
+// ---------------------------------------------------------------------------
+
+class _ParticipantsPanel extends StatelessWidget {
+  final Mission mission;
+  final String currentUid;
+  const _ParticipantsPanel({required this.mission, required this.currentUid});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      color: isDark ? const Color(0xFF12142b) : const Color(0xFFF1F5F9),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Participants',
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant, letterSpacing: 0.8)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              for (final p in mission.participants)
+                _ParticipantChipFull(
+                  participant: p,
+                  isCurrentUser: p.uid == currentUid,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParticipantChipFull extends StatelessWidget {
+  final MissionParticipant participant;
+  final bool isCurrentUser;
+  const _ParticipantChipFull(
+      {required this.participant, required this.isCurrentUser});
+
+  Color get _accentColor {
+    final id = participant.rrn ?? participant.uid ?? participant.name;
+    return _colorForId(id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = isCurrentUser ? '${participant.name} (you)' : participant.name;
+    final roleLabel =
+        participant.isHuman && participant.role != null
+            ? participant.role!.label
+            : null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: _accentColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _accentColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            participant.isRobot
+                ? Icons.smart_toy_outlined
+                : Icons.person_outline,
+            size: 12,
+            color: _accentColor,
+          ),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: _accentColor,
+                  fontWeight: FontWeight.w600)),
+          if (roleLabel != null) ...[
+            const SizedBox(width: 4),
+            Text('· $roleLabel',
+                style: TextStyle(
+                    fontSize: 10,
+                    color: _accentColor.withOpacity(0.7))),
+          ],
         ],
       ),
     );
@@ -260,11 +379,13 @@ class _MessagesList extends StatelessWidget {
   final String missionId;
   final Mission mission;
   final ScrollController scrollCtrl;
+  final String currentUid;
 
   const _MessagesList({
     required this.missionId,
     required this.mission,
     required this.scrollCtrl,
+    required this.currentUid,
   });
 
   @override
@@ -287,27 +408,34 @@ class _MessagesList extends StatelessWidget {
               'No messages yet.\nSay something to your robots!',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           );
         }
 
         return ListView.builder(
           controller: scrollCtrl,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          padding:
+              const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           itemCount: docs.length,
           itemBuilder: (context, i) {
             final msg = MissionMessage.fromDocument(docs[i]);
-            final currentUid = FirebaseAuth.instance.currentUser?.uid;
-            final isMe = !msg.isFromRobot && msg.fromUid == currentUid;
+            final isMe =
+                !msg.isFromRobot && msg.fromUid == currentUid;
 
-            if (isMe) {
-              return _HumanMessageBubble(msg: msg);
-            } else {
+            if (msg.isFromRobot) {
               final rrn = msg.fromRrn ?? '';
-              final color = _colorForRrn(rrn);
-              return _RobotMessageBubble(msg: msg, accentColor: color);
+              return _RobotMessageBubble(
+                  msg: msg, accentColor: _colorForId(rrn));
+            } else if (isMe) {
+              return _HumanMessageBubble(msg: msg, isMe: true);
+            } else {
+              // Another human participant
+              final uid = msg.fromUid ?? msg.fromName;
+              return _HumanMessageBubble(
+                  msg: msg,
+                  isMe: false,
+                  accentColor: _colorForId(uid));
             }
           },
         );
@@ -322,43 +450,109 @@ class _MessagesList extends StatelessWidget {
 
 class _HumanMessageBubble extends StatelessWidget {
   final MissionMessage msg;
-  const _HumanMessageBubble({required this.msg});
+  final bool isMe;
+  final Color? accentColor; // null = self (blue)
+  const _HumanMessageBubble(
+      {required this.msg, required this.isMe, this.accentColor});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = accentColor ?? const Color(0xFF0ea5e9);
+    final roleStr =
+        msg.fromRole != null ? ' · ${msg.fromRole!.label}' : '';
+
+    if (isMe) {
+      // Right-aligned self bubble
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8, left: 48),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'You$roleStr · ${_timeLabel(msg.timestamp)}',
+                    style: TextStyle(
+                        fontSize: 10, color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0ea5e9),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(4),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      msg.content,
+                      style: const TextStyle(
+                          color: Colors.white, fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Left-aligned other-human bubble with person avatar
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 48),
+      padding: const EdgeInsets.only(bottom: 8, right: 48),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Person avatar
+          Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.only(right: 8, top: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color, width: 1.5),
+            ),
+            child: Icon(Icons.person_outline, size: 16, color: color),
+          ),
           Flexible(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${msg.fromName} · ${_timeLabel(msg.timestamp)}',
-                  style:
-                      TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                  '${msg.fromName}$roleStr · ${_timeLabel(msg.timestamp)}',
+                  style: TextStyle(
+                      fontSize: 10, color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 2),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0ea5e9),
+                    border: Border(
+                      left: BorderSide(color: color, width: 3),
+                    ),
+                    color: isDark
+                        ? const Color(0xFF1a1b2e)
+                        : const Color(0xFFEDE9FE),
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(4),
-                      bottomLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomLeft: Radius.circular(4),
                       bottomRight: Radius.circular(16),
                     ),
                   ),
-                  child: Text(
-                    msg.content,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                  ),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child:
+                      Text(msg.content, style: const TextStyle(fontSize: 14)),
                 ),
               ],
             ),
@@ -372,7 +566,8 @@ class _HumanMessageBubble extends StatelessWidget {
 class _RobotMessageBubble extends StatelessWidget {
   final MissionMessage msg;
   final Color accentColor;
-  const _RobotMessageBubble({required this.msg, required this.accentColor});
+  const _RobotMessageBubble(
+      {required this.msg, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -384,7 +579,6 @@ class _RobotMessageBubble extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Robot avatar
           Container(
             width: 32,
             height: 32,
@@ -403,16 +597,14 @@ class _RobotMessageBubble extends StatelessWidget {
               children: [
                 Text(
                   '${msg.fromName} · ${_timeLabel(msg.timestamp)}',
-                  style:
-                      TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                  style: TextStyle(
+                      fontSize: 10, color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: 2),
-                // Colored left border for robot messages
                 Container(
                   decoration: BoxDecoration(
                     border: Border(
-                      left: BorderSide(color: accentColor, width: 3),
-                    ),
+                        left: BorderSide(color: accentColor, width: 3)),
                     color: isDark
                         ? const Color(0xFF1a1b2e)
                         : const Color(0xFFF1F5F9),
@@ -424,11 +616,9 @@ class _RobotMessageBubble extends StatelessWidget {
                   ),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 10),
-                  child: Text(
-                    msg.content,
-                    style: TextStyle(
-                        color: cs.onSurface, fontSize: 14),
-                  ),
+                  child: Text(msg.content,
+                      style: TextStyle(
+                          color: cs.onSurface, fontSize: 14)),
                 ),
               ],
             ),
@@ -443,6 +633,112 @@ String _timeLabel(DateTime dt) {
   final h = dt.hour.toString().padLeft(2, '0');
   final m = dt.minute.toString().padLeft(2, '0');
   return '$h:$m';
+}
+
+// ---------------------------------------------------------------------------
+// @Mention suggestions
+// ---------------------------------------------------------------------------
+
+class _MentionSuggestions extends StatelessWidget {
+  final List<String> suggestions;
+  final Mission mission;
+  final ValueChanged<String> onSelect;
+  const _MentionSuggestions(
+      {required this.suggestions,
+      required this.mission,
+      required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      color: cs.surfaceVariant,
+      child: Column(
+        children: suggestions
+            .map((token) {
+              // Figure out if this is a robot or human for icon
+              final isRobot = mission.participants.any(
+                  (p) => p.isRobot && (p.name == token || p.rrn == token));
+              return ListTile(
+                dense: true,
+                leading: Icon(
+                  isRobot
+                      ? Icons.smart_toy_outlined
+                      : Icons.person_outline,
+                  size: 16,
+                ),
+                title: Text('@$token',
+                    style: const TextStyle(fontSize: 13)),
+                onTap: () => onSelect(token),
+              );
+            })
+            .toList(),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Observer banner
+// ---------------------------------------------------------------------------
+
+class _ObserverBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        color: cs.surfaceVariant,
+        child: Row(
+          children: [
+            Icon(Icons.visibility_outlined,
+                size: 16, color: cs.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Text(
+              'Observer mode — you can read but not send messages.',
+              style: TextStyle(
+                  fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Error banner
+// ---------------------------------------------------------------------------
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismiss;
+  const _ErrorBanner({required this.message, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(8),
+      color: cs.errorContainer,
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: cs.error, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(message,
+                  style: TextStyle(color: cs.error, fontSize: 12))),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: onDismiss,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -466,11 +762,15 @@ class _InputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final robots = mission.robotParticipants;
-    final hint = robots.isEmpty
+    final humans = mission.humanParticipants;
+    // Build hint: @Bob @Alex @Alice (first few)
+    final all = [...robots, ...humans];
+    final hintTokens =
+        all.take(3).map((p) => '@${p.name}').join(' ');
+    final hint = all.isEmpty
         ? 'Type a mission command…'
-        : '[${robots.map((r) => "@${r.name}").join(" ")}] Type a mission command…';
+        : '$hintTokens · Type a mission command…';
 
     return SafeArea(
       child: Padding(
@@ -483,10 +783,9 @@ class _InputBar extends StatelessWidget {
                 onChanged: onChanged,
                 decoration: InputDecoration(
                   hintText: hint,
-                  hintStyle: const TextStyle(fontSize: 13),
+                  hintStyle: const TextStyle(fontSize: 12),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
+                      borderRadius: BorderRadius.circular(24)),
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 10),
                   isDense: true,

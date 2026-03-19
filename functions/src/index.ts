@@ -23,5 +23,5 @@ export { forkConfig, addComment, getComments, deleteComment, getMyStars, getMyCo
 // Fleet registration limit (MAX_ROBOTS = 2 per user, free tier)
 export { registerRobot, enforceRobotLimit } from "./registration";
 
-// R2R2H Mission Threads — multi-robot group chat
-export { createMission, sendMissionMessage, listMissions } from "./missions";
+// R2R2H Mission Threads — multi-robot, multi-human group chat
+export { createMission, sendMissionMessage, listMissions, inviteToMission, joinMission } from "./missions";
