@@ -7,20 +7,86 @@ library;
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Position of a node on the canvas.
+/// Node types for the flow graph.
+///
+/// - [skill]       Standard skill layer.
+/// - [input]       __input__ sentinel (entry point).
+/// - [output]      __output__ sentinel (exit point).
+/// - [conditional] if/else branch — two outgoing edges: YES and NO.
+/// - [parallel]    Fork — all outgoing edges execute concurrently.
+/// - [join]        Merge parallel lanes back into one.
+/// - [hitl]        Human-in-the-loop gate — pauses for app approval.
+/// - [timeout]     Deadline node — exits after N seconds if not complete.
+/// - [costGate]    Halts execution if budget is exceeded.
+/// - [modality]    Routes to different models based on input type.
+enum FlowNodeType {
+  skill,
+  input,
+  output,
+  conditional,
+  parallel,
+  join,
+  hitl,
+  timeout,
+  costGate,
+  modality,
+}
+
+extension FlowNodeTypeX on FlowNodeType {
+  String get jsonKey => name;
+
+  static FlowNodeType fromJson(String? value) {
+    if (value == null) return FlowNodeType.skill;
+    return FlowNodeType.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => FlowNodeType.skill,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Position of a node on the canvas, including its type and optional config.
 class FlowNodePos {
   final String layerId;
   double x;
   double y;
 
-  FlowNodePos({required this.layerId, required this.x, required this.y});
+  /// Node type — controls shape, colour, and icon in the canvas renderer.
+  FlowNodeType type;
 
-  Map<String, dynamic> toJson() => {'layerId': layerId, 'x': x, 'y': y};
+  /// Optional display label override (defaults to layerId).
+  String? label;
+
+  /// Node-specific configuration (e.g. condition expression, timeout_s,
+  /// budget_usd, model name for [FlowNodeType.modality]).
+  Map<String, dynamic>? nodeConfig;
+
+  FlowNodePos({
+    required this.layerId,
+    required this.x,
+    required this.y,
+    this.type = FlowNodeType.skill,
+    this.label,
+    this.nodeConfig,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'layerId': layerId,
+        'x': x,
+        'y': y,
+        'type': type.jsonKey,
+        if (label != null) 'label': label,
+        if (nodeConfig != null) 'nodeConfig': nodeConfig,
+      };
 
   factory FlowNodePos.fromJson(Map<String, dynamic> j) => FlowNodePos(
         layerId: j['layerId'] as String,
         x: (j['x'] as num).toDouble(),
         y: (j['y'] as num).toDouble(),
+        type: FlowNodeTypeX.fromJson(j['type'] as String?),
+        label: j['label'] as String?,
+        nodeConfig: j['nodeConfig'] as Map<String, dynamic>?,
       );
 }
 
@@ -107,12 +173,18 @@ class FlowGraph {
 
     final positions = <FlowNodePos>[];
     // INPUT sentinel
-    positions.add(FlowNodePos(layerId: '__input__', x: startX, y: startY));
+    positions.add(FlowNodePos(
+      layerId: '__input__',
+      x: startX,
+      y: startY,
+      type: FlowNodeType.input,
+    ));
     for (var i = 0; i < layerIds.length; i++) {
       positions.add(FlowNodePos(
         layerId: layerIds[i],
         x: startX,
         y: startY + stepY * (i + 1),
+        type: FlowNodeType.skill,
       ));
     }
     // OUTPUT sentinel
@@ -120,6 +192,7 @@ class FlowGraph {
       layerId: '__output__',
       x: startX,
       y: startY + stepY * (layerIds.length + 1),
+      type: FlowNodeType.output,
     ));
 
     // Auto-edges: INPUT → first → ... → last → OUTPUT

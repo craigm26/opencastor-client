@@ -174,6 +174,17 @@ class _FlowCanvasState extends State<FlowCanvas> {
                     onAdd: _addLoop,
                   ),
                 ),
+
+              // ── Node-type palette (edit mode only) ───────────────────────
+              if (widget.editable)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _NodeTypePalette(
+                    onTypeSelected: (type) => _addNodeOfType(type),
+                  ),
+                ),
             ],
           ),
         ),
@@ -196,18 +207,33 @@ class _FlowCanvasState extends State<FlowCanvas> {
             widget.editable ? (d) => _onNodeDragUpdate(id, d.delta) : null,
         child: _FlowNode(
           id: id,
-          label: isInput
-              ? 'RCAN\ncommand'
-              : isOutput
-                  ? 'Response'
-                  : (layer?.label ?? id),
-          isInput: isInput,
-          isOutput: isOutput,
+          label: pos.label ??
+              (isInput
+                  ? 'RCAN\ncommand'
+                  : isOutput
+                      ? 'Response'
+                      : (layer?.label ?? id)),
+          nodeType: pos.type,
           isAlwaysOn: isAlwaysOn,
           enabled: layer?.enabled ?? true,
         ),
       ),
     );
+  }
+
+  /// Add a new node of [type] to the canvas at a default drop position.
+  void _addNodeOfType(FlowNodeType type) {
+    setState(() {
+      final newId = '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
+      _graph.positions.add(FlowNodePos(
+        layerId: newId,
+        x: 80,
+        y: 80 + _graph.positions.length * 40.0,
+        type: type,
+        label: type.name,
+      ));
+    });
+    if (widget.onGraphChanged != null) widget.onGraphChanged!(_graph);
   }
 }
 
@@ -329,28 +355,123 @@ class _EdgePainter extends CustomPainter {
 class _FlowNode extends StatelessWidget {
   final String id;
   final String label;
-  final bool isInput;
-  final bool isOutput;
   final bool isAlwaysOn;
   final bool enabled;
+  final FlowNodeType nodeType;
 
   const _FlowNode({
     required this.id,
     required this.label,
-    this.isInput = false,
-    this.isOutput = false,
+    required this.nodeType,
     this.isAlwaysOn = false,
     this.enabled = true,
   });
 
+  // ── Type-specific styling ─────────────────────────────────────────────────
+
+  Color get _borderColor {
+    if (isAlwaysOn) return _kAccentGreen;
+    switch (nodeType) {
+      case FlowNodeType.hitl:
+        return const Color(0xFFFF9800); // orange
+      case FlowNodeType.timeout:
+        return const Color(0xFF9C27B0); // purple
+      case FlowNodeType.costGate:
+        return const Color(0xFFFFEB3B); // yellow
+      case FlowNodeType.modality:
+        return const Color(0xFF2196F3); // blue
+      case FlowNodeType.input:
+      case FlowNodeType.output:
+        return _kAccentGreen;
+      default:
+        return enabled ? _kNodeBorder : _kNodeBorder.withValues(alpha: 0.4);
+    }
+  }
+
+  double get _borderWidth {
+    switch (nodeType) {
+      case FlowNodeType.hitl:
+      case FlowNodeType.timeout:
+      case FlowNodeType.costGate:
+      case FlowNodeType.modality:
+        return 2.0;
+      default:
+        return isAlwaysOn ? 2.0 : 1.0;
+    }
+  }
+
+  String? get _typeIcon {
+    switch (nodeType) {
+      case FlowNodeType.conditional:
+        return '◆'; // diamond indicator
+      case FlowNodeType.parallel:
+        return '≫';
+      case FlowNodeType.join:
+        return '≪';
+      case FlowNodeType.hitl:
+        return '✋';
+      case FlowNodeType.timeout:
+        return '⏱';
+      case FlowNodeType.costGate:
+        return '\$';
+      case FlowNodeType.modality:
+        return '⇒';
+      default:
+        return null;
+    }
+  }
+
+  BorderRadius get _borderRadius {
+    switch (nodeType) {
+      case FlowNodeType.input:
+      case FlowNodeType.output:
+        return BorderRadius.circular(28);
+      case FlowNodeType.parallel:
+      case FlowNodeType.join:
+        return BorderRadius.circular(4);
+      default:
+        return BorderRadius.circular(8);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final borderColor = isAlwaysOn
-        ? _kAccentGreen
-        : enabled
-            ? _kNodeBorder
-            : _kNodeBorder.withValues(alpha: 0.4);
     final textColor = enabled ? _kTextColor : _kMutedText;
+    final icon = _typeIcon;
+
+    // Conditional → diamond shape via Transform.rotate
+    if (nodeType == FlowNodeType.conditional) {
+      return SizedBox(
+        width: _kNodeW,
+        height: _kNodeH,
+        child: Transform.rotate(
+          angle: 0.785398, // 45°
+          child: Container(
+            width: _kNodeH * 0.8,
+            height: _kNodeH * 0.8,
+            decoration: BoxDecoration(
+              color: _kNodeBg,
+              border: Border.all(color: _borderColor, width: _borderWidth),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Transform.rotate(
+              angle: -0.785398,
+              child: Center(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return SizedBox(
       width: _kNodeW,
@@ -358,23 +479,49 @@ class _FlowNode extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: _kNodeBg,
-          border: Border.all(
-              color: borderColor, width: isAlwaysOn ? 2 : 1),
-          borderRadius:
-              BorderRadius.circular(isInput || isOutput ? 28 : 8),
+          border: Border.all(color: _borderColor, width: _borderWidth),
+          borderRadius: _borderRadius,
         ),
         child: Center(
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 12,
-              fontWeight:
-                  isAlwaysOn ? FontWeight.w700 : FontWeight.w500,
-              letterSpacing: 0.3,
-            ),
-          ),
+          child: icon != null
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      icon,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _borderColor,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        label,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 12,
+                    fontWeight:
+                        isAlwaysOn ? FontWeight.w700 : FontWeight.w500,
+                    letterSpacing: 0.3,
+                  ),
+                ),
         ),
       ),
     );
@@ -446,6 +593,105 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_DashedBorderPainter _) => false;
+}
+
+// ─── Node-type palette ────────────────────────────────────────────────────────
+
+/// Row of buttons to add different node types to the canvas in edit mode.
+class _NodeTypePalette extends StatelessWidget {
+  final void Function(FlowNodeType type) onTypeSelected;
+
+  const _NodeTypePalette({required this.onTypeSelected});
+
+  static const _paletteTypes = [
+    FlowNodeType.conditional,
+    FlowNodeType.parallel,
+    FlowNodeType.join,
+    FlowNodeType.hitl,
+    FlowNodeType.timeout,
+    FlowNodeType.costGate,
+    FlowNodeType.modality,
+  ];
+
+  static const _paletteIcons = [
+    '◆',
+    '≫',
+    '≪',
+    '✋',
+    '⏱',
+    '\$',
+    '⇒',
+  ];
+
+  static const _paletteLabels = [
+    'Cond',
+    'Fork',
+    'Join',
+    'HITL',
+    'Time',
+    'Cost',
+    'Route',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xCC0A0A0F),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Text(
+                'Add:',
+                style: TextStyle(
+                  color: Color(0xFF8888AA),
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            for (var i = 0; i < _paletteTypes.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: GestureDetector(
+                  onTap: () => onTypeSelected(_paletteTypes[i]),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF16161E),
+                      border: Border.all(
+                          color: const Color(0xFF333355), width: 1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _paletteIcons[i],
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          _paletteLabels[i],
+                          style: const TextStyle(
+                            color: Color(0xFFCCCCDD),
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Add loop FAB ─────────────────────────────────────────────────────────────
