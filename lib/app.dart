@@ -25,6 +25,7 @@ import 'ui/explore/explore_screen.dart';
 import 'ui/explore/qr_scanner_screen.dart';
 import 'ui/fleet/fleet_screen.dart';
 import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
+import 'ui/robot_detail/robot_detail_view_model.dart';
 import 'ui/login/ecosystem_section.dart';
 import 'ui/physical_control/physical_control_screen.dart';
 import 'ui/harness/harness_editor.dart';
@@ -302,32 +303,53 @@ class _HarnessEditorArgs {
 }
 
 /// Standalone harness viewer page — wraps HarnessViewer + Edit Harness button.
-class _HarnessViewerPage extends StatelessWidget {
+/// Loads the robot's actual harness config from telemetry, falling back to
+/// defaults if not yet published by the bridge.
+class _HarnessViewerPage extends ConsumerWidget {
   final String rrn;
   const _HarnessViewerPage({required this.rrn});
 
   @override
-  Widget build(BuildContext context) {
-    final config = HarnessConfig.defaults(robotRrn: rrn);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Harness'),
-        actions: [
-          FilledButton.icon(
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Edit Harness'),
-            onPressed: () => context.push(
-              '/robot/$rrn/harness/edit',
-              extra: _HarnessEditorArgs(
-                robotName: rrn,
-                config: config,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final robotAsync = ref.watch(robotDetailProvider(rrn));
+    final config = robotAsync.whenData((robot) {
+      if (robot == null) return HarnessConfig.defaults(robotRrn: rrn);
+      final harnessData = robot.telemetry['harness_config'];
+      if (harnessData is Map<String, dynamic>) {
+        return HarnessConfig.fromApiJson(rrn, harnessData);
+      }
+      return HarnessConfig.defaults(robotRrn: rrn);
+    });
+
+    return config.when(
+      loading: () => Scaffold(
+        appBar: AppBar(title: const Text('Harness')),
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(title: const Text('Harness')),
+        body: Center(child: Text('Error loading harness: $e')),
+      ),
+      data: (harnessConfig) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Harness'),
+          actions: [
+            FilledButton.icon(
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: const Text('Edit Harness'),
+              onPressed: () => context.push(
+                '/robot/$rrn/harness/edit',
+                extra: _HarnessEditorArgs(
+                  robotName: rrn,
+                  config: harnessConfig,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-        ],
+            const SizedBox(width: 12),
+          ],
+        ),
+        body: HarnessViewer(config: harnessConfig),
       ),
-      body: HarnessViewer(config: config),
     );
   }
 }

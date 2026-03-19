@@ -234,10 +234,10 @@ export const validateAndSaveHarness = functions.onCall(
           title,
           content,
           tags: [...new Set([...(tags ?? []), "rcan-1.6"])],
-          author_uid: uid,
+          author_id: uid,
           author_name: authorName,
           public: false,
-          rcan_version: "1.6",
+          rcan_version: "1.6.1",
           validation_warnings: issues
             .filter((i) => i.severity === "warn")
             .map((i) => i.message),

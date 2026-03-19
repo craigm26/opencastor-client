@@ -326,6 +326,128 @@ class HarnessConfig {
         ],
       );
 
+  // ── Parse from /api/harness JSON response ───────────────────────────
+
+  /// Parses the flat JSON returned by `GET /api/harness` (keys: skills,
+  /// hooks, context, model_tiers, trajectory, max_iterations).
+  factory HarnessConfig.fromApiJson(String rrn, Map<String, dynamic> json) {
+    final skillsList = (json['skills'] as List<dynamic>?) ?? [];
+    final hooks = Map<String, dynamic>.from(
+        (json['hooks'] as Map?)?.cast<String, dynamic>() ?? {});
+    final context = Map<String, dynamic>.from(
+        (json['context'] as Map?)?.cast<String, dynamic>() ?? {});
+    final modelTiers = Map<String, dynamic>.from(
+        (json['model_tiers'] as Map?)?.cast<String, dynamic>() ?? {});
+    final trajectory = Map<String, dynamic>.from(
+        (json['trajectory'] as Map?)?.cast<String, dynamic>() ?? {});
+
+    final layers = <HarnessLayer>[];
+
+    // P66 hook — always on
+    layers.add(HarnessLayer(
+      id: 'hook-p66',
+      type: 'hook',
+      label: 'P66 Safety',
+      description: 'ESTOP bypass · Scope enforcement · Physical consent',
+      enabled: true,
+      canDisable: false,
+      canReorder: false,
+      config: {'p66_audit': hooks['p66_audit'] as bool? ?? true},
+    ));
+
+    // Context builder
+    layers.add(HarnessLayer(
+      id: 'context-builder',
+      type: 'context',
+      label: 'Context Builder',
+      description: 'Assembles memory, telemetry, and skill context',
+      enabled: true,
+      canDisable: false,
+      canReorder: false,
+      config: {
+        'memory': context['memory'] as bool? ?? true,
+        'telemetry': context['telemetry'] as bool? ?? true,
+        'system_prompt': context['system_prompt'] as bool? ?? true,
+        'skills_context': context['skills_context'] as bool? ?? true,
+      },
+    ));
+
+    // Skills from the API list
+    for (final skillMap in skillsList) {
+      final s = Map<String, dynamic>.from(
+          (skillMap as Map?)?.cast<String, dynamic>() ?? {});
+      final name =
+          (s['name'] as String? ?? '').replaceAll('_', '-');
+      layers.add(HarnessLayer(
+        id: s['id'] as String? ?? 'skill-$name',
+        type: 'skill',
+        label: name,
+        description: _skillDescription(name),
+        enabled: s['enabled'] as bool? ?? false,
+        config: {
+          'order': s['order'] as int? ?? 0,
+          ...Map<String, dynamic>.from(
+              (s['config'] as Map?)?.cast<String, dynamic>() ?? {}),
+        },
+      ));
+    }
+
+    // Dual model
+    layers.add(HarnessLayer(
+      id: 'model-dual',
+      type: 'model',
+      label: 'Dual Model',
+      description: 'Fast and slow model routing by confidence',
+      enabled: true,
+      canDisable: false,
+      canReorder: false,
+      config: {
+        'fast_provider': modelTiers['fast_provider'] as String? ?? 'ollama',
+        'fast_model': modelTiers['fast_model'] as String? ?? 'gemma3:1b',
+        'slow_provider': modelTiers['slow_provider'] as String? ?? 'google',
+        'slow_model':
+            modelTiers['slow_model'] as String? ?? 'gemini-2.0-flash',
+        'confidence_threshold':
+            (modelTiers['confidence_threshold'] as num?)?.toDouble() ?? 0.7,
+      },
+    ));
+
+    // Drift detection hook
+    layers.add(HarnessLayer(
+      id: 'hook-drift',
+      type: 'hook',
+      label: 'Drift Detection',
+      description: 'Detects model off-task drift after 3+ iterations',
+      enabled: hooks['drift_detection'] as bool? ?? true,
+      config: {
+        'drift_threshold':
+            (hooks['drift_threshold'] as num?)?.toDouble() ?? 0.15,
+      },
+    ));
+
+    // Trajectory logger — always on, always last
+    layers.add(HarnessLayer(
+      id: 'trajectory-logger',
+      type: 'trajectory',
+      label: 'Trajectory Logger',
+      description:
+          'Always-on audit trail — every run logged to SQLite. '
+          'Required for autoresearch and RCAN compliance.',
+      enabled: true,
+      canDisable: false,
+      canReorder: false,
+      config: {
+        'sqlite_path': trajectory['sqlite_path'] as String? ?? 'trajectory.db',
+      },
+    ));
+
+    return HarnessConfig(
+      robotRrn: rrn,
+      name: 'Robot Harness',
+      layers: layers,
+    );
+  }
+
   // ── Parse from RCAN YAML map ──────────────────────────────────────────
 
   factory HarnessConfig.fromYaml(Map<String, dynamic> yaml, String rrn) {
