@@ -21,6 +21,7 @@ import '../../ui/core/theme/app_theme.dart';
 import '../explore/explore_view_model.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'harness_viewer.dart';
+import 'model_garage.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -397,10 +398,12 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 ? _NoSelectionPanel(
                     skillLayers: _config.skillLayers,
                     onReorder: _reorderSkills,
+                    onToggle: _toggleLayerEnabled,
                     onAddBlock: _showAddBlockSheet,
                   )
                 : _LayerEditPanel(
                     key: ValueKey(_selectedLayer!.id),
+                    rrn: widget.rrn,
                     layer: _selectedLayer!,
                     onToggle: _toggleLayerEnabled,
                     onConfigChanged: _updateLayerConfig,
@@ -421,11 +424,13 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
 class _NoSelectionPanel extends StatelessWidget {
   final List<HarnessLayer> skillLayers;
   final void Function(int oldIndex, int newIndex) onReorder;
+  final void Function(HarnessLayer) onToggle;
   final VoidCallback onAddBlock;
 
   const _NoSelectionPanel({
     required this.skillLayers,
     required this.onReorder,
+    required this.onToggle,
     required this.onAddBlock,
   });
 
@@ -471,7 +476,7 @@ class _NoSelectionPanel extends StatelessWidget {
                       style: const TextStyle(fontSize: 13)),
                   trailing: Switch(
                     value: skill.enabled,
-                    onChanged: (_) {},
+                    onChanged: (_) => onToggle(skill),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -486,6 +491,7 @@ class _NoSelectionPanel extends StatelessWidget {
 // ── Layer edit panel ──────────────────────────────────────────────────────────
 
 class _LayerEditPanel extends StatefulWidget {
+  final String rrn;
   final HarnessLayer layer;
   final void Function(HarnessLayer) onToggle;
   final void Function(HarnessLayer, Map<String, dynamic>) onConfigChanged;
@@ -494,6 +500,7 @@ class _LayerEditPanel extends StatefulWidget {
 
   const _LayerEditPanel({
     super.key,
+    required this.rrn,
     required this.layer,
     required this.onToggle,
     required this.onConfigChanged,
@@ -512,6 +519,17 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
   void initState() {
     super.initState();
     _config = Map<String, dynamic>.from(widget.layer.config);
+  }
+
+  @override
+  void didUpdateWidget(_LayerEditPanel old) {
+    super.didUpdateWidget(old);
+    // Refresh local config snapshot when the parent swaps in a new layer
+    // (e.g. after a toggle or external config change).
+    if (old.layer.id != widget.layer.id ||
+        old.layer.config != widget.layer.config) {
+      _config = Map<String, dynamic>.from(widget.layer.config);
+    }
   }
 
   void _updateConfig(String key, dynamic value) {
@@ -602,7 +620,6 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
           layer: widget.layer,
           config: _config,
           onUpdate: _updateConfig,
-          onToggle: () => widget.onToggle(widget.layer),
           onRemove: widget.onRemove,
         );
 
@@ -610,7 +627,11 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
         return _ContextEditor(config: _config, onUpdate: _updateConfig);
 
       case 'model':
-        return _ModelEditor(config: _config, onUpdate: _updateConfig);
+        return _ModelEditor(
+          rrn: widget.rrn,
+          config: _config,
+          onUpdate: _updateConfig,
+        );
 
       case 'trajectory':
         return _TrajectoryEditor(
@@ -688,14 +709,12 @@ class _SkillEditor extends StatelessWidget {
   final HarnessLayer layer;
   final Map<String, dynamic> config;
   final void Function(String, dynamic) onUpdate;
-  final VoidCallback onToggle;
   final VoidCallback? onRemove;
 
   const _SkillEditor({
     required this.layer,
     required this.config,
     required this.onUpdate,
-    required this.onToggle,
     this.onRemove,
   });
 
@@ -736,15 +755,6 @@ class _SkillEditor extends StatelessWidget {
             Text('Order: ${config['order'] ?? 0}',
                 style: TextStyle(
                     fontSize: 12, color: cs.onSurfaceVariant)),
-            const Spacer(),
-            Text('Enabled',
-                style: TextStyle(
-                    fontSize: 12, color: cs.onSurfaceVariant)),
-            Switch(
-              value: layer.enabled,
-              onChanged: (_) => onToggle(),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -820,10 +830,15 @@ class _ContextEditor extends StatelessWidget {
 // ── Model editor with cascading provider → model dropdowns ────────────────────
 
 class _ModelEditor extends StatefulWidget {
+  final String rrn;
   final Map<String, dynamic> config;
   final void Function(String, dynamic) onUpdate;
 
-  const _ModelEditor({required this.config, required this.onUpdate});
+  const _ModelEditor({
+    required this.rrn,
+    required this.config,
+    required this.onUpdate,
+  });
 
   @override
   State<_ModelEditor> createState() => _ModelEditorState();
@@ -957,6 +972,55 @@ class _ModelEditorState extends State<_ModelEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Model Garage button ────────────────────────────────────────
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            icon: const Text('🔧', style: TextStyle(fontSize: 14)),
+            label: const Text('Open Garage',
+                style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            ),
+            onPressed: () async {
+              final sel = await ModelGarage.open(
+                context,
+                rrn: widget.rrn,
+                currentFastProvider: _fastProvider,
+                currentFastModel: _fastModel,
+                currentSlowProvider: _slowProvider,
+                currentSlowModel: _slowModel,
+              );
+              if (sel == null) return;
+              if (sel.tier == 'fast') {
+                setState(() {
+                  _fastProvider = sel.provider;
+                  _fastModel = sel.model;
+                  _fastCustomCtrl.text =
+                      _isCustomOllama(sel.provider, sel.model)
+                          ? sel.model
+                          : '';
+                });
+                widget.onUpdate('fast_provider', sel.provider);
+                widget.onUpdate('fast_model', sel.model);
+              } else {
+                setState(() {
+                  _slowProvider = sel.provider;
+                  _slowModel = sel.model;
+                  _slowCustomCtrl.text =
+                      _isCustomOllama(sel.provider, sel.model)
+                          ? sel.model
+                          : '';
+                });
+                widget.onUpdate('slow_provider', sel.provider);
+                widget.onUpdate('slow_model', sel.model);
+              }
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
