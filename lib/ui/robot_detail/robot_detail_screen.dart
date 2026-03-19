@@ -130,6 +130,69 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     }
   }
 
+  /// Extract a human-readable response string from a command result map.
+  ///
+  /// Handles two result shapes:
+  ///  - Chat/control: {raw_text, action, model_used, harness}
+  ///  - Status: rich status dict with robot_name, version, brain_primary, etc.
+  static String? _extractResponseText(Map<String, dynamic>? result, String? scope) {
+    if (result == null) return null;
+
+    // Chat-style response
+    final rawText = result['raw_text'] as String?;
+    if (rawText != null && rawText.isNotEmpty) return rawText;
+    final response = result['response'] as String?;
+    if (response != null && response.isNotEmpty) return response;
+    final thought = result['thought'] as String?;
+    if (thought != null && thought.isNotEmpty) return thought;
+
+    // Status-scope result — format as a readable summary card
+    if (result.containsKey('robot_name') || result.containsKey('version') ||
+        result.containsKey('brain_primary')) {
+      return _formatStatusResult(result);
+    }
+
+    // LIST_SKILLS result
+    if (result.containsKey('skills') || result.containsKey('skill_list')) {
+      final skills = (result['skills'] ?? result['skill_list']) as List?;
+      if (skills != null && skills.isNotEmpty) {
+        return '📦 Skills loaded:\n${skills.map((s) => '• $s').join('\n')}';
+      }
+    }
+
+    return null;
+  }
+
+  static String _formatStatusResult(Map<String, dynamic> r) {
+    final lines = <String>[];
+    final name = r['robot_name'] as String?;
+    if (name != null) lines.add('🤖 $name');
+    final version = r['version'] as String?;
+    if (version != null) lines.add('📦 v$version');
+    final primary = r['brain_primary'] as Map?;
+    if (primary != null) {
+      lines.add('🧠 ${primary['provider']}/${primary['model']}');
+    }
+    final lastThought = r['last_thought'] as Map?;
+    if (lastThought != null) {
+      final lt = lastThought['raw_text'] as String?;
+      if (lt != null && lt.isNotEmpty) lines.add('💭 "$lt"');
+    }
+    final security = r['security_posture'] as Map?;
+    if (security != null) {
+      final mode = security['mode'] as String?;
+      lines.add('🔒 Security: ${mode ?? 'unknown'}');
+    }
+    final speaking = r['speaking'] as bool?;
+    lines.add(speaking == true ? '🔊 Speaking' : '🔇 Idle');
+    final channels = r['channels_available'] as Map?;
+    if (channels != null) {
+      final active = channels.entries.where((e) => e.value == true).map((e) => e.key).join(', ');
+      if (active.isNotEmpty) lines.add('📡 $active');
+    }
+    return lines.join('\n');
+  }
+
   /// Normalize bare command names to slash form.
   /// e.g. "status", "STATUS", "/status" → "/status"
   static const _knownCommands = {
@@ -393,14 +456,15 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
       // Robot response bubble (shown first in reverse list = shown after command)
       Widget? responseBubble;
-      if (cmd.result?['raw_text'] != null) {
+      final responseText = _extractResponseText(cmd.result, cmd.scope.name);
+      if (responseText != null) {
         responseBubble = GestureDetector(
           onLongPress: () {
             HapticFeedback.mediumImpact();
             _showHideCmdSheet(context, cmd.id);
           },
           child: ChatBubble(
-            text: (cmd.result?['raw_text'] ?? cmd.result?['response'] ?? cmd.result?['thought'] ?? '').toString(),
+            text: responseText,
             isUser: false,
             timestamp: cmd.issuedAt,
           ),
