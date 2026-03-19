@@ -44,7 +44,6 @@ class HarnessEditorScreen extends ConsumerStatefulWidget {
 
 class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   late HarnessConfig _config;
-  HarnessLayer? _selectedLayer;
   bool _saving = false;
   bool _deploying = false;
 
@@ -65,7 +64,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 l.id == layer.id ? l.copyWith(enabled: !l.enabled) : l)
             .toList(),
       );
-      _selectedLayer = _config.layers.firstWhere((l) => l.id == layer.id);
     });
   }
 
@@ -77,7 +75,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 l.id == layer.id ? l.copyWith(config: newConfig) : l)
             .toList(),
       );
-      _selectedLayer = _config.layers.firstWhere((l) => l.id == layer.id);
     });
   }
 
@@ -115,9 +112,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     if (confirmed != true) return;
     setState(() {
       _config = _config.withLayerRemoved(layer.id);
-      if (_selectedLayer?.id == layer.id) {
-        _selectedLayer = null;
-      }
     });
   }
 
@@ -182,6 +176,45 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
             Navigator.pop(ctx);
             _addLayer(layer);
           },
+        ),
+      ),
+    );
+  }
+
+  // ── Open layer edit bottom sheet ──────────────────────────────────────────
+
+  void _openEditSheet(HarnessLayer layer) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (ctx, scrollCtrl) => SingleChildScrollView(
+          controller: scrollCtrl,
+          child: _LayerEditPanel(
+            key: ValueKey(layer.id),
+            rrn: widget.rrn,
+            layer: layer,
+            onToggle: (l) {
+              _toggleLayerEnabled(l);
+              Navigator.pop(ctx);
+            },
+            onConfigChanged: _updateLayerConfig,
+            onClose: () => Navigator.pop(ctx),
+            onRemove: layer.canDisable
+                ? () {
+                    _removeLayer(layer);
+                    Navigator.pop(ctx);
+                  }
+                : null,
+          ),
         ),
       ),
     );
@@ -376,114 +409,14 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
         tooltip: 'Add block',
         child: const Icon(Icons.add),
       ),
-      body: Column(
-        children: [
-          // ── Top: interactive viewer ──────────────────────────────────────
-          Expanded(
-            flex: 5,
-            child: HarnessViewer(
-              config: _config,
-              onEditLayer: (layer) =>
-                  setState(() => _selectedLayer = layer),
-            ),
-          ),
-
-          // ── Divider ──────────────────────────────────────────────────────
-          const Divider(height: 1),
-
-          // ── Bottom: editing panel ────────────────────────────────────────
-          Expanded(
-            flex: 4,
-            child: _selectedLayer == null
-                ? _NoSelectionPanel(
-                    skillLayers: _config.skillLayers,
-                    onReorder: _reorderSkills,
-                    onToggle: _toggleLayerEnabled,
-                    onAddBlock: _showAddBlockSheet,
-                  )
-                : _LayerEditPanel(
-                    key: ValueKey(_selectedLayer!.id),
-                    rrn: widget.rrn,
-                    layer: _selectedLayer!,
-                    onToggle: _toggleLayerEnabled,
-                    onConfigChanged: _updateLayerConfig,
-                    onClose: () => setState(() => _selectedLayer = null),
-                    onRemove: _selectedLayer!.canDisable
-                        ? () => _removeLayer(_selectedLayer!)
-                        : null,
-                  ),
-          ),
-        ],
+      body: HarnessViewer(
+        config: _config,
+        onEditLayer: _openEditSheet,
+        onToggleLayer: _toggleLayerEnabled,
+        onReorderSkills: _reorderSkills,
+        onAddSkill: _showSkillBrowser,
+        onAddBlock: _showAddBlockSheet,
       ),
-    );
-  }
-}
-
-// ── No-selection panel (shows skill reorder list + add button) ────────────────
-
-class _NoSelectionPanel extends StatelessWidget {
-  final List<HarnessLayer> skillLayers;
-  final void Function(int oldIndex, int newIndex) onReorder;
-  final void Function(HarnessLayer) onToggle;
-  final VoidCallback onAddBlock;
-
-  const _NoSelectionPanel({
-    required this.skillLayers,
-    required this.onReorder,
-    required this.onToggle,
-    required this.onAddBlock,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Tap a node to edit · Drag to reorder skills',
-                  style: TextStyle(
-                      fontSize: 12, color: cs.onSurfaceVariant),
-                ),
-              ),
-              TextButton.icon(
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Add Block'),
-                onPressed: onAddBlock,
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ReorderableListView(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            onReorder: onReorder,
-            children: [
-              for (final skill in skillLayers)
-                ListTile(
-                  key: ValueKey(skill.id),
-                  dense: true,
-                  leading: ReorderableDragStartListener(
-                    index: skillLayers.indexOf(skill),
-                    child: const Icon(Icons.drag_handle, size: 18),
-                  ),
-                  title: Text(skill.label,
-                      style: const TextStyle(fontSize: 13)),
-                  trailing: Switch(
-                    value: skill.enabled,
-                    onChanged: (_) => onToggle(skill),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

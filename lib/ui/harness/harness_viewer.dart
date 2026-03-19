@@ -59,6 +59,18 @@ class HarnessViewer extends StatefulWidget {
   /// If provided, a pencil icon appears on each node and calls this when tapped.
   final void Function(HarnessLayer layer)? onEditLayer;
 
+  /// If provided, enables skill toggle switches in [_SkillGroupCard].
+  final void Function(HarnessLayer)? onToggleLayer;
+
+  /// If provided, enables drag-to-reorder in [_SkillGroupCard].
+  final void Function(int, int)? onReorderSkills;
+
+  /// If provided, shows an "+ Add Skill" button inside [_SkillGroupCard].
+  final VoidCallback? onAddSkill;
+
+  /// If provided, shows an "+ Add Block" button below the pipeline.
+  final VoidCallback? onAddBlock;
+
   /// If true, shows a loading shimmer instead of the real pipeline.
   final bool loading;
 
@@ -66,6 +78,10 @@ class HarnessViewer extends StatefulWidget {
     super.key,
     required this.config,
     this.onEditLayer,
+    this.onToggleLayer,
+    this.onReorderSkills,
+    this.onAddSkill,
+    this.onAddBlock,
     this.loading = false,
   });
 
@@ -135,6 +151,15 @@ class _HarnessViewerState extends State<HarnessViewer> {
             _buildPipelineItem(context, pipeline[i]),
             if (i < pipeline.length - 1) _Arrow(),
           ],
+          if (widget.onAddBlock != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.add, size: 14),
+                label: const Text('Add Block'),
+                onPressed: widget.onAddBlock,
+              ),
+            ),
         ],
       ),
     );
@@ -145,6 +170,9 @@ class _HarnessViewerState extends State<HarnessViewer> {
       return _SkillGroupCard(
         layers: item.skills!,
         onEditLayer: widget.onEditLayer,
+        onToggleSkill: widget.onToggleLayer,
+        onReorder: widget.onReorderSkills,
+        onAddSkill: widget.onAddSkill,
         expanded: _isExpanded('skills-group'),
         onToggle: () => _toggle('skills-group'),
       );
@@ -314,12 +342,18 @@ class _LayerCard extends StatelessWidget {
 class _SkillGroupCard extends StatelessWidget {
   final List<HarnessLayer> layers;
   final void Function(HarnessLayer layer)? onEditLayer;
+  final void Function(HarnessLayer)? onToggleSkill;
+  final void Function(int oldIndex, int newIndex)? onReorder;
+  final VoidCallback? onAddSkill;
   final bool expanded;
   final VoidCallback onToggle;
 
   const _SkillGroupCard({
     required this.layers,
     required this.onEditLayer,
+    this.onToggleSkill,
+    this.onReorder,
+    this.onAddSkill,
     required this.expanded,
     required this.onToggle,
   });
@@ -402,38 +436,62 @@ class _SkillGroupCard extends StatelessWidget {
             // ── Skill list ───────────────────────────────────────────────
             if (expanded)
               Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Column(
-                  children: layers.map((skill) {
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(
-                        skill.enabled
-                            ? Icons.check_circle_outline
-                            : Icons.radio_button_unchecked,
-                        size: 16,
-                        color: skill.enabled
-                            ? borderColor
-                            : cs.onSurfaceVariant,
+                  children: [
+                    ReorderableListView(
+                      shrinkWrap: true,
+                      physics: onReorder != null
+                          ? null
+                          : const NeverScrollableScrollPhysics(),
+                      onReorder: onReorder ?? (_, __) {},
+                      children: [
+                        for (final skill in layers)
+                          ListTile(
+                            key: ValueKey(skill.id),
+                            dense: true,
+                            leading: ReorderableDragStartListener(
+                              index: layers.indexOf(skill),
+                              child: const Icon(Icons.drag_handle, size: 18),
+                            ),
+                            title: Text(skill.label,
+                                style: const TextStyle(fontSize: 13)),
+                            subtitle: Text(skill.description,
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Switch(
+                                  value: skill.enabled,
+                                  onChanged: onToggleSkill != null
+                                      ? (_) => onToggleSkill!(skill)
+                                      : null,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                if (onEditLayer != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 14),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => onEditLayer!(skill),
+                                  ),
+                              ],
+                            ),
+                            contentPadding:
+                                const EdgeInsets.only(left: 4, right: 0),
+                          ),
+                      ],
+                    ),
+                    if (onAddSkill != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.add, size: 14),
+                        label: const Text('Add Skill'),
+                        onPressed: onAddSkill,
                       ),
-                      title: Text(skill.label,
-                          style: const TextStyle(fontSize: 13)),
-                      subtitle: Text(skill.description,
-                          style:
-                              TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-                      trailing: onEditLayer != null
-                          ? IconButton(
-                              icon: const Icon(Icons.edit_outlined,
-                                  size: 14),
-                              visualDensity: VisualDensity.compact,
-                              onPressed: () => onEditLayer!(skill),
-                            )
-                          : null,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 4),
-                    );
-                  }).toList(),
+                  ],
                 ),
               ),
           ],
