@@ -454,4 +454,31 @@ class HarnessConfig {
         name: newName,
         layers: layers,
       );
+
+  /// Returns a new config with [layer] inserted just before the trajectory
+  /// logger (always-last), or appended if no trajectory layer is found.
+  HarnessConfig withLayerAdded(HarnessLayer layer) {
+    final newLayers = List<HarnessLayer>.from(layers);
+    final trajIdx = newLayers.indexWhere((l) => l.type == 'trajectory');
+    if (trajIdx >= 0) {
+      newLayers.insert(trajIdx, layer);
+    } else {
+      newLayers.add(layer);
+    }
+    return copyWithLayers(newLayers);
+  }
+
+  /// Returns a new config with the layer matching [layerId] removed.
+  /// P66 and trajectory layers are silently kept even if targeted.
+  HarnessConfig withLayerRemoved(String layerId) {
+    final removed = layers.firstWhere(
+      (l) => l.id == layerId,
+      orElse: () => const HarnessLayer(
+        id: '', type: '', label: '', description: '', enabled: false,
+      ),
+    );
+    // Never remove always-on invariant layers
+    if (!removed.canDisable) return this;
+    return copyWithLayers(layers.where((l) => l.id != layerId).toList());
+  }
 }

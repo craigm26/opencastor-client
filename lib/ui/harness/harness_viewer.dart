@@ -208,7 +208,7 @@ class _LayerCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       color: isDark ? const Color(0xFF12142b) : cs.surface,
       child: Container(
@@ -246,7 +246,10 @@ class _LayerCard extends StatelessWidget {
                                     fontSize: 14),
                               ),
                               const SizedBox(width: 8),
-                              _Badge(layer: layer),
+                              _Badge(
+                                layer: layer,
+                                showOptional: onEdit != null,
+                              ),
                             ],
                           ),
                           if (!expanded)
@@ -332,7 +335,7 @@ class _SkillGroupCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       color: isDark ? const Color(0xFF12142b) : cs.surface,
       child: Container(
@@ -444,7 +447,11 @@ class _SkillGroupCard extends StatelessWidget {
 
 class _Badge extends StatelessWidget {
   final HarnessLayer layer;
-  const _Badge({required this.layer});
+
+  /// When true, show an OPTIONAL chip for canDisable layers (i.e. edit mode).
+  final bool showOptional;
+
+  const _Badge({required this.layer, this.showOptional = false});
 
   @override
   Widget build(BuildContext context) {
@@ -455,15 +462,18 @@ class _Badge extends StatelessWidget {
     if (!layer.enabled) {
       return _chip('off', cs.onSurfaceVariant);
     }
+    if (showOptional) {
+      return _chip('optional', cs.primary);
+    }
     return const SizedBox.shrink();
   }
 
   Widget _chip(String label, Color color) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Text(
           label,
