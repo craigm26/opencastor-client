@@ -16,7 +16,9 @@ import '../../core/constants.dart';
 import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/health_indicator.dart';
+import '../harness/hardware_provider.dart';
 import '../robot_detail/robot_detail_view_model.dart';
+import '../robot_detail/slash_command_provider.dart';
 
 class RobotCapabilitiesScreen extends ConsumerWidget {
   final String rrn;
@@ -172,14 +174,16 @@ Future<void> _shareAsHarness(BuildContext ctx, Robot robot) async {
   }
 }
 
-class _CapabilitiesView extends StatelessWidget {
+class _CapabilitiesView extends ConsumerWidget {
   final Robot robot;
   const _CapabilitiesView({required this.robot});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final score = _conformanceScore(robot);
     final p66Pass = _p66PassCount(robot);
+    final hwAsync = ref.watch(hardwareProfileProvider(robot.rrn));
+    final skillsAsync = ref.watch(slashCommandsProvider(robot.rrn));
 
     return Scaffold(
       appBar: AppBar(
@@ -363,6 +367,124 @@ class _CapabilitiesView extends StatelessWidget {
               ),
             ],
           ),
+          // ── Detected Hardware ──────────────────────────────────────────
+          const SizedBox(height: 16),
+          hwAsync.when(
+            loading: () => const _LoadingSection(title: 'Detected Hardware'),
+            error: (_, __) => _CapSection(
+              title: 'Detected Hardware',
+              icon: Icons.memory_outlined,
+              rows: [_CapabilityRow(label: 'Hardware data unavailable', status: _CapStatus.info, description: 'Robot may be offline')],
+            ),
+            data: (hw) {
+              if (hw.isEmpty) {
+                return _CapSection(
+                  title: 'Detected Hardware',
+                  icon: Icons.memory_outlined,
+                  rows: [_CapabilityRow(label: 'Hardware data unavailable', status: _CapStatus.info, description: 'Robot may be offline')],
+                );
+              }
+              final cpuModel = hw['cpu_model'] as String? ?? '';
+              final cpuCores = hw['cpu_cores'] as int? ?? 0;
+              final arch = hw['arch'] as String? ?? 'unknown';
+              final platform = hw['platform'] as String? ?? 'generic';
+              final ramGb = (hw['ram_gb'] as num?)?.toStringAsFixed(1) ?? '?';
+              final ramAvail = (hw['ram_available_gb'] as num?)?.toStringAsFixed(1) ?? '?';
+              final storageFree = (hw['storage_free_gb'] as num?)?.toStringAsFixed(1) ?? '?';
+              final tier = hw['hardware_tier'] as String? ?? 'unknown';
+              final accel = (hw['accelerators'] as List<dynamic>?) ?? [];
+              final ollama = (hw['ollama_models'] as List<dynamic>?) ?? [];
+
+              String tierLabel(String t) => switch (t) {
+                'pi5-hailo' => 'Pi 5 + Hailo-8 NPU',
+                'pi5-8gb' => 'Pi 5 · 8 GB',
+                'pi5-4gb' => 'Pi 5 · 4 GB',
+                'pi4-8gb' => 'Pi 4 · 8 GB',
+                'pi4-4gb' => 'Pi 4 · 4 GB',
+                'server' => 'Server-class',
+                'minimal' => 'Minimal',
+                _ => t,
+              };
+
+              final rows = <_CapabilityRow>[
+                _CapabilityRow(
+                  label: cpuModel.isNotEmpty ? (cpuModel.length > 35 ? '${cpuModel.substring(0, 35)}…' : cpuModel) : 'CPU: unknown',
+                  status: cpuModel.isNotEmpty ? _CapStatus.ok : _CapStatus.info,
+                  description: '$cpuCores cores · $arch · $platform',
+                ),
+                _CapabilityRow(
+                  label: '$ramGb GB RAM',
+                  status: _CapStatus.ok,
+                  description: '$ramAvail GB available · $storageFree GB disk free',
+                ),
+                _CapabilityRow(
+                  label: tierLabel(tier),
+                  status: _CapStatus.ok,
+                  description: 'Hardware class for LLM model selection',
+                ),
+                if (accel.isEmpty)
+                  _CapabilityRow(label: 'No accelerators detected', status: _CapStatus.info, description: 'NPU/GPU not found')
+                else
+                  ...accel.map((a) => _CapabilityRow(label: a.toString(), status: _CapStatus.ok, description: 'Hardware accelerator')),
+                if (ollama.isNotEmpty)
+                  _CapabilityRow(
+                    label: 'Local models: ${ollama.join(", ")}',
+                    status: _CapStatus.ok,
+                    description: '${ollama.length} model(s) available via Ollama',
+                  )
+                else
+                  _CapabilityRow(label: 'No local models', status: _CapStatus.info, description: 'No Ollama models installed'),
+              ];
+              return _CapSection(title: 'Detected Hardware', icon: Icons.memory_outlined, rows: rows);
+            },
+          ),
+
+          // ── Software Stack ─────────────────────────────────────────────
+          const SizedBox(height: 16),
+          () {
+            final t = robot.telemetry;
+            final brainPrimary = t['brain_primary'] as Map<String, dynamic>? ?? {};
+            final activeModel = t['brain_active_model'] as String? ?? brainPrimary['model'] as String? ?? 'Unknown';
+            final provider = brainPrimary['provider'] as String? ?? 'unknown';
+            final fallback = t['offline_fallback'] as Map<String, dynamic>? ?? {};
+            final fallbackEnabled = fallback['enabled'] as bool? ?? false;
+            final fallbackModel = fallback['fallback_model'] as String? ?? '';
+            final fallbackProvider = fallback['fallback_provider'] as String? ?? '';
+            final channels = (t['channels_active'] as List<dynamic>?)?.cast<String>() ?? [];
+            final cameraModel = t['camera_model'] as String?;
+            final version = robot.opencastorVersion ?? t['version'] as String?;
+            final skills = (skillsAsync.value ?? []).where((s) => s.group == 'Skills').toList();
+
+            final rows = <_CapabilityRow>[
+              _CapabilityRow(
+                label: activeModel,
+                status: activeModel != 'Unknown' ? _CapStatus.ok : _CapStatus.info,
+                description: 'Provider: $provider',
+              ),
+              if (fallbackEnabled && fallbackModel.isNotEmpty)
+                _CapabilityRow(
+                  label: '$fallbackModel (offline fallback)',
+                  status: _CapStatus.ok,
+                  description: 'Provider: $fallbackProvider',
+                ),
+              _CapabilityRow(
+                label: channels.isNotEmpty ? channels.join(', ') : 'No active channels',
+                status: channels.isNotEmpty ? _CapStatus.ok : _CapStatus.info,
+                description: 'Communication channels',
+              ),
+              if (cameraModel != null && cameraModel != 'unknown')
+                _CapabilityRow(label: cameraModel, status: _CapStatus.ok, description: 'Camera driver'),
+              if (version != null && version != 'unknown')
+                _CapabilityRow(label: 'OpenCastor $version', status: _CapStatus.ok, description: 'Robot runtime version'),
+              _CapabilityRow(
+                label: skills.isEmpty ? 'No skills active' : '${skills.length} skill(s) active',
+                status: skills.isEmpty ? _CapStatus.info : _CapStatus.ok,
+                description: skills.isEmpty ? 'No skills enabled in RCAN config' : skills.map((s) => s.cmd).join(', '),
+              ),
+            ];
+            return _CapSection(title: 'Software Stack', icon: Icons.layers_outlined, rows: rows);
+          }(),
+
           const SizedBox(height: 32),
         ],
       ),
@@ -897,6 +1019,34 @@ class _CodeBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LoadingSection extends StatelessWidget {
+  final String title;
+  const _LoadingSection({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Icon(Icons.memory_outlined, size: 14, color: cs.primary),
+          const SizedBox(width: 6),
+          Text(title, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: cs.primary)),
+        ]),
+        const SizedBox(height: 8),
+        const Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ),
+      ],
     );
   }
 }
