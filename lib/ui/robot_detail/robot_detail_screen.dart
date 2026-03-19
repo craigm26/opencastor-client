@@ -181,7 +181,25 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     final security = r['security_posture'] as Map?;
     if (security != null) {
       final mode = security['mode'] as String?;
-      lines.add('🔒 Security: ${mode ?? 'unknown'}');
+      final reasons = (security['reasons'] as List?)?.cast<String>() ?? [];
+      String secLabel;
+      String secDetail = '';
+      switch (mode) {
+        case 'full':
+          secLabel = '🔒 Security: full (signed boot + RCAN token)';
+          break;
+        case 'degraded':
+          secLabel = '⚠️ Security: degraded (dev mode — no hardware token)';
+          if (reasons.isNotEmpty) {
+            final readable = reasons.map((r) => r.replaceAll('_', ' ')).join(', ');
+            secDetail = '   Missing: $readable';
+          }
+          break;
+        default:
+          secLabel = '🔓 Security: ${mode ?? 'unknown'}';
+      }
+      lines.add(secLabel);
+      if (secDetail.isNotEmpty) lines.add(secDetail);
     }
     final speaking = r['speaking'] as bool?;
     lines.add(speaking == true ? '🔊 Speaking' : '🔇 Idle');
