@@ -12,7 +12,7 @@ Deployed at **[app.opencastor.com](https://app.opencastor.com)** via Cloudflare 
 | [craigm26/OpenCastor](https://github.com/craigm26/OpenCastor) | Robot runtime (Python). `castor` CLI, Protocol 66 safety layer, RCAN router, `castor bridge` daemon. | `main` |
 | [craigm26/opencastor-client](https://github.com/craigm26/opencastor-client) | **This repo.** Flutter web fleet management app. | `master` |
 | [craigm26/opencastor-ops](https://github.com/craigm26/opencastor-ops) | Private. Business, legal, compliance, infrastructure docs. | `main` |
-| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification (v1.6). Astro site at rcan.dev. | `master` |
+| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification (v1.6.1). Astro site at rcan.dev. | `master` |
 | [continuonai/rcan-py](https://github.com/continuonai/rcan-py) | Python RCAN SDK (v0.6.0). `pip install rcan`. | `main` |
 | [continuonai/rcan-ts](https://github.com/continuonai/rcan-ts) | TypeScript RCAN SDK (v0.6.0). `npm install @continuonai/rcan`. | `master` |
 | [continuonai/RobotRegistryFoundation](https://github.com/continuonai/RobotRegistryFoundation) | Robot Registry Foundation — canonical RRN records. | `main` |
@@ -228,7 +228,7 @@ Robot (castor bridge) ──outbound──▶ Firestore ◀── Flutter app
 
 ## RCAN Protocol
 
-This client implements the consumer side of [RCAN v1.6](https://rcan.dev):
+This client implements the consumer side of [RCAN v1.6.1](https://rcan.dev):
 
 - **RRN** (Robot Resource Name): `RRN-000000000001` format — unique robot identifier
 - **RURI** (Robot URI): `rcan://[org].[model].[instance]` — routing address
@@ -253,3 +253,13 @@ This client implements the consumer side of [RCAN v1.6](https://rcan.dev):
 Apache 2.0 open source + managed SaaS at `app.opencastor.com`.
 Details in [opencastor-ops](https://github.com/craigm26/opencastor-ops) (private).
 EU AI Act compliance deadline: August 2, 2026.
+
+---
+
+## Recent Features (2026-03-19)
+
+- **Capabilities screen**: Detected Hardware + Software Stack sections (`hardwareProfileProvider` + `slashCommandsProvider`)
+- **Slash commands**: `/pause` `/resume` `/shutdown` `/snapshot` added
+- **Harness editor**: flow graph auto-syncs on block add/remove/reorder (`_syncGraph()`)
+- **Security**: GitHub Actions pinned to SHA (#5)
+- **Harness automerge**: harness-update PRs auto-merge on CI pass
