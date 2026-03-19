@@ -809,9 +809,7 @@ class _TelemetryPanel extends StatelessWidget {
           ),
 
           // ── Telemetry chips row ────────────────────────────────────
-          if (t['cpu_temp'] != null ||
-              t['disk_pct'] != null ||
-              robot.version.isNotEmpty) ...[
+          if (t['cpu_temp'] != null || t['disk_pct'] != null) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 12,
@@ -822,8 +820,6 @@ class _TelemetryPanel extends StatelessWidget {
                 if (t['disk_pct'] != null)
                   _Metric(Icons.storage_outlined,
                       '${(t['disk_pct'] as num).toStringAsFixed(0)}%'),
-                if (robot.version.isNotEmpty)
-                  _Metric(Icons.tag_outlined, robot.version),
               ],
             ),
           ],

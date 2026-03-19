@@ -141,8 +141,11 @@ class Robot {
       loaEnforcement: m['loa_enforcement'] as bool? ?? false,
       multimodalEnabled: m['multimodal_enabled'] as bool? ?? true,
       registryTier: m['registry_tier'] as String? ?? 'community',
-      opencastorVersion: m['opencastor_version'] as String?
-          ?? m['telemetry']?['opencastor_version'] as String?,
+      opencastorVersion: _resolveVersion(
+          m['opencastor_version'] as String?,
+          m['telemetry']?['opencastor_version'] as String?,
+          m['telemetry']?['version'] as String?,
+        ),
     );
   }
 
@@ -190,5 +193,14 @@ class Robot {
       (e) => e.name == s,
       orElse: () => RevocationStatus.active,
     );
+  }
+
+  /// Returns the first non-null, non-empty, non-"unknown" version string from
+  /// the candidates, in priority order.  Falls back to null if none qualify.
+  static String? _resolveVersion(String? v1, String? v2, String? v3) {
+    for (final v in [v1, v2, v3]) {
+      if (v != null && v.isNotEmpty && v != 'unknown') return v;
+    }
+    return null;
   }
 }
