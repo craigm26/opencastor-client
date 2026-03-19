@@ -56,6 +56,39 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   void initState() {
     super.initState();
     _config = widget.initialConfig;
+    _syncGraph();
+  }
+
+  /// Rebuild the flow graph from the current config layers.
+  ///
+  /// Preserves existing node positions for layers already in the graph
+  /// and auto-lays out any new nodes. Edges are always regenerated to
+  /// match the current layer list.
+  ///
+  /// Keep in sync with: ~/OpenCastor/castor/harness/default_harness.yaml
+  void _syncGraph() {
+    final layerIds = _config.layers.map((l) => l.id).toList();
+    final fresh = FlowGraph.autoLayout(layerIds);
+    final existingPosMap = _flowGraph.posMap;
+    final mergedPositions = fresh.positions.map((pos) {
+      final existing = existingPosMap[pos.layerId];
+      if (existing != null) {
+        return FlowNodePos(
+          layerId: pos.layerId,
+          x: existing.x,
+          y: existing.y,
+          type: pos.type,
+          label: pos.label,
+          nodeConfig: pos.nodeConfig,
+        );
+      }
+      return pos;
+    }).toList();
+    _flowGraph = FlowGraph(
+      positions: mergedPositions,
+      edges: fresh.edges,
+      groups: _flowGraph.groups,
+    );
   }
 
   // ── Layer update helpers ─────────────────────────────────────────────────
@@ -69,6 +102,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 l.id == layer.id ? l.copyWith(enabled: !l.enabled) : l)
             .toList(),
       );
+      _syncGraph();
     });
   }
 
@@ -80,12 +114,14 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 l.id == layer.id ? l.copyWith(config: newConfig) : l)
             .toList(),
       );
+      _syncGraph();
     });
   }
 
   void _addLayer(HarnessLayer layer) {
     setState(() {
       _config = _config.withLayerAdded(layer);
+      _syncGraph();
     });
   }
 
@@ -117,6 +153,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     if (confirmed != true) return;
     setState(() {
       _config = _config.withLayerRemoved(layer.id);
+      _syncGraph();
     });
   }
 
@@ -139,6 +176,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     }
     setState(() {
       _config = _config.copyWithLayers(newLayers);
+      _syncGraph();
     });
   }
 
