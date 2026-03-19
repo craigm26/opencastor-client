@@ -96,5 +96,82 @@ service cloud.firestore {
     match /_rate_limits/{key} {
       allow read, write: if false; // Cloud Functions admin SDK only
     }
+
+    // -----------------------------------------------------------------------
+    // /configs/{configId}  — community hub configs
+    // -----------------------------------------------------------------------
+    match /configs/{configId} {
+      // Public configs readable by anyone (signed-in or not)
+      allow read: if resource.data.public == true || isSignedIn();
+      // Owners can update their own configs (e.g. star count changes via CF)
+      allow create: if isSignedIn()
+        && request.resource.data.author_id == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.author_id == request.auth.uid;
+    }
+
+    // -----------------------------------------------------------------------
+    // /stars/{starId}  — hub config stars (owner-private)
+    // -----------------------------------------------------------------------
+    match /stars/{starId} {
+      allow read, write: if isSignedIn()
+        && starId.matches(request.auth.uid + '_.*');
+    }
+
+    // -----------------------------------------------------------------------
+    // /missions/{missionId}  — R2R2H mission threads
+    // -----------------------------------------------------------------------
+    match /missions/{missionId} {
+      // Participant check using flat participant_uids array
+      function isMissionParticipant() {
+        return isSignedIn()
+          && request.auth.uid in resource.data.participant_uids;
+      }
+
+      // Any participant can read the mission doc
+      allow read: if isMissionParticipant();
+
+      // Creator can create; must set themselves as owner participant
+      allow create: if isSignedIn()
+        && request.resource.data.created_by == request.auth.uid
+        && request.auth.uid in request.resource.data.participant_uids;
+
+      // Only participants can update (e.g. last_message_at); deletions via CF only
+      allow update: if isMissionParticipant();
+      allow delete: if false; // Cloud Functions only
+
+      // -----------------------------------------------------------------
+      // /missions/{missionId}/messages/{msgId}
+      // -----------------------------------------------------------------
+      match /messages/{msgId} {
+        // Participants can read the message thread (real-time onSnapshot)
+        allow read: if isSignedIn()
+          && request.auth.uid in
+            get(/databases/$(database)/documents/missions/$(missionId))
+              .data.participant_uids;
+
+        // Human participants can write their own messages directly;
+        // robot messages are written by Cloud Functions (Admin SDK, bypasses rules)
+        allow create: if isSignedIn()
+          && request.auth.uid in
+            get(/databases/$(database)/documents/missions/$(missionId))
+              .data.participant_uids
+          && request.resource.data.from_uid == request.auth.uid
+          && request.resource.data.from_type == 'human';
+
+        // Messages are immutable once sent
+        allow update, delete: if false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // /mission_invites/{uid}/invites/{missionId}  — pending invite banner
+    // -----------------------------------------------------------------------
+    match /mission_invites/{uid}/invites/{missionId} {
+      // Only the invited user reads their own invites
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      // Writes are Cloud Functions only (Admin SDK)
+      allow write: if false;
+    }
   }
 }
