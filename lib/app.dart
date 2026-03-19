@@ -37,6 +37,8 @@ import 'ui/settings/theme_mode_provider.dart';
 import 'ui/setup/setup_screen.dart';
 import 'ui/account/account_screen.dart';
 import 'ui/shared/adaptive_navigation.dart';
+import 'ui/mission/mission_list_screen.dart';
+import 'ui/mission/mission_screen.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
@@ -224,6 +226,42 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/account',
             builder: (_, __) => const AccountScreen(),
           ),
+          GoRoute(
+            path: '/missions',
+            builder: (_, __) => const MissionListScreen(),
+            pageBuilder: (_, state) => CustomTransitionPage(
+              key: state.pageKey,
+              child: const MissionListScreen(),
+              transitionsBuilder: (ctx, animation, secondary, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
+          ),
+          GoRoute(
+            path: '/missions/new',
+            redirect: (_, __) => '/missions',
+          ),
+          GoRoute(
+            path: '/missions/:id',
+            builder: (_, state) =>
+                MissionScreen(missionId: state.pathParameters['id']!),
+            pageBuilder: (_, state) {
+              final id = state.pathParameters['id']!;
+              return CustomTransitionPage(
+                key: state.pageKey,
+                child: MissionScreen(missionId: id),
+                transitionsBuilder: (ctx, animation, secondary, child) {
+                  final slide = Tween(
+                    begin: const Offset(0, 0.08),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                      parent: animation, curve: Curves.easeOutCubic));
+                  return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(position: slide, child: child));
+                },
+              );
+            },
+          ),
         ],
       ),
     ],
@@ -342,6 +380,8 @@ class _AppShell extends StatelessWidget {
       selectedIndex = 2;
     } else if (location.startsWith('/settings')) {
       selectedIndex = 3;
+    } else if (location.startsWith('/missions')) {
+      selectedIndex = 4;
     }
 
     const destinations = [
@@ -365,6 +405,11 @@ class _AppShell extends StatelessWidget {
         selectedIcon: Icon(Icons.settings),
         label: 'Settings',
       ),
+      NavigationDestination(
+        icon: Icon(Icons.track_changes_outlined),
+        selectedIcon: Icon(Icons.track_changes),
+        label: 'Missions',
+      ),
     ];
 
     return AdaptiveScaffold(
@@ -379,6 +424,8 @@ class _AppShell extends StatelessWidget {
             context.go('/alerts');
           case 3:
             context.go('/settings');
+          case 4:
+            context.go('/missions');
         }
       },
       destinations: destinations,
