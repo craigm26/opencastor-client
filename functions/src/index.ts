@@ -25,3 +25,6 @@ export { registerRobot, enforceRobotLimit } from "./registration";
 
 // R2R2H Mission Threads — multi-robot, multi-human group chat
 export { createMission, sendMissionMessage, listMissions, inviteToMission, joinMission, deleteMissionMessage, hideMission } from "./missions";
+
+// Harness safety gate — validates + saves harness to Firestore
+export { validateAndSaveHarness } from "./harness_validator";

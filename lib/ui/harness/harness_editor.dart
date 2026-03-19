@@ -22,6 +22,7 @@ import '../explore/explore_view_model.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'flow_canvas.dart';
 import 'flow_graph.dart';
+import 'harness_validator.dart';
 import 'harness_viewer.dart';
 import 'model_garage.dart';
 
@@ -224,22 +225,126 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     );
   }
 
+  // ── Validation dialog ─────────────────────────────────────────────────────
+
+  Future<bool> _showValidationDialog(
+    HarnessValidationResult result, {
+    required bool blocked,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: Row(children: [
+              Icon(
+                blocked ? Icons.block : Icons.warning_amber_rounded,
+                color: blocked ? Colors.red : Colors.orange,
+              ),
+              const SizedBox(width: 8),
+              Text(blocked ? 'Harness blocked' : 'Safety warnings'),
+            ]),
+            content: SizedBox(
+              width: 400,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (blocked)
+                      const Text(
+                        'This harness cannot be saved. Fix the following issues:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    if (!blocked)
+                      const Text(
+                        'Review these warnings before saving:',
+                        style: TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    const SizedBox(height: 12),
+                    ...result.issues.map((issue) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                issue.severity == ValidationSeverity.block
+                                    ? Icons.error_outline
+                                    : Icons.warning_amber_outlined,
+                                size: 16,
+                                color:
+                                    issue.severity == ValidationSeverity.block
+                                        ? Colors.red
+                                        : Colors.orange,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(issue.message,
+                                        style:
+                                            const TextStyle(fontSize: 13)),
+                                    if (issue.fix != null)
+                                      Text(
+                                        'Fix: ${issue.fix}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              if (!blocked)
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Save anyway'),
+                ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   // ── Save as template ──────────────────────────────────────────────────────
 
   Future<void> _saveAsTemplate() async {
+    // 1. Client-side safety validation
+    final validationResult =
+        HarnessValidator.validate(_config.layers, _flowGraph);
+    if (validationResult.isBlocked) {
+      await _showValidationDialog(validationResult, blocked: true);
+      return;
+    }
+    if (validationResult.hasWarnings) {
+      final proceed =
+          await _showValidationDialog(validationResult, blocked: false);
+      if (!proceed) return;
+    }
+
     setState(() => _saving = true);
     try {
+      // 2. Use validateAndSaveHarness CF — server-side gate included
       final callable =
-          FirebaseFunctions.instance.httpsCallable('uploadConfig');
+          FirebaseFunctions.instance.httpsCallable('validateAndSaveHarness');
       await callable.call<dynamic>({
-        'type': 'harness',
+        'layers': _config.layers.map((l) => l.toJson()).toList(),
+        'edges': _flowGraph.edges.map((e) => e.toJson()).toList(),
+        'content': _configToYamlString(),
         'title': '${widget.robotName} Harness',
         'tags': [widget.rrn.toLowerCase(), 'harness'],
-        'content': _configToYamlString(),
-        'filename':
-            '${widget.rrn.toLowerCase().replaceAll('-', '_')}.harness.yaml',
-        'robot_rrn': widget.rrn,
-        'public': false,
       });
 
       if (mounted) {
@@ -291,9 +396,22 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    // Safety validation before deploy
+    final validationResult =
+        HarnessValidator.validate(_config.layers, _flowGraph);
+    if (validationResult.isBlocked) {
+      await _showValidationDialog(validationResult, blocked: true);
+      return;
+    }
+    if (validationResult.hasWarnings) {
+      final proceed =
+          await _showValidationDialog(validationResult, blocked: false);
+      if (!proceed) return;
+    }
+
     setState(() => _deploying = true);
     try {
-      // Step 1: Upload config
+      // Step 1: Upload config (deploy path keeps uploadConfig for robot_rrn tracking)
       final callable =
           FirebaseFunctions.instance.httpsCallable('uploadConfig');
       await callable.call<dynamic>({

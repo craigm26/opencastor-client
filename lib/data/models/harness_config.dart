@@ -68,6 +68,9 @@ class HarnessLayer {
         'config': config,
       };
 
+  /// Alias for [toMap] — used by harness validator CF call serialisation.
+  Map<String, dynamic> toJson() => toMap();
+
   factory HarnessLayer.fromMap(Map<String, dynamic> map) => HarnessLayer(
         id: map['id'] as String? ?? '',
         type: map['type'] as String? ?? 'skill',
