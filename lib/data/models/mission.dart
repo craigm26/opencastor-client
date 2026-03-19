@@ -99,6 +99,7 @@ class Mission {
   final List<MissionParticipant> participants;
   final MissionStatus status;
   final DateTime lastMessageAt;
+  final List<String> hiddenBy;
 
   const Mission({
     required this.id,
@@ -108,6 +109,7 @@ class Mission {
     required this.participants,
     required this.status,
     required this.lastMessageAt,
+    this.hiddenBy = const [],
   });
 
   static DateTime _parseTs(dynamic v) {
@@ -130,6 +132,7 @@ class Mission {
 
   factory Mission.fromMap(String docId, Map<String, dynamic> m) {
     final rawParts = (m['participants'] as List<dynamic>?) ?? [];
+    final rawHiddenBy = (m['hidden_by'] as List<dynamic>?) ?? [];
     return Mission(
       id: docId,
       title: m['title'] as String? ?? 'Untitled Mission',
@@ -140,6 +143,7 @@ class Mission {
           .toList(),
       status: _statusFromStr(m['status'] as String?),
       lastMessageAt: _parseTs(m['last_message_at']),
+      hiddenBy: rawHiddenBy.map((e) => e as String).toList(),
     );
   }
 
@@ -181,6 +185,7 @@ class MissionMessage {
   final List<String> mentions;
   final DateTime timestamp;
   final MissionMessageStatus status;
+  final bool isDeleted;
 
   const MissionMessage({
     required this.id,
@@ -193,6 +198,7 @@ class MissionMessage {
     required this.mentions,
     required this.timestamp,
     required this.status,
+    this.isDeleted = false,
   });
 
   static DateTime _parseTs(dynamic v) {
@@ -237,6 +243,7 @@ class MissionMessage {
       mentions: rawMentions.map((e) => e as String).toList(),
       timestamp: _parseTs(m['timestamp']),
       status: _statusFromStr(m['status'] as String?),
+      isDeleted: m['deleted'] as bool? ?? false,
     );
   }
 

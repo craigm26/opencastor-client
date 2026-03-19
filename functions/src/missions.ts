@@ -10,6 +10,7 @@
 
 import * as admin from "firebase-admin";
 import { https } from "firebase-functions/v2";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 import * as uuid from "uuid";
 
 const db = () => admin.firestore();
@@ -546,5 +547,75 @@ export const listMissions = https.onCall(
 
     const missions = snapshot.docs.map((doc) => doc.data() as Mission);
     return { missions };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// deleteMissionMessage
+// ---------------------------------------------------------------------------
+
+export const deleteMissionMessage = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"],
+    invoker: "public",
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Login required");
+    const { missionId, msgId } = request.data as { missionId: string; msgId: string };
+    if (!missionId || !msgId) throw new HttpsError("invalid-argument", "missionId and msgId required");
+
+    const firestore = admin.firestore();
+    const missionRef = firestore.collection("missions").doc(missionId);
+    const msgRef = missionRef.collection("messages").doc(msgId);
+
+    const [missionDoc, msgDoc] = await Promise.all([missionRef.get(), msgRef.get()]);
+    if (!missionDoc.exists || !msgDoc.exists) throw new HttpsError("not-found", "Not found");
+
+    const mission = missionDoc.data()!;
+    const msg = msgDoc.data()!;
+    const uid = request.auth.uid;
+
+    const isOwner = mission.created_by === uid;
+    const isSender = msg.from_uid === uid;
+    if (!isOwner && !isSender) throw new HttpsError("permission-denied", "Cannot delete this message");
+
+    await msgRef.update({ deleted: true, content: "" });
+    return { ok: true };
+  }
+);
+
+// ---------------------------------------------------------------------------
+// hideMission
+// ---------------------------------------------------------------------------
+
+export const hideMission = onCall(
+  {
+    region: "us-central1",
+    cors: ["https://app.opencastor.com", "https://opencastor-client.pages.dev", "http://localhost"],
+    invoker: "public",
+  },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Login required");
+    const { missionId, hidden } = request.data as { missionId: string; hidden: boolean };
+    if (!missionId) throw new HttpsError("invalid-argument", "missionId required");
+
+    const firestore = admin.firestore();
+    const ref = firestore.collection("missions").doc(missionId);
+    const doc = await ref.get();
+    if (!doc.exists) throw new HttpsError("not-found", "Mission not found");
+
+    const data = doc.data()!;
+    if (!data.participant_uids?.includes(request.auth.uid)) {
+      throw new HttpsError("permission-denied", "Not a participant");
+    }
+
+    const uid = request.auth.uid;
+    if (hidden) {
+      await ref.update({ hidden_by: admin.firestore.FieldValue.arrayUnion(uid) });
+    } else {
+      await ref.update({ hidden_by: admin.firestore.FieldValue.arrayRemove(uid) });
+    }
+    return { ok: true };
   }
 );

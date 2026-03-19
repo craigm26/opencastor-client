@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/models/mission.dart';
 import '../widgets/thinking_indicator.dart';
@@ -96,6 +97,56 @@ class _MissionScreenState extends State<MissionScreen> {
       selection: TextSelection.collapsed(offset: newText.length),
     );
     setState(() => _mentionSuggestions = []);
+  }
+
+  Future<void> _deleteMessage(
+      BuildContext context, String missionId, MissionMessage msg) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Delete message',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () => Navigator.pop(ctx, true),
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(ctx, false),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final fn =
+          FirebaseFunctions.instance.httpsCallable('deleteMissionMessage');
+      await fn.call({'missionId': missionId, 'msgId': msg.id});
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
+    }
   }
 
   Future<void> _sendMessage(String missionId, Mission mission) async {
@@ -209,6 +260,9 @@ class _MissionScreenState extends State<MissionScreen> {
                   mission: mission,
                   scrollCtrl: _scrollCtrl,
                   currentUid: myUid ?? '',
+                  missionOwnerUid: mission.createdBy,
+                  onLongPressMessage: (msg) =>
+                      _deleteMessage(context, widget.missionId, msg),
                   onRobotMessageArrived: (rrn) {
                     if (_thinkingRobots.containsKey(rrn)) {
                       setState(() {
@@ -457,15 +511,20 @@ class _MessagesList extends StatelessWidget {
   final Mission mission;
   final ScrollController scrollCtrl;
   final String currentUid;
+  final String missionOwnerUid;
   /// Called when a new robot message is detected in the stream.
   final void Function(String rrn) onRobotMessageArrived;
+  /// Called when user long-presses a message bubble.
+  final void Function(MissionMessage msg) onLongPressMessage;
 
   const _MessagesList({
     required this.missionId,
     required this.mission,
     required this.scrollCtrl,
     required this.currentUid,
+    required this.missionOwnerUid,
     required this.onRobotMessageArrived,
+    required this.onLongPressMessage,
   });
 
   @override
@@ -514,21 +573,35 @@ class _MessagesList extends StatelessWidget {
             final msg = MissionMessage.fromDocument(docs[i]);
             final isMe =
                 !msg.isFromRobot && msg.fromUid == currentUid;
+            final canDelete = !msg.isDeleted &&
+                (msg.fromUid == currentUid ||
+                    currentUid == missionOwnerUid);
 
+            Widget bubble;
             if (msg.isFromRobot) {
               final rrn = msg.fromRrn ?? '';
-              return _RobotMessageBubble(
+              bubble = _RobotMessageBubble(
                   msg: msg, accentColor: _colorForId(rrn));
             } else if (isMe) {
-              return _HumanMessageBubble(msg: msg, isMe: true);
+              bubble = _HumanMessageBubble(msg: msg, isMe: true);
             } else {
-              // Another human participant
               final uid = msg.fromUid ?? msg.fromName;
-              return _HumanMessageBubble(
+              bubble = _HumanMessageBubble(
                   msg: msg,
                   isMe: false,
                   accentColor: _colorForId(uid));
             }
+
+            if (canDelete) {
+              return GestureDetector(
+                onLongPress: () {
+                  HapticFeedback.mediumImpact();
+                  onLongPressMessage(msg);
+                },
+                child: bubble,
+              );
+            }
+            return bubble;
           },
         );
       },
@@ -554,6 +627,31 @@ class _HumanMessageBubble extends StatelessWidget {
     final color = accentColor ?? const Color(0xFF0ea5e9);
     final roleStr =
         msg.fromRole != null ? ' · ${msg.fromRole!.label}' : '';
+
+    // Deleted placeholder
+    if (msg.isDeleted) {
+      return Padding(
+        padding: EdgeInsets.only(
+            bottom: 8, left: isMe ? 48 : 0, right: isMe ? 0 : 48),
+        child: Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.delete_outline,
+                  size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text('This message was deleted',
+                  style: TextStyle(
+                      color: cs.onSurfaceVariant,
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic)),
+            ]),
+          ),
+        ),
+      );
+    }
 
     if (isMe) {
       // Right-aligned self bubble
@@ -665,6 +763,25 @@ class _RobotMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Deleted placeholder
+    if (msg.isDeleted) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8, right: 48),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.delete_outline, size: 14, color: cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text('This message was deleted',
+                style: TextStyle(
+                    color: cs.onSurfaceVariant,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic)),
+          ]),
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, right: 48),

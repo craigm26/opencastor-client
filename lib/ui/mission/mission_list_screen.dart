@@ -1,13 +1,84 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/mission.dart';
 import 'create_mission_sheet.dart';
 
-class MissionListScreen extends StatelessWidget {
+class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
+
+  @override
+  State<MissionListScreen> createState() => _MissionListScreenState();
+}
+
+class _MissionListScreenState extends State<MissionListScreen> {
+  bool _showHidden = false;
+
+  Future<void> _toggleHideMission(
+      BuildContext context, Mission mission, String uid) async {
+    final isHidden = mission.hiddenBy.contains(uid);
+    try {
+      final fn = FirebaseFunctions.instance.httpsCallable('hideMission');
+      await fn.call({'missionId': mission.id, 'hidden': !isHidden});
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showHideMissionSheet(
+      BuildContext context, Mission mission, String uid) {
+    final isHidden = mission.hiddenBy.contains(uid);
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Icon(isHidden
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined),
+                title: Text(
+                    isHidden ? 'Show mission' : 'Archive / Hide mission'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _toggleHideMission(context, mission, uid);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,16 +116,54 @@ class MissionListScreen extends StatelessWidget {
             return _EmptyState(onNewMission: () => _showCreateSheet(context));
           }
 
+          final allMissions = docs
+              .map((d) => Mission.fromDocument(d))
+              .toList();
+
+          final visibleMissions = _showHidden
+              ? allMissions
+              : allMissions
+                  .where((m) => !m.hiddenBy.contains(uid))
+                  .toList();
+
+          final hiddenCount = allMissions
+              .where((m) => m.hiddenBy.contains(uid))
+              .length;
+
+          if (visibleMissions.isEmpty && hiddenCount == 0) {
+            return _EmptyState(onNewMission: () => _showCreateSheet(context));
+          }
+
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: docs.length,
+            itemCount: visibleMissions.length + (hiddenCount > 0 ? 1 : 0),
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, i) {
-              final mission = Mission.fromDocument(docs[i]);
+              // "Show hidden" toggle button appended at the end
+              if (i == visibleMissions.length) {
+                return Center(
+                  child: TextButton.icon(
+                    icon: Icon(_showHidden
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined),
+                    label: Text(_showHidden
+                        ? 'Hide archived'
+                        : 'Show $hiddenCount archived'),
+                    onPressed: () =>
+                        setState(() => _showHidden = !_showHidden),
+                  ),
+                );
+              }
+
+              final mission = visibleMissions[i];
+              final isHidden = mission.hiddenBy.contains(uid);
               return _MissionCard(
                 mission: mission,
                 currentUid: uid,
+                isHidden: isHidden,
                 onTap: () => context.push('/missions/${mission.id}'),
+                onLongPress: () =>
+                    _showHideMissionSheet(context, mission, uid),
               );
             },
           );
@@ -121,11 +230,15 @@ class _EmptyState extends StatelessWidget {
 class _MissionCard extends StatelessWidget {
   final Mission mission;
   final String currentUid;
+  final bool isHidden;
   final VoidCallback onTap;
+  final VoidCallback onLongPress;
   const _MissionCard({
     required this.mission,
     required this.currentUid,
+    required this.isHidden,
     required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -142,64 +255,79 @@ class _MissionCard extends StatelessWidget {
     final summary =
         '$humanCount human${humanCount != 1 ? "s" : ""} · $robotCount robot${robotCount != 1 ? "s" : ""}$rolePart';
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark
-              ? const Color(0xFF0ea5e9).withOpacity(0.15)
-              : cs.outlineVariant,
+    return Opacity(
+      opacity: isHidden ? 0.55 : 1.0,
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: isDark
+                ? const Color(0xFF0ea5e9).withOpacity(0.15)
+                : cs.outlineVariant,
+          ),
         ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title row
-              Row(
-                children: [
-                  const Icon(Icons.track_changes,
-                      size: 18, color: Color(0xFF0ea5e9)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      mission.title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600),
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            onLongPress();
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title row
+                Row(
+                  children: [
+                    const Icon(Icons.track_changes,
+                        size: 18, color: Color(0xFF0ea5e9)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        mission.title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
                     ),
-                  ),
-                  _StatusBadge(status: mission.status),
-                ],
-              ),
-              const SizedBox(height: 6),
+                    if (isHidden)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(Icons.visibility_off_outlined,
+                            size: 14, color: cs.onSurfaceVariant),
+                      ),
+                    _StatusBadge(status: mission.status),
+                  ],
+                ),
+                const SizedBox(height: 6),
 
-              // "N humans · M robots · My Role" summary
-              Text(
-                summary,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 8),
+                // "N humans · M robots · My Role" summary
+                Text(
+                  summary,
+                  style:
+                      TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 8),
 
-              // Participant avatar row
-              _ParticipantAvatarRow(
-                participants: mission.participants,
-                maxVisible: 6,
-              ),
-              const SizedBox(height: 8),
+                // Participant avatar row
+                _ParticipantAvatarRow(
+                  participants: mission.participants,
+                  maxVisible: 6,
+                ),
+                const SizedBox(height: 8),
 
-              // Time ago
-              Text(
-                _timeAgo(mission.lastMessageAt),
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-              ),
-            ],
+                // Time ago
+                Text(
+                  _timeAgo(mission.lastMessageAt),
+                  style:
+                      TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -56,6 +56,9 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   Uint8List? _attachedImage;
   String _imageAnnotation = '';
 
+  // In-memory set of hidden command IDs (resets on screen leave)
+  final Set<String> _hiddenCmdIds = {};
+
   // Slash command palette state
   bool _showPalette = false;
   String _paletteQuery = '';
@@ -312,6 +315,48 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     }
   }
 
+  /// Show bottom sheet to hide a command from local view.
+  void _showHideCmdSheet(BuildContext context, String cmdId) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(top: 12, bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: const Text('Hide message'),
+                subtitle:
+                    const Text('Hidden until you leave this screen'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _hiddenCmdIds.add(cmdId));
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(ctx),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// Build list items for the chat ListView (reverse order):
   /// each command → ChatBubble for instruction + ChatBubble for response.
   /// Inserts DateSeparator when the date changes.
@@ -321,37 +366,61 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
     // cmds are already ordered newest-first (watchCommands descending)
     for (final cmd in cmds) {
+      // Skip hidden commands
+      if (_hiddenCmdIds.contains(cmd.id)) continue;
+
       final date = cmd.issuedAt.toLocal();
       final dayKey = DateTime(date.year, date.month, date.day);
 
       // Robot response bubble (shown first in reverse list = shown after command)
+      Widget? responseBubble;
       if (cmd.result?['raw_text'] != null) {
-        items.add(ChatBubble(
-          text: cmd.result!['raw_text'].toString(),
-          isUser: false,
-          timestamp: cmd.issuedAt,
-        ));
+        responseBubble = GestureDetector(
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _showHideCmdSheet(context, cmd.id);
+          },
+          child: ChatBubble(
+            text: cmd.result!['raw_text'].toString(),
+            isUser: false,
+            timestamp: cmd.issuedAt,
+          ),
+        );
       } else if (cmd.isFailed && cmd.error != null) {
-        items.add(ChatBubble(
-          text: '⚠ ${cmd.error}',
-          isUser: false,
-          timestamp: cmd.issuedAt,
-        ));
+        responseBubble = GestureDetector(
+          onLongPress: () {
+            HapticFeedback.mediumImpact();
+            _showHideCmdSheet(context, cmd.id);
+          },
+          child: ChatBubble(
+            text: '⚠ ${cmd.error}',
+            isUser: false,
+            timestamp: cmd.issuedAt,
+          ),
+        );
       } else if (!cmd.isComplete && !cmd.isFailed) {
-        // Still processing
-        items.add(ChatBubble(
+        // Still processing — no long-press on loading bubble
+        responseBubble = ChatBubble(
           text: '',
           isUser: false,
           isLoading: true,
           timestamp: cmd.issuedAt,
-        ));
+        );
       }
 
-      // User command bubble
-      items.add(ChatBubble(
-        text: cmd.instruction,
-        isUser: true,
-        timestamp: cmd.issuedAt,
+      if (responseBubble != null) items.add(responseBubble);
+
+      // User command bubble with long-press to hide
+      items.add(GestureDetector(
+        onLongPress: () {
+          HapticFeedback.mediumImpact();
+          _showHideCmdSheet(context, cmd.id);
+        },
+        child: ChatBubble(
+          text: cmd.instruction,
+          isUser: true,
+          timestamp: cmd.issuedAt,
+        ),
       ));
 
       // Date separator (inserted after the bubble, so visible above it in reverse list)
