@@ -20,6 +20,8 @@ import '../../data/models/provider_models.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../explore/explore_view_model.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import 'flow_canvas.dart';
+import 'flow_graph.dart';
 import 'harness_viewer.dart';
 import 'model_garage.dart';
 
@@ -46,6 +48,8 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   late HarnessConfig _config;
   bool _saving = false;
   bool _deploying = false;
+  bool _showFlow = false;
+  FlowGraph _flowGraph = FlowGraph.empty();
 
   @override
   void initState() {
@@ -372,6 +376,14 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       appBar: AppBar(
         title: Text('Edit Harness — ${widget.robotName}'),
         actions: [
+          // Flow / list view toggle
+          IconButton(
+            icon: Icon(
+                _showFlow ? Icons.list : Icons.account_tree_outlined),
+            tooltip:
+                _showFlow ? 'List view' : 'Flow view',
+            onPressed: () => setState(() => _showFlow = !_showFlow),
+          ),
           if (_saving)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -409,14 +421,21 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
         tooltip: 'Add block',
         child: const Icon(Icons.add),
       ),
-      body: HarnessViewer(
-        config: _config,
-        onEditLayer: _openEditSheet,
-        onToggleLayer: _toggleLayerEnabled,
-        onReorderSkills: _reorderSkills,
-        onAddSkill: _showSkillBrowser,
-        onAddBlock: _showAddBlockSheet,
-      ),
+      body: _showFlow
+          ? FlowCanvas(
+              layers: _config.layers,
+              graph: _flowGraph,
+              editable: true,
+              onGraphChanged: (g) => setState(() => _flowGraph = g),
+            )
+          : HarnessViewer(
+              config: _config,
+              onEditLayer: _openEditSheet,
+              onToggleLayer: _toggleLayerEnabled,
+              onReorderSkills: _reorderSkills,
+              onAddSkill: _showSkillBrowser,
+              onAddBlock: _showAddBlockSheet,
+            ),
     );
   }
 }

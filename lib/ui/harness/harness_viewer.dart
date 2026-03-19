@@ -11,6 +11,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/harness_config.dart';
 import '../../ui/core/theme/app_theme.dart';
+import 'flow_canvas.dart';
+import 'flow_graph.dart';
 
 // ── Layer colour palette ──────────────────────────────────────────────────────
 
@@ -91,6 +93,8 @@ class HarnessViewer extends StatefulWidget {
 
 class _HarnessViewerState extends State<HarnessViewer> {
   final _expanded = <String, bool>{};
+  bool _showFlow = false;
+  FlowGraph _flowGraph = FlowGraph.empty();
 
   bool _isExpanded(String id) => _expanded[id] ?? false;
 
@@ -101,6 +105,32 @@ class _HarnessViewerState extends State<HarnessViewer> {
   Widget build(BuildContext context) {
     if (widget.loading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    // Flow view (read-only) — toggled by the graph icon in the corner.
+    if (_showFlow) {
+      return Stack(
+        children: [
+          FlowCanvas(
+            layers: widget.config.layers,
+            graph: _flowGraph,
+            editable: false,
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: FloatingActionButton.small(
+              heroTag: 'viewer_flow_toggle',
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              tooltip: 'List view',
+              onPressed: () => setState(() => _showFlow = false),
+              child: const Icon(Icons.list, size: 18),
+            ),
+          ),
+        ],
+      );
     }
 
     // Build the ordered display groups:
@@ -143,25 +173,44 @@ class _HarnessViewerState extends State<HarnessViewer> {
       pipeline.add(_PipelineItem.single(l));
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        children: [
-          for (var i = 0; i < pipeline.length; i++) ...[
-            _buildPipelineItem(context, pipeline[i]),
-            if (i < pipeline.length - 1) _Arrow(),
-          ],
-          if (widget.onAddBlock != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.add, size: 14),
-                label: const Text('Add Block'),
-                onPressed: widget.onAddBlock,
-              ),
-            ),
-        ],
-      ),
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            children: [
+              for (var i = 0; i < pipeline.length; i++) ...[
+                _buildPipelineItem(context, pipeline[i]),
+                if (i < pipeline.length - 1) _Arrow(),
+              ],
+              if (widget.onAddBlock != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 14),
+                    label: const Text('Add Block'),
+                    onPressed: widget.onAddBlock,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Flow-view toggle button (read-only explore / robot-detail)
+        Positioned(
+          top: 8,
+          right: 8,
+          child: FloatingActionButton.small(
+            heroTag: 'viewer_list_toggle',
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
+            foregroundColor:
+                Theme.of(context).colorScheme.onSurface,
+            tooltip: 'Flow view',
+            onPressed: () => setState(() => _showFlow = true),
+            child: const Icon(Icons.account_tree_outlined, size: 18),
+          ),
+        ),
+      ],
     );
   }
 
