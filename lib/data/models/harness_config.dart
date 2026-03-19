@@ -122,9 +122,9 @@ class HarnessConfig {
 
   static HarnessConfig defaults({String robotRrn = ''}) => HarnessConfig(
         robotRrn: robotRrn,
-        name: 'Default Harness',
+        name: 'Advanced Agent Harness',
         layers: [
-          // 1. P66 Safety hook — always on, always first
+          // ── ALWAYS-ON SAFETY INVARIANTS ───────────────────────────────────
           const HarnessLayer(
             id: 'hook-p66',
             type: 'hook',
@@ -135,12 +135,28 @@ class HarnessConfig {
             canReorder: false,
             config: {'p66_audit': true},
           ),
-          // 2. Context Builder
+
+          // ── SECURITY & VALIDATION ─────────────────────────────────────────
+          const HarnessLayer(
+            id: 'prompt-guard',
+            type: 'guard',
+            label: 'Prompt Guard',
+            description: 'Blocks jailbreak, injection, and role-switch attempts',
+            enabled: true,
+            config: {
+              'block_jailbreak': true,
+              'block_injection': true,
+              'block_role_switch': true,
+              'risk_threshold': 0.6,
+            },
+          ),
+
+          // ── CONTEXT ASSEMBLY ──────────────────────────────────────────────
           const HarnessLayer(
             id: 'context-builder',
             type: 'context',
             label: 'Context Builder',
-            description: 'Assembles memory, telemetry, and skill context',
+            description: 'Memory · Telemetry · Skills · System prompt',
             enabled: true,
             canDisable: false,
             canReorder: false,
@@ -149,9 +165,25 @@ class HarnessConfig {
               'telemetry': true,
               'system_prompt': true,
               'skills_context': true,
+              'rcan_identity': true,
             },
           ),
-          // 3. Skills (ordered, reorderable)
+
+          // ── WORKING MEMORY ────────────────────────────────────────────────
+          const HarnessLayer(
+            id: 'working-memory',
+            type: 'memory',
+            label: 'Working Memory',
+            description: 'Per-session scratchpad for multi-step reasoning',
+            enabled: true,
+            config: {
+              'max_entries': 50,
+              'ttl_s': 1800,
+              'persist': false,
+            },
+          ),
+
+          // ── SKILLS ────────────────────────────────────────────────────────
           HarnessLayer(
             id: 'skill-navigate-to',
             type: 'skill',
@@ -169,19 +201,19 @@ class HarnessConfig {
             config: const {'order': 1},
           ),
           HarnessLayer(
-            id: 'skill-arm-manipulate',
-            type: 'skill',
-            label: 'arm-manipulate',
-            description: 'Arm/gripper manipulation primitives',
-            enabled: false,
-            config: const {'order': 2},
-          ),
-          HarnessLayer(
             id: 'skill-web-lookup',
             type: 'skill',
             label: 'web-lookup',
             description: 'Web search and knowledge retrieval',
             enabled: true,
+            config: const {'order': 2},
+          ),
+          HarnessLayer(
+            id: 'skill-arm-manipulate',
+            type: 'skill',
+            label: 'arm-manipulate',
+            description: 'Arm/gripper manipulation primitives',
+            enabled: false,
             config: const {'order': 3},
           ),
           HarnessLayer(
@@ -192,20 +224,40 @@ class HarnessConfig {
             enabled: false,
             config: const {'order': 4},
           ),
-          HarnessLayer(
-            id: 'skill-code-reviewer',
-            type: 'skill',
-            label: 'code-reviewer',
-            description: 'Code analysis and review tool',
-            enabled: false,
-            config: const {'order': 5},
+
+          // ── CONFIDENCE & SAFETY GATES ─────────────────────────────────────
+          const HarnessLayer(
+            id: 'circuit-breaker',
+            type: 'circuit_breaker',
+            label: 'Circuit Breaker',
+            description: 'Disables skills after 3 failures; resets after 30s',
+            enabled: true,
+            config: {
+              'failure_threshold': 3,
+              'cooldown_s': 30,
+              'half_open_probe': true,
+            },
           ),
-          // 4. Dual Model config
+          const HarnessLayer(
+            id: 'hitl-physical',
+            type: 'hitl',
+            label: 'Physical HITL Gate',
+            description: 'Operator approval required for physical actions',
+            enabled: true,
+            config: {
+              'timeout_s': 30,
+              'on_timeout': 'block',
+              'require_auth': true,
+              'action_types': ['move', 'actuate', 'grip', 'rotate', 'extend', 'retract'],
+            },
+          ),
+
+          // ── MODEL ROUTING ─────────────────────────────────────────────────
           const HarnessLayer(
             id: 'model-dual',
             type: 'model',
             label: 'Dual Model',
-            description: 'Fast and slow model routing by confidence',
+            description: 'Fast local (Gemma 3) · Slow cloud (Gemini 2.5) by confidence',
             enabled: true,
             canDisable: false,
             canReorder: false,
@@ -213,11 +265,24 @@ class HarnessConfig {
               'fast_provider': 'ollama',
               'fast_model': 'gemma3:1b',
               'slow_provider': 'google',
-              'slow_model': 'gemini-2.0-flash',
-              'confidence_threshold': 0.7,
+              'slow_model': 'gemini-2.5-flash',
+              'confidence_threshold': 0.72,
             },
           ),
-          // 5. DriftDetection hook (optional)
+
+          // ── COST & DRIFT MONITORING ───────────────────────────────────────
+          const HarnessLayer(
+            id: 'cost-gate',
+            type: 'cost_gate',
+            label: 'Cost Gate',
+            description: r'Halts if LLM spend exceeds $0.10/session',
+            enabled: true,
+            config: {
+              'budget_usd': 0.10,
+              'on_exceed': 'block',
+              'alert_at_pct': 80,
+            },
+          ),
           const HarnessLayer(
             id: 'hook-drift',
             type: 'hook',
@@ -226,7 +291,26 @@ class HarnessConfig {
             enabled: true,
             config: {'drift_threshold': 0.15},
           ),
-          // 6. Trajectory Logger — always on, always last
+
+          // ── OBSERVABILITY ─────────────────────────────────────────────────
+          const HarnessLayer(
+            id: 'span-tracer',
+            type: 'tracer',
+            label: 'Span Tracer',
+            description: 'OpenTelemetry-style execution traces → SQLite',
+            enabled: true,
+            config: {'export': 'sqlite', 'db_path': 'traces.db'},
+          ),
+          const HarnessLayer(
+            id: 'dlq',
+            type: 'dlq',
+            label: 'Dead Letter Queue',
+            description: 'Failed commands queued for human review',
+            enabled: true,
+            config: {'db_path': 'dlq.db', 'max_size': 500},
+          ),
+
+          // ── AUDIT (always-on, always last) ────────────────────────────────
           const HarnessLayer(
             id: 'trajectory-logger',
             type: 'trajectory',
@@ -237,9 +321,7 @@ class HarnessConfig {
             enabled: true,
             canDisable: false,
             canReorder: false,
-            config: {
-              'sqlite_path': 'trajectory.db',
-            },
+            config: {'sqlite_path': 'trajectory.db'},
           ),
         ],
       );

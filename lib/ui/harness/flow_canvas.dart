@@ -337,10 +337,20 @@ class _EdgePainter extends CustomPainter {
   }
 
   void _drawLabel(Canvas canvas, String text, Offset pos) {
+    Color labelColor = _kMutedText;
+    if (text == 'YES') labelColor = const Color(0xFF3FB950); // green
+    if (text == 'NO') labelColor = const Color(0xFFF44336);  // red
+
     final tp = TextPainter(
       text: TextSpan(
           text: text,
-          style: const TextStyle(color: _kMutedText, fontSize: 10)),
+          style: TextStyle(
+            color: labelColor,
+            fontSize: 10,
+            fontWeight: (text == 'YES' || text == 'NO')
+                ? FontWeight.bold
+                : FontWeight.normal,
+          )),
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, pos);
@@ -372,12 +382,17 @@ class _FlowNode extends StatelessWidget {
   Color get _borderColor {
     if (isAlwaysOn) return _kAccentGreen;
     switch (nodeType) {
+      case FlowNodeType.conditional:
+        return const Color(0xFFFFCA28); // amber
       case FlowNodeType.hitl:
-        return const Color(0xFFFF9800); // orange
+        return const Color(0xFF2196F3); // blue
       case FlowNodeType.timeout:
+        return const Color(0xFFFF9800); // orange
+      case FlowNodeType.parallel:
+      case FlowNodeType.join:
         return const Color(0xFF9C27B0); // purple
       case FlowNodeType.costGate:
-        return const Color(0xFFFFEB3B); // yellow
+        return const Color(0xFFF44336); // red
       case FlowNodeType.modality:
         return const Color(0xFF2196F3); // blue
       case FlowNodeType.input:
@@ -390,8 +405,11 @@ class _FlowNode extends StatelessWidget {
 
   double get _borderWidth {
     switch (nodeType) {
+      case FlowNodeType.conditional:
       case FlowNodeType.hitl:
       case FlowNodeType.timeout:
+      case FlowNodeType.parallel:
+      case FlowNodeType.join:
       case FlowNodeType.costGate:
       case FlowNodeType.modality:
         return 2.0;
@@ -402,18 +420,16 @@ class _FlowNode extends StatelessWidget {
 
   String? get _typeIcon {
     switch (nodeType) {
-      case FlowNodeType.conditional:
-        return '◆'; // diamond indicator
       case FlowNodeType.parallel:
-        return '≫';
+        return '⑂';
       case FlowNodeType.join:
-        return '≪';
+        return '⑃';
       case FlowNodeType.hitl:
-        return '✋';
+        return '👤';
       case FlowNodeType.timeout:
-        return '⏱';
+        return '↺'; // loop/retry indicator for timeout
       case FlowNodeType.costGate:
-        return '\$';
+        return '💰';
       case FlowNodeType.modality:
         return '⇒';
       default:
@@ -439,31 +455,34 @@ class _FlowNode extends StatelessWidget {
     final textColor = enabled ? _kTextColor : _kMutedText;
     final icon = _typeIcon;
 
-    // Conditional → diamond shape via Transform.rotate
+    // Conditional → amber diamond shape via Transform.rotate
     if (nodeType == FlowNodeType.conditional) {
+      const amberBorder = Color(0xFFFFCA28);
       return SizedBox(
         width: _kNodeW,
         height: _kNodeH,
-        child: Transform.rotate(
-          angle: 0.785398, // 45°
-          child: Container(
-            width: _kNodeH * 0.8,
-            height: _kNodeH * 0.8,
-            decoration: BoxDecoration(
-              color: _kNodeBg,
-              border: Border.all(color: _borderColor, width: _borderWidth),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Transform.rotate(
-              angle: -0.785398,
-              child: Center(
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+        child: Center(
+          child: Transform.rotate(
+            angle: 0.785398, // 45°
+            child: Container(
+              width: _kNodeH * 0.82,
+              height: _kNodeH * 0.82,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1500),
+                border: Border.all(color: amberBorder, width: 2.0),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Transform.rotate(
+                angle: -0.785398,
+                child: Center(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFFFCA28),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -615,11 +634,11 @@ class _NodeTypePalette extends StatelessWidget {
 
   static const _paletteIcons = [
     '◆',
-    '≫',
-    '≪',
-    '✋',
-    '⏱',
-    '\$',
+    '⑂',
+    '⑃',
+    '👤',
+    '↺',
+    '💰',
     '⇒',
   ];
 

@@ -1411,6 +1411,181 @@ class _AddBlockSheet extends StatelessWidget {
           ));
         },
       ),
+      _BlockEntry(
+        emoji: '❓',
+        title: 'Conditional Branch',
+        subtitle: 'Route execution based on a condition (YES/NO)',
+        onAdd: () {
+          final id = 'cond-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'conditional',
+            label: 'If / Else',
+            description: 'Branch on a condition expression',
+            enabled: true,
+            config: const {
+              'condition': 'confidence > 0.7',
+              'yes_next': '',
+              'no_next': '',
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '🔁',
+        title: 'Retry Loop',
+        subtitle: 'Retry a step up to N times on failure',
+        onAdd: () {
+          final id = 'loop-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'loop',
+            label: 'Retry Loop',
+            description: 'Retry on failure, up to max_retries times',
+            enabled: true,
+            config: const {
+              'max_retries': 3,
+              'retry_on': 'error',
+              'backoff_s': 1,
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '🧑',
+        title: 'HITL Gate',
+        subtitle: 'Pause for human approval before proceeding',
+        onAdd: () {
+          final id = 'hitl-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'hitl',
+            label: 'Human Gate',
+            description: 'Requires operator approval to continue',
+            enabled: true,
+            config: const {
+              'timeout_s': 30,
+              'on_timeout': 'block',
+              'require_auth': true,
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '⑂',
+        title: 'Parallel Fork',
+        subtitle: 'Execute multiple branches concurrently',
+        onAdd: () {
+          final id = 'parallel-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'parallel',
+            label: 'Parallel Fork',
+            description: 'Fan out to concurrent execution branches',
+            enabled: true,
+            config: const {
+              'branches': [],
+              'join_strategy': 'all',
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '🛡️',
+        title: 'Circuit Breaker',
+        subtitle: 'Disable a skill after repeated failures',
+        onAdd: () {
+          final id = 'circuit-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'circuit_breaker',
+            label: 'Circuit Breaker',
+            description: 'Open circuit after N failures, auto-reset after cooldown',
+            enabled: true,
+            config: const {
+              'failure_threshold': 3,
+              'cooldown_s': 30,
+              'half_open_probe': true,
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '💰',
+        title: 'Cost Gate',
+        subtitle: 'Halt if LLM spend exceeds budget',
+        onAdd: () {
+          final id = 'cost-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
+          onAddLayer(HarnessLayer(
+            id: id,
+            type: 'cost_gate',
+            label: 'Cost Gate',
+            description: 'Block execution if budget_usd ceiling is exceeded',
+            enabled: true,
+            config: const {
+              'budget_usd': 0.10,
+              'on_exceed': 'block',
+              'alert_at_pct': 80,
+            },
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '📤',
+        title: 'Dead Letter Queue',
+        subtitle: 'Capture failed commands for human review',
+        onAdd: () {
+          if (config.layers.any((l) => l.id == 'dlq')) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('DLQ is already in this harness'),
+                  behavior: SnackBarBehavior.floating),
+            );
+            return;
+          }
+          Navigator.pop(context);
+          onAddLayer(const HarnessLayer(
+            id: 'dlq',
+            type: 'dlq',
+            label: 'Dead Letter Queue',
+            description: 'Failed commands queued for human review',
+            enabled: true,
+            config: {'db_path': 'dlq.db', 'max_size': 500},
+          ));
+        },
+      ),
+      _BlockEntry(
+        emoji: '🔍',
+        title: 'Span Tracer',
+        subtitle: 'OpenTelemetry-style execution traces',
+        onAdd: () {
+          if (config.layers.any((l) => l.id == 'span-tracer')) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Span Tracer already added'),
+                  behavior: SnackBarBehavior.floating),
+            );
+            return;
+          }
+          Navigator.pop(context);
+          onAddLayer(const HarnessLayer(
+            id: 'span-tracer',
+            type: 'tracer',
+            label: 'Span Tracer',
+            description: 'Records execution spans for debugging and audit',
+            enabled: true,
+            config: {'export': 'sqlite', 'db_path': 'traces.db'},
+          ));
+        },
+      ),
     ];
 
     return SafeArea(
