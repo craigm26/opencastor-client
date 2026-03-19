@@ -242,6 +242,10 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
       '/reload-config' => ('RELOAD_CONFIG', CommandScope.system),
       '/share' => ('SHARE_CONFIG', CommandScope.system),
       '/install' => ('INSTALL: ${args.isNotEmpty ? args.first : ''}', CommandScope.system),
+      '/pause' => ('PAUSE', CommandScope.system),
+      '/resume' => ('RESUME', CommandScope.system),
+      '/shutdown' => ('SHUTDOWN', CommandScope.system),
+      '/snapshot' => ('SNAPSHOT', CommandScope.status),
       _ when cmd.startsWith('/') => (cmd.substring(1).toUpperCase() +
             (args.isNotEmpty ? ': ${args.join(' ')}' : ''),
           CommandScope.chat),
