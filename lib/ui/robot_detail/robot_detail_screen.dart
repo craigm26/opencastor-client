@@ -34,6 +34,7 @@ import '../../data/models/command.dart' hide CommandScope;
 import '../../data/models/slash_command.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
+import '../widgets/thinking_indicator.dart';
 import 'robot_detail_view_model.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
@@ -51,6 +52,7 @@ class RobotDetailScreen extends ConsumerStatefulWidget {
 class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   final _ctrl = TextEditingController();
   bool _sending = false;
+  bool _thinking = false;
   Uint8List? _attachedImage;
   String _imageAnnotation = '';
 
@@ -365,7 +367,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     final text = _ctrl.text.trim();
     if (text.isEmpty && _attachedImage == null) return;
     _dismissPalette();
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _thinking = true;
+    });
+    final sendTime = DateTime.now();
     final capturedText = text;
     final capturedImage = _attachedImage;
     final capturedAnnotation = _imageAnnotation;
@@ -373,6 +379,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     setState(() {
       _attachedImage = null;
       _imageAnnotation = '';
+    });
+
+    // 30-second hard timeout for thinking indicator.
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted && _thinking) setState(() => _thinking = false);
     });
 
     // Handle slash commands typed directly into the input field
@@ -383,6 +394,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
         final args = parts.skip(1).toList();
         await _sendSlashCommand(cmd, args, robot);
       } finally {
+        final elapsed = DateTime.now().difference(sendTime).inMilliseconds;
+        final remaining = 1500 - elapsed;
+        if (remaining > 0) {
+          await Future.delayed(Duration(milliseconds: remaining));
+        }
         if (mounted) setState(() => _sending = false);
       }
       return;
@@ -421,6 +437,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
             mediaChunks: mediaChunks,
           );
     } finally {
+      final elapsed = DateTime.now().difference(sendTime).inMilliseconds;
+      final remaining = 1500 - elapsed;
+      if (remaining > 0) {
+        await Future.delayed(Duration(milliseconds: remaining));
+      }
       if (mounted) setState(() => _sending = false);
     }
   }
@@ -448,6 +469,20 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     Robot robot,
     AsyncValue<List<RobotCommand>> commandsAsync,
   ) {
+    // Clear thinking indicator when the robot responds (command becomes complete).
+    ref.listen<AsyncValue<List<RobotCommand>>>(
+      commandsProvider(widget.rrn),
+      (prev, next) {
+        next.whenData((cmds) {
+          if (!_thinking || cmds.isEmpty) return;
+          final latest = cmds.first; // newest command (list is newest-first)
+          if (latest.isComplete || latest.isFailed) {
+            if (mounted) setState(() => _thinking = false);
+          }
+        });
+      },
+    );
+
     final repo = ref.read(robotRepositoryProvider);
 
     return Scaffold(
@@ -577,6 +612,14 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               },
             ),
           ),
+
+          // ── Robot thinking indicator ───────────────────────────────────────
+          if (_thinking)
+            Padding(
+              padding:
+                  const EdgeInsets.only(left: 12, right: 48, bottom: 8),
+              child: ThinkingIndicator(robotName: robot.name),
+            ),
 
           // ── Image preview above input ──────────────────────────────────────
           if (_attachedImage != null)

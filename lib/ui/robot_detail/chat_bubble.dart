@@ -7,6 +7,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../widgets/thinking_indicator.dart';
+
 class ChatBubble extends StatelessWidget {
   final String text;
   final bool isUser;
@@ -67,7 +69,7 @@ class ChatBubble extends StatelessWidget {
 
               // ── Text / typing indicator ───────────────────────────────
               if (isLoading)
-                _TypingIndicator(color: textColor)
+                ThinkingIndicator(robotName: '', compact: true, color: textColor)
               else if (text.isNotEmpty)
                 Text(
                   text,

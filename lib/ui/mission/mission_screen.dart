@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/models/mission.dart';
+import '../widgets/thinking_indicator.dart';
 
 // ---------------------------------------------------------------------------
 // Consistent color palette — shared by robots (by RRN) and humans (by uid)
@@ -48,8 +51,16 @@ class _MissionScreenState extends State<MissionScreen> {
   // @mention suggestions
   List<String> _mentionSuggestions = [];
 
+  // Thinking indicators: rrn → time when thinking started
+  final _thinkingRobots = <String, DateTime>{};
+  Timer? _thinkingTimeout;
+
+  // Delivered receipt: set after a successful send
+  int? _deliveredRobotCount;
+
   @override
   void dispose() {
+    _thinkingTimeout?.cancel();
     _textCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -112,6 +123,28 @@ class _MissionScreenState extends State<MissionScreen> {
       final fn =
           FirebaseFunctions.instance.httpsCallable('sendMissionMessage');
       await fn.call({'missionId': missionId, 'content': content});
+
+      // Mark robot participants as thinking and show delivered receipt.
+      final robots =
+          mission.participants.where((p) => p.isRobot).toList();
+      setState(() {
+        for (final r in robots) {
+          if (r.rrn != null) _thinkingRobots[r.rrn!] = DateTime.now();
+        }
+        _deliveredRobotCount = robots.length;
+      });
+
+      // Auto-clear after 45 s in case the robot is offline.
+      _thinkingTimeout?.cancel();
+      _thinkingTimeout = Timer(const Duration(seconds: 45), () {
+        if (mounted) {
+          setState(() {
+            _thinkingRobots.clear();
+            _deliveredRobotCount = null;
+          });
+        }
+      });
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollCtrl.hasClients) {
           _scrollCtrl.animateTo(
@@ -176,8 +209,52 @@ class _MissionScreenState extends State<MissionScreen> {
                   mission: mission,
                   scrollCtrl: _scrollCtrl,
                   currentUid: myUid ?? '',
+                  onRobotMessageArrived: (rrn) {
+                    if (_thinkingRobots.containsKey(rrn)) {
+                      setState(() {
+                        _thinkingRobots.remove(rrn);
+                        if (_thinkingRobots.isEmpty) {
+                          _thinkingTimeout?.cancel();
+                          _deliveredRobotCount = null;
+                        }
+                      });
+                    }
+                  },
                 ),
               ),
+
+              // Thinking indicators (one per pending robot)
+              if (_thinkingRobots.isNotEmpty)
+                ...mission.participants
+                    .where((p) =>
+                        p.isRobot && _thinkingRobots.containsKey(p.rrn))
+                    .map(
+                      (p) => Padding(
+                        padding: const EdgeInsets.only(
+                            left: 12, right: 48, top: 4, bottom: 4),
+                        child: ThinkingIndicator(
+                          robotName: p.name,
+                          color: _colorForId(p.rrn!),
+                        ),
+                      ),
+                    ),
+
+              // Delivered receipt
+              if (_deliveredRobotCount != null && _deliveredRobotCount! > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 14, bottom: 2),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '✓ Delivered to $_deliveredRobotCount'
+                      ' robot${_deliveredRobotCount! == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
 
               // Error banner
               if (_error != null) _ErrorBanner(
@@ -380,12 +457,15 @@ class _MessagesList extends StatelessWidget {
   final Mission mission;
   final ScrollController scrollCtrl;
   final String currentUid;
+  /// Called when a new robot message is detected in the stream.
+  final void Function(String rrn) onRobotMessageArrived;
 
   const _MessagesList({
     required this.missionId,
     required this.mission,
     required this.scrollCtrl,
     required this.currentUid,
+    required this.onRobotMessageArrived,
   });
 
   @override
@@ -411,6 +491,18 @@ class _MessagesList extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           );
+        }
+
+        // Notify parent when a robot message is detected so it can clear
+        // the thinking indicator for that robot.
+        if (docs.isNotEmpty) {
+          final latestDoc = docs.last;
+          final latestMsg = MissionMessage.fromDocument(latestDoc);
+          if (latestMsg.isFromRobot && latestMsg.fromRrn != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              onRobotMessageArrived(latestMsg.fromRrn!);
+            });
+          }
         }
 
         return ListView.builder(
