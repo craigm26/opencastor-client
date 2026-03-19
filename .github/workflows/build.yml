@@ -11,7 +11,7 @@ jobs:
     name: Flutter build + test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
       - uses: subosito/flutter-action@v2
         with:
@@ -75,9 +75,9 @@ jobs:
       run:
         working-directory: functions
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4  # pin when SHA available
         with:
           node-version: '20'
           cache: npm
