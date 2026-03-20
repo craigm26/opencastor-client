@@ -662,16 +662,52 @@ class HarnessConfig {
         layers: layers,
       );
 
-  /// Returns a new config with [layer] inserted just before the trajectory
-  /// logger (always-last), or appended if no trajectory layer is found.
+  /// Pipeline priority order for smart block insertion.
+  /// Lower = earlier in the pipeline. Trajectory is always last (99).
+  /// p66 has canReorder=false so it never moves regardless of priority.
+  static const _kLayerPipelineOrder = <String, int>{
+    'guard': 1,
+    'context': 2,
+    'memory': 3,
+    'skill': 4,
+    'model': 5,
+    'hitl': 6,
+    'cost_gate': 7,
+    'circuit_breaker': 8,
+    'hook': 9,        // drift and other runtime hooks (p66 fixed via canReorder)
+    'tracer': 10,
+    'dlq': 11,
+    'trajectory': 99, // always last — canReorder=false
+  };
+
+  static int _priorityFor(String type) =>
+      _kLayerPipelineOrder[type] ?? 90;
+
+  /// Returns a new config with [layer] inserted at its correct pipeline
+  /// position based on [_kLayerPipelineOrder]. Falls back to inserting before
+  /// trajectory for unknown types.
   HarnessConfig withLayerAdded(HarnessLayer layer) {
     final newLayers = List<HarnessLayer>.from(layers);
-    final trajIdx = newLayers.indexWhere((l) => l.type == 'trajectory');
-    if (trajIdx >= 0) {
-      newLayers.insert(trajIdx, layer);
-    } else {
-      newLayers.add(layer);
+    final newPriority = _priorityFor(layer.type);
+
+    // Walk from end: find the last layer with priority ≤ newPriority.
+    // Insert immediately after it.
+    int insertIdx = newLayers.length; // default: append
+    for (var i = newLayers.length - 1; i >= 0; i--) {
+      final p = _priorityFor(newLayers[i].type);
+      if (p <= newPriority) {
+        insertIdx = i + 1;
+        break;
+      }
     }
+
+    // Always insert before trajectory
+    final trajIdx = newLayers.indexWhere((l) => l.type == 'trajectory');
+    if (trajIdx >= 0 && insertIdx > trajIdx) {
+      insertIdx = trajIdx;
+    }
+
+    newLayers.insert(insertIdx, layer);
     return copyWithLayers(newLayers);
   }
 

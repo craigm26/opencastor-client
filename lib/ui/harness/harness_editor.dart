@@ -123,6 +123,25 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       _config = _config.withLayerAdded(layer);
       _syncGraph();
     });
+
+    // Show placement toast
+    final newIdx = _config.layers.indexWhere((l) => l.id == layer.id);
+    final prevLabel =
+        newIdx > 0 ? _config.layers[newIdx - 1].label : '__input__';
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Added ${layer.label} after $prevLabel'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'View in graph',
+            onPressed: () => setState(() => _showFlow = true),
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _removeLayer(HarnessLayer layer) async {

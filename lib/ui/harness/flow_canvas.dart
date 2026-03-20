@@ -4,6 +4,11 @@
 /// curved feedback-loop arrows, and dashed-border group containers.
 /// Uses only Flutter stdlib: CustomPainter, InteractiveViewer,
 /// GestureDetector, Stack, Positioned.
+///
+/// Features:
+///   - Zoom in / out / reset controls (viewport-fixed, bottom-right)
+///   - Connect mode: tap a node then tap another to draw an edge
+///   - Auto-connect when adding a node via the palette
 library;
 
 import 'package:flutter/material.dart';
@@ -24,6 +29,7 @@ const _kGroupBorder = Color(0xFF3D444D);
 const _kTextColor = Color(0xFFE6EDF3);
 const _kMutedText = Color(0xFF8B949E);
 const _kAccentGreen = Color(0xFF3FB950);
+const _kConnectHighlight = Color(0xFF58A6FF);
 
 // ─── FlowCanvas ───────────────────────────────────────────────────────────────
 
@@ -50,6 +56,12 @@ class FlowCanvas extends StatefulWidget {
 
 class _FlowCanvasState extends State<FlowCanvas> {
   late FlowGraph _graph;
+  final _transformController = TransformationController();
+
+  // ── Connect-mode state ────────────────────────────────────────────────────
+  bool _connectMode = false;
+  String? _connectFromId;
+  Offset? _connectDragEnd;
 
   @override
   void initState() {
@@ -67,6 +79,12 @@ class _FlowCanvasState extends State<FlowCanvas> {
           ? FlowGraph.autoLayout(widget.layers.map((l) => l.id).toList())
           : widget.graph;
     }
+  }
+
+  @override
+  void dispose() {
+    _transformController.dispose();
+    super.dispose();
   }
 
   HarnessLayer? _layerById(String id) {
@@ -121,6 +139,22 @@ class _FlowCanvasState extends State<FlowCanvas> {
     widget.onGraphChanged?.call(_graph);
   }
 
+  void _addEdge(String fromId, String toId) {
+    // Avoid duplicate non-loop edges
+    final exists = _graph.edges.any(
+      (e) => e.fromId == fromId && e.toId == toId && !e.isLoop,
+    );
+    if (exists) return;
+    setState(() {
+      _graph.edges.add(FlowEdge(
+        id: 'conn_${fromId}_$toId',
+        fromId: fromId,
+        toId: toId,
+      ));
+    });
+    widget.onGraphChanged?.call(_graph);
+  }
+
   // Canvas total size derived from node positions
   Size get _canvasSize {
     double maxX = 600, maxY = 600;
@@ -138,64 +172,146 @@ class _FlowCanvasState extends State<FlowCanvas> {
 
     return Container(
       color: _kBg,
-      child: InteractiveViewer(
-        constrained: false,
-        minScale: 0.4,
-        maxScale: 2.5,
-        child: SizedBox(
-          width: canvasSize.width,
-          height: canvasSize.height,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // ── Edge painter (bottom layer) ─────────────────────────────
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _EdgePainter(
-                    graph: _graph,
-                    posMap: posMap,
+      child: Stack(
+        children: [
+          // ── Interactive canvas ─────────────────────────────────────────
+          InteractiveViewer(
+            transformationController: _transformController,
+            constrained: false,
+            minScale: 0.4,
+            maxScale: 2.5,
+            child: SizedBox(
+              width: canvasSize.width,
+              height: canvasSize.height,
+              child: GestureDetector(
+                // Cancel connect-from selection when tapping blank canvas
+                onTap: () {
+                  if (_connectMode && _connectFromId != null) {
+                    setState(() {
+                      _connectFromId = null;
+                      _connectDragEnd = null;
+                    });
+                  }
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // ── Edge painter (bottom layer) ─────────────────────
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _EdgePainter(
+                          graph: _graph,
+                          posMap: posMap,
+                        ),
+                      ),
+                    ),
+
+                    // ── Connect-mode drag line overlay ──────────────────
+                    if (_connectMode &&
+                        _connectFromId != null &&
+                        _connectDragEnd != null)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: CustomPaint(
+                            painter: _DragLinePainter(
+                              from: Offset(
+                                (posMap[_connectFromId]?.x ?? 0) +
+                                    _kNodeW / 2,
+                                (posMap[_connectFromId]?.y ?? 0) +
+                                    _kNodeH,
+                              ),
+                              to: _connectDragEnd!,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // ── Group containers ────────────────────────────────
+                    for (final group in _graph.groups)
+                      _GroupContainer(
+                          group: group, rect: _groupRect(group)),
+
+                    // ── Nodes ───────────────────────────────────────────
+                    for (final pos in _graph.positions)
+                      _buildNode(pos),
+
+                    // ── Edge connector tap targets (edit mode only) ─────
+                    if (widget.editable)
+                      for (final edge in _graph.edges)
+                        _buildEdgeTapTarget(edge),
+
+                    // ── Add loop FAB (edit mode only) ───────────────────
+                    if (widget.editable)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: _AddLoopButton(
+                          layers: widget.layers,
+                          onAdd: _addLoop,
+                        ),
+                      ),
+
+                    // ── Node-type palette (edit mode only) ───────────────
+                    if (widget.editable)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: _NodeTypePalette(
+                          onTypeSelected: (type) => _addNodeOfType(type),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Viewport-fixed controls (edit mode only) ──────────────────
+          if (widget.editable) ...[
+            // Connect mode toggle
+            Positioned(
+              right: 16,
+              bottom: 200,
+              child: Tooltip(
+                message: _connectMode ? 'Cancel connect' : 'Draw connection',
+                child: GestureDetector(
+                  onTap: () => setState(() {
+                    _connectMode = !_connectMode;
+                    _connectFromId = null;
+                    _connectDragEnd = null;
+                  }),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _connectMode
+                          ? _kEdgeColor.withValues(alpha: 0.2)
+                          : const Color(0xFF21262D),
+                      border: Border.all(
+                        color: _connectMode ? _kEdgeColor : _kNodeBorder,
+                        width: _connectMode ? 2.0 : 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.cable_outlined,
+                      size: 18,
+                      color: _connectMode ? _kEdgeColor : _kMutedText,
+                    ),
                   ),
                 ),
               ),
+            ),
 
-              // ── Group containers ────────────────────────────────────────
-              for (final group in _graph.groups)
-                _GroupContainer(
-                    group: group, rect: _groupRect(group)),
-
-              // ── Nodes ───────────────────────────────────────────────────
-              for (final pos in _graph.positions)
-                _buildNode(pos),
-
-              // ── Edge connector tap targets (edit mode only) ──────────────
-              if (widget.editable)
-                for (final edge in _graph.edges)
-                  _buildEdgeTapTarget(edge),
-
-              // ── Add loop FAB (edit mode only) ───────────────────────────
-              if (widget.editable)
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: _AddLoopButton(
-                    layers: widget.layers,
-                    onAdd: _addLoop,
-                  ),
-                ),
-
-              // ── Node-type palette (edit mode only) ───────────────────────
-              if (widget.editable)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _NodeTypePalette(
-                    onTypeSelected: (type) => _addNodeOfType(type),
-                  ),
-                ),
-            ],
-          ),
-        ),
+            // Zoom controls
+            Positioned(
+              right: 16,
+              bottom: 80,
+              child: _ZoomControls(controller: _transformController),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -206,16 +322,54 @@ class _FlowCanvasState extends State<FlowCanvas> {
     final isInput = id == '__input__';
     final isOutput = id == '__output__';
     final isAlwaysOn = layer?.canDisable == false;
+    final isSelected = _connectMode && _connectFromId == id;
 
     return Positioned(
       left: pos.x,
       top: pos.y,
       child: GestureDetector(
-        onPanUpdate:
-            widget.editable ? (d) => _onNodeDragUpdate(id, d.delta) : null,
-        onTap: (widget.editable && layer != null && widget.onNodeTap != null)
-            ? () => widget.onNodeTap!(layer)
-            : null,
+        onPanUpdate: _connectMode
+            ? (d) {
+                // Track drag end position for dotted-line preview
+                setState(() {
+                  _connectDragEnd = Offset(
+                    pos.x + _kNodeW / 2 + d.localPosition.dx,
+                    pos.y + _kNodeH / 2 + d.localPosition.dy,
+                  );
+                });
+              }
+            : (widget.editable
+                ? (d) => _onNodeDragUpdate(id, d.delta)
+                : null),
+        onTap: () {
+          if (_connectMode) {
+            if (_connectFromId == null) {
+              // First tap: select as "from"
+              setState(() {
+                _connectFromId = id;
+                _connectDragEnd = null;
+              });
+            } else if (_connectFromId != id) {
+              // Second tap: create edge
+              _addEdge(_connectFromId!, id);
+              setState(() {
+                _connectFromId = null;
+                _connectDragEnd = null;
+                _connectMode = false;
+              });
+            } else {
+              // Tapped same node: cancel selection
+              setState(() {
+                _connectFromId = null;
+                _connectDragEnd = null;
+              });
+            }
+            return;
+          }
+          if (widget.editable && layer != null && widget.onNodeTap != null) {
+            widget.onNodeTap!(layer);
+          }
+        },
         child: _FlowNode(
           id: id,
           label: pos.label ??
@@ -228,6 +382,7 @@ class _FlowCanvasState extends State<FlowCanvas> {
           isAlwaysOn: isAlwaysOn,
           enabled: layer?.enabled ?? true,
           tappable: widget.editable && layer != null && widget.onNodeTap != null,
+          isSelected: isSelected,
         ),
       ),
     );
@@ -389,7 +544,7 @@ class _FlowCanvasState extends State<FlowCanvas> {
     );
   }
 
-  /// Add a new node of [type] to the canvas at a default drop position.
+  /// Add a new node of [type] to the canvas, auto-connecting it into the chain.
   void _addNodeOfType(FlowNodeType type) {
     setState(() {
       final newId = '${type.name}_${DateTime.now().millisecondsSinceEpoch}';
@@ -400,8 +555,33 @@ class _FlowCanvasState extends State<FlowCanvas> {
         type: type,
         label: type.name,
       ));
+
+      // Auto-connect: last non-output node → new node → __output__
+      final nonOutput = _graph.positions
+          .where((p) => p.layerId != '__output__' && p.layerId != newId)
+          .map((p) => p.layerId)
+          .toList();
+
+      if (nonOutput.isNotEmpty) {
+        final lastId = nonOutput.last;
+        // Remove old edge from lastId → __output__ (if present)
+        _graph.edges
+            .removeWhere((e) => e.fromId == lastId && e.toId == '__output__');
+        _graph.edges.add(FlowEdge(
+          id: 'auto_${lastId}_$newId',
+          fromId: lastId,
+          toId: newId,
+        ));
+      }
+
+      // New node → __output__
+      _graph.edges.add(FlowEdge(
+        id: 'auto_${newId}___output__',
+        fromId: newId,
+        toId: '__output__',
+      ));
     });
-    if (widget.onGraphChanged != null) widget.onGraphChanged!(_graph);
+    widget.onGraphChanged?.call(_graph);
   }
 }
 
@@ -528,6 +708,50 @@ class _EdgePainter extends CustomPainter {
   bool shouldRepaint(_EdgePainter old) => true;
 }
 
+// ─── Connect-mode drag line painter ──────────────────────────────────────────
+
+class _DragLinePainter extends CustomPainter {
+  final Offset from;
+  final Offset to;
+
+  const _DragLinePainter({required this.from, required this.to});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = _kEdgeColor.withValues(alpha: 0.7)
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const dashLen = 8.0, gapLen = 5.0;
+    final dir = to - from;
+    final dist = dir.distance;
+    if (dist < 1) return;
+    final step = dir / dist;
+    double traveled = 0;
+    bool drawing = true;
+    final path = Path()..moveTo(from.dx, from.dy);
+    while (traveled < dist) {
+      final segLen = drawing ? dashLen : gapLen;
+      final end = (traveled + segLen) > dist ? dist : (traveled + segLen);
+      final target = from + step * end;
+      if (drawing) {
+        path.lineTo(target.dx, target.dy);
+      } else {
+        path.moveTo(target.dx, target.dy);
+      }
+      traveled = end;
+      drawing = !drawing;
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_DragLinePainter old) =>
+      old.from != from || old.to != to;
+}
+
 // ─── Flow node widget ─────────────────────────────────────────────────────────
 
 class _FlowNode extends StatelessWidget {
@@ -537,6 +761,7 @@ class _FlowNode extends StatelessWidget {
   final bool enabled;
   final FlowNodeType nodeType;
   final bool tappable;
+  final bool isSelected;
 
   const _FlowNode({
     required this.id,
@@ -545,11 +770,13 @@ class _FlowNode extends StatelessWidget {
     this.isAlwaysOn = false,
     this.enabled = true,
     this.tappable = false,
+    this.isSelected = false,
   });
 
   // ── Type-specific styling ─────────────────────────────────────────────────
 
   Color get _borderColor {
+    if (isSelected) return _kConnectHighlight;
     if (isAlwaysOn) return _kAccentGreen;
     switch (nodeType) {
       case FlowNodeType.conditional:
@@ -574,6 +801,7 @@ class _FlowNode extends StatelessWidget {
   }
 
   double get _borderWidth {
+    if (isSelected) return 2.5;
     switch (nodeType) {
       case FlowNodeType.conditional:
       case FlowNodeType.hitl:
@@ -667,59 +895,61 @@ class _FlowNode extends StatelessWidget {
       height: _kNodeH,
       child: Stack(
         children: [
-      Container(
-        width: _kNodeW,
-        height: _kNodeH,
-        decoration: BoxDecoration(
-          color: _kNodeBg,
-          border: Border.all(
-            color: tappable ? _borderColor.withValues(alpha: 0.9) : _borderColor,
-            width: _borderWidth,
-          ),
-          borderRadius: _borderRadius,
-        ),
-        child: Center(
-          child: icon != null
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      icon,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: _borderColor,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        label,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.3,
+          Container(
+            width: _kNodeW,
+            height: _kNodeH,
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? _kConnectHighlight.withValues(alpha: 0.1)
+                  : _kNodeBg,
+              border: Border.all(
+                color: tappable ? _borderColor.withValues(alpha: 0.9) : _borderColor,
+                width: _borderWidth,
+              ),
+              borderRadius: _borderRadius,
+            ),
+            child: Center(
+              child: icon != null
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          icon,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _borderColor,
+                          ),
                         ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 12,
+                        fontWeight:
+                            isAlwaysOn ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: 0.3,
                       ),
                     ),
-                  ],
-                )
-              : Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 12,
-                    fontWeight:
-                        isAlwaysOn ? FontWeight.w700 : FontWeight.w500,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-        ),
-      ),
+            ),
+          ),
           // Tap-to-edit indicator (pencil in top-right corner)
           if (tappable)
             Positioned(
@@ -731,7 +961,91 @@ class _FlowNode extends StatelessWidget {
                 color: _kMutedText.withValues(alpha: 0.7),
               ),
             ),
+          // Connect-from indicator (dot in top-right)
+          if (isSelected)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: _kConnectHighlight,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Zoom controls ────────────────────────────────────────────────────────────
+
+class _ZoomControls extends StatelessWidget {
+  final TransformationController controller;
+
+  const _ZoomControls({required this.controller});
+
+  void _zoomIn() {
+    final m = controller.value.clone();
+    m.scaleByDouble(1.25, 1.25, 1.0, 1.0);
+    controller.value = m;
+  }
+
+  void _zoomOut() {
+    final m = controller.value.clone();
+    m.scaleByDouble(0.8, 0.8, 1.0, 1.0);
+    controller.value = m;
+  }
+
+  void _reset() {
+    controller.value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ZoomBtn(icon: Icons.add, tooltip: 'Zoom in', onTap: _zoomIn),
+        const SizedBox(height: 4),
+        _ZoomBtn(icon: Icons.remove, tooltip: 'Zoom out', onTap: _zoomOut),
+        const SizedBox(height: 4),
+        _ZoomBtn(icon: Icons.fit_screen, tooltip: 'Reset zoom', onTap: _reset),
+      ],
+    );
+  }
+}
+
+class _ZoomBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ZoomBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: const Color(0xFF21262D),
+            border: Border.all(color: _kNodeBorder),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 16, color: _kTextColor),
+        ),
       ),
     );
   }

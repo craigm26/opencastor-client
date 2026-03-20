@@ -5,6 +5,7 @@
 ///
 /// Tap any node to expand/collapse details.
 /// Pass [onEditLayer] to enable the pencil-icon edit button per node.
+/// Tap the ℹ️ icon on any block to see contextual help.
 library;
 
 import 'package:flutter/material.dart';
@@ -52,6 +53,138 @@ IconData _iconForLayer(HarnessLayer layer) {
   }
 }
 
+// ── Block info data ───────────────────────────────────────────────────────────
+
+class _LayerInfoData {
+  final String what;
+  final String why;
+  final String canDo;
+  final String interactions;
+
+  const _LayerInfoData({
+    required this.what,
+    required this.why,
+    required this.canDo,
+    required this.interactions,
+  });
+}
+
+/// Info text for each layer type/id. Looked up first by layer.id, then by layer.type.
+const _kLayerInfo = <String, _LayerInfoData>{
+  'hook-p66': _LayerInfoData(
+    what:
+        'Protocol 66 Safety Hook — intercepts every command and enforces ESTOP bypass, scope gating, and physical consent (R2RAM). Cannot be disabled.',
+    why:
+        'Must run first so no command can ever bypass safety checks, regardless of other layers.',
+    canDo: 'View audit log in the Trajectory Logger.',
+    interactions:
+        'Blocks all CommandScope.control commands that lack physical consent.',
+  ),
+  'prompt-guard': _LayerInfoData(
+    what:
+        'Prompt injection and jailbreak filter. Scores each incoming message and blocks it if risk exceeds the threshold.',
+    why: 'Runs before context assembly so malicious payloads never reach the model.',
+    canDo:
+        'Adjust risk_threshold (lower = stricter). Enable/disable per harness.',
+    interactions:
+        'Blocked messages are forwarded to the Dead Letter Queue if present.',
+  ),
+  'context': _LayerInfoData(
+    what:
+        'Assembles the agent context: working memory, telemetry, system prompt, and skill definitions.',
+    why: 'Runs before skills and model so all downstream layers have full context.',
+    canDo:
+        'Toggle individual context sources (memory, telemetry, system_prompt, skills_context).',
+    interactions: 'Skills and the model depend on this layer\'s output.',
+  ),
+  'memory': _LayerInfoData(
+    what:
+        'Per-session scratchpad for multi-step reasoning. Stores intermediate facts and sub-goals.',
+    why:
+        'Runs after context assembly and before skills so reasoning state is available during skill execution.',
+    canDo: 'Set max_entries and TTL. Disable persistence between sessions.',
+    interactions:
+        'Context Builder reads from this layer. Trajectory Logger archives it.',
+  ),
+  'skill': _LayerInfoData(
+    what:
+        'An executable capability the agent can invoke (navigation, vision, web search, etc.).',
+    why: 'Skills run after context is assembled and before model inference.',
+    canDo: 'Enable/disable, reorder via drag, edit config, or remove.',
+    interactions:
+        'Circuit Breaker disables a skill after repeated failures. HITL Gate blocks physical skills pending approval.',
+  ),
+  'model': _LayerInfoData(
+    what:
+        'LLM routing layer. Routes inferences to a fast local model or a slow cloud model based on confidence.',
+    why: 'Runs after skills so model output depends on skill results and context.',
+    canDo: 'Change fast/slow provider and model. Adjust confidence threshold.',
+    interactions:
+        'Cost Gate halts cloud calls if budget is exceeded. Drift Detection flags off-task outputs.',
+  ),
+  'hitl': _LayerInfoData(
+    what:
+        'Human-in-the-Loop gate. Pauses execution and waits for operator approval before physical actions proceed.',
+    why: 'Sits between skills and post-processing so a human reviews before actuation.',
+    canDo:
+        'Set timeout, on_timeout policy (block/allow), and action types requiring approval.',
+    interactions:
+        'Times out to block by default. Works with P66 for double-gating physical commands.',
+  ),
+  'cost_gate': _LayerInfoData(
+    what:
+        'Budget ceiling for LLM spend. Halts execution if the session cost exceeds budget_usd.',
+    why: 'Runs after model to catch runaway spend before the next iteration.',
+    canDo: 'Set budget_usd, on_exceed policy, and alert_at_pct threshold.',
+    interactions: 'Works with Dual Model to limit slow (cloud) model invocations.',
+  ),
+  'circuit_breaker': _LayerInfoData(
+    what:
+        'Disables a skill after failure_threshold consecutive errors and auto-resets after cooldown_s seconds.',
+    why: 'Prevents cascading failures from a broken skill blocking the whole pipeline.',
+    canDo: 'Set failure_threshold and cooldown_s. Toggle half-open probe.',
+    interactions: 'Resets automatically. Works alongside HITL Gate for physical actions.',
+  ),
+  'hook': _LayerInfoData(
+    what: 'Runtime hook that monitors pipeline execution (e.g. Drift Detection).',
+    why: 'Runs after model to inspect outputs without blocking the main flow.',
+    canDo: 'Enable/disable. Adjust threshold parameters.',
+    interactions:
+        'Drift Detection triggers a warning that the Trajectory Logger records.',
+  ),
+  'guard': _LayerInfoData(
+    what: 'Input validation guard. Inspects and blocks unsafe or policy-violating inputs before they reach downstream layers.',
+    why: 'Positioned early in the pipeline to reject bad inputs before expensive computation.',
+    canDo: 'Adjust block policies and risk threshold.',
+    interactions: 'Blocked messages flow to the Dead Letter Queue if configured.',
+  ),
+  'tracer': _LayerInfoData(
+    what:
+        'OpenTelemetry-style span tracer. Records every layer execution as a named span in SQLite.',
+    why:
+        'Runs near the end of the pipeline to capture full execution context including model outputs.',
+    canDo: 'Change export format and db_path.',
+    interactions:
+        'Feeds the same SQLite used by the trajectory logger for unified audit.',
+  ),
+  'dlq': _LayerInfoData(
+    what:
+        'Dead Letter Queue. Captures failed commands and blocked messages for human review.',
+    why: 'Sits near the end of the pipeline to catch anything that fell through upstream gates.',
+    canDo: 'Set db_path and max_size.',
+    interactions:
+        'Receives blocked messages from Prompt Guard and timed-out HITL gates.',
+  ),
+  'trajectory': _LayerInfoData(
+    what:
+        'Always-on audit trail. Every agent run is logged to SQLite — required for RCAN compliance.',
+    why: 'Must run last to capture the complete pipeline execution record.',
+    canDo: 'Change sqlite_path.',
+    interactions:
+        'Read by the robot\'s autoresearch system and required for R2RAM consent audits.',
+  ),
+};
+
 // ── Public widget ─────────────────────────────────────────────────────────────
 
 class HarnessViewer extends StatefulWidget {
@@ -94,12 +227,79 @@ class HarnessViewer extends StatefulWidget {
 class _HarnessViewerState extends State<HarnessViewer> {
   final _expanded = <String, bool>{};
   bool _showFlow = false;
-  FlowGraph _flowGraph = FlowGraph.empty();
+  late FlowGraph _flowGraph;
+
+  @override
+  void initState() {
+    super.initState();
+    _flowGraph = FlowGraph.autoLayout(
+      widget.config.layers.map((l) => l.id).toList(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(HarnessViewer old) {
+    super.didUpdateWidget(old);
+    if (old.config.layers != widget.config.layers) {
+      // Rebuild internal flow graph to match new layer order
+      _flowGraph = FlowGraph.autoLayout(
+        widget.config.layers.map((l) => l.id).toList(),
+      );
+    }
+  }
 
   bool _isExpanded(String id) => _expanded[id] ?? false;
 
   void _toggle(String id) =>
       setState(() => _expanded[id] = !(_expanded[id] ?? false));
+
+  void _showLayerInfo(HarnessLayer layer) {
+    final key =
+        _kLayerInfo.containsKey(layer.id) ? layer.id : layer.type;
+    final info = _kLayerInfo[key];
+    if (info == null) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(_iconForLayer(layer),
+                size: 20,
+                color: _borderColorForType(layer.type)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(layer.label,
+                  style: const TextStyle(fontSize: 15)),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _InfoSection(label: 'What it does', text: info.what),
+              const SizedBox(height: 12),
+              _InfoSection(label: 'Why it\'s here', text: info.why),
+              const SizedBox(height: 12),
+              _InfoSection(
+                  label: 'What you can do', text: info.canDo),
+              const SizedBox(height: 12),
+              _InfoSection(
+                  label: 'Interactions', text: info.interactions),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -222,6 +422,18 @@ class _HarnessViewerState extends State<HarnessViewer> {
         onToggleSkill: widget.onToggleLayer,
         onReorder: widget.onReorderSkills,
         onAddSkill: widget.onAddSkill,
+        onInfo: () => _showLayerInfo(
+          // Use the first skill layer as representative for the group info
+          item.skills!.isNotEmpty
+              ? item.skills!.first
+              : const HarnessLayer(
+                  id: 'skill-group',
+                  type: 'skill',
+                  label: 'Skills',
+                  description: '',
+                  enabled: true,
+                ),
+        ),
         expanded: _isExpanded('skills-group'),
         onToggle: () => _toggle('skills-group'),
       );
@@ -232,6 +444,7 @@ class _HarnessViewerState extends State<HarnessViewer> {
       onEdit: widget.onEditLayer != null
           ? () => widget.onEditLayer!(layer)
           : null,
+      onInfo: () => _showLayerInfo(layer),
       expanded: _isExpanded(layer.id),
       onToggle: () => _toggle(layer.id),
     );
@@ -264,12 +477,14 @@ class _Arrow extends StatelessWidget {
 class _LayerCard extends StatelessWidget {
   final HarnessLayer layer;
   final VoidCallback? onEdit;
+  final VoidCallback onInfo;
   final bool expanded;
   final VoidCallback onToggle;
 
   const _LayerCard({
     required this.layer,
     required this.onEdit,
+    required this.onInfo,
     required this.expanded,
     required this.onToggle,
   });
@@ -341,6 +556,13 @@ class _LayerCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    // Info icon
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, size: 16),
+                      tooltip: 'About this block',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onInfo,
+                    ),
                     if (onEdit != null)
                       IconButton(
                         icon: const Icon(Icons.edit_outlined, size: 16),
@@ -394,6 +616,7 @@ class _SkillGroupCard extends StatelessWidget {
   final void Function(HarnessLayer)? onToggleSkill;
   final void Function(int oldIndex, int newIndex)? onReorder;
   final VoidCallback? onAddSkill;
+  final VoidCallback onInfo;
   final bool expanded;
   final VoidCallback onToggle;
 
@@ -403,6 +626,7 @@ class _SkillGroupCard extends StatelessWidget {
     this.onToggleSkill,
     this.onReorder,
     this.onAddSkill,
+    required this.onInfo,
     required this.expanded,
     required this.onToggle,
   });
@@ -469,6 +693,13 @@ class _SkillGroupCard extends StatelessWidget {
                             ),
                         ],
                       ),
+                    ),
+                    // Info icon
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, size: 16),
+                      tooltip: 'About skills',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onInfo,
                     ),
                     Icon(
                       expanded
@@ -620,6 +851,29 @@ class _ConfigTable extends StatelessWidget {
           ],
         );
       }).toList(),
+    );
+  }
+}
+
+class _InfoSection extends StatelessWidget {
+  final String label;
+  final String text;
+
+  const _InfoSection({required this.label, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, fontSize: 12)),
+        const SizedBox(height: 2),
+        Text(text,
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+      ],
     );
   }
 }
