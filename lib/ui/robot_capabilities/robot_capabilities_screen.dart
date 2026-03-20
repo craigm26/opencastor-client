@@ -488,6 +488,112 @@ class _CapabilitiesView extends ConsumerWidget {
             return _CapSection(title: 'Software Stack', icon: Icons.layers_outlined, rows: rows);
           }(),
 
+          // ── Gated Providers ───────────────────────────────────────────
+          const SizedBox(height: 16),
+          () {
+            final rawProviders =
+                (robot.telemetry['providers'] as List<dynamic>?) ?? [];
+            if (rawProviders.isEmpty) {
+              return _CapSection(
+                title: 'Gated Providers',
+                icon: Icons.vpn_key_outlined,
+                rows: [
+                  _CapabilityRow(
+                    label: 'No gated providers configured',
+                    status: _CapStatus.info,
+                    description:
+                        'Add provider credentials in your robot config to enable cloud AI access.',
+                  ),
+                ],
+              );
+            }
+
+            final rows = <_CapabilityRow>[];
+            for (final raw in rawProviders) {
+              final p = raw as Map<String, dynamic>? ?? {};
+              final name = p['name'] as String? ?? 'Unknown provider';
+              final authMethod = p['auth_method'] as String? ?? 'unknown';
+              final tokenStatus =
+                  (p['token_status'] as String? ?? 'unknown').toLowerCase();
+              final models =
+                  (p['models'] as List<dynamic>?)?.cast<String>() ?? [];
+              final fallback = p['fallback'] as String?;
+              final rateLimitRemaining = p['rate_limit_remaining'] as int?;
+
+              // Map token status string → display values
+              final _CapStatus tokenCapStatus;
+              final String tokenLabel;
+              if (tokenStatus == 'valid') {
+                tokenCapStatus = _CapStatus.ok;
+                tokenLabel = 'Token valid';
+              } else if (tokenStatus == 'refreshing') {
+                tokenCapStatus = _CapStatus.warning;
+                tokenLabel = 'Token refreshing';
+              } else if (tokenStatus == 'expired') {
+                tokenCapStatus = _CapStatus.missing;
+                tokenLabel = 'Token expired';
+              } else {
+                tokenCapStatus = _CapStatus.info;
+                tokenLabel = 'Token: $tokenStatus';
+              }
+
+              // Provider name + auth method + token status
+              rows.add(_CapabilityRow(
+                label: name,
+                status: tokenCapStatus,
+                description: 'Auth: $authMethod · $tokenLabel',
+              ));
+
+              // Available models
+              rows.add(_CapabilityRow(
+                label: models.isEmpty
+                    ? 'No models reported'
+                    : models.join(', '),
+                status:
+                    models.isEmpty ? _CapStatus.info : _CapStatus.ok,
+                description: models.isEmpty
+                    ? 'No models available from this provider'
+                    : '${models.length} model(s) available',
+              ));
+
+              // Fallback configuration
+              if (fallback != null && fallback.isNotEmpty) {
+                rows.add(_CapabilityRow(
+                  label: 'Fallback: $fallback',
+                  status: _CapStatus.ok,
+                  description: 'Fallback provider when primary is unavailable',
+                ));
+              }
+
+              // Rate limit remaining
+              if (rateLimitRemaining != null) {
+                final _CapStatus rateStatus;
+                if (rateLimitRemaining > 100) {
+                  rateStatus = _CapStatus.ok;
+                } else if (rateLimitRemaining > 10) {
+                  rateStatus = _CapStatus.warning;
+                } else {
+                  rateStatus = _CapStatus.missing;
+                }
+                rows.add(_CapabilityRow(
+                  label: '$rateLimitRemaining requests remaining',
+                  status: rateStatus,
+                  description: 'Rate limit for $name API',
+                ));
+              }
+            }
+
+            return _CapSection(
+              title: 'Gated Providers',
+              icon: Icons.vpn_key_outlined,
+              rows: rows,
+            );
+          }(),
+
+          // ── Gated Providers ─────────────────────────────────────────
+          const SizedBox(height: 16),
+          _GatedProvidersSection(providers: robot.telemetry['gated_providers'] as List<dynamic>?),
+
           // ── Contribute ────────────────────────────────────────────────
           const SizedBox(height: 16),
           ContributeSection(stats: robot.contribute),
@@ -988,6 +1094,130 @@ class _StepItem extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _GatedProvidersSection extends StatelessWidget {
+  final List<dynamic>? providers;
+  const _GatedProvidersSection({this.providers});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    final items = providers ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Icon(Icons.vpn_key_outlined, size: 14, color: cs.primary),
+          const SizedBox(width: 6),
+          Text('Gated Providers', style: ts.labelLarge?.copyWith(color: cs.primary)),
+        ]),
+        const SizedBox(height: 8),
+        if (items.isEmpty)
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(children: [
+                Icon(Icons.info_outline, size: 16, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Text('No gated providers configured',
+                    style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              ]),
+            ),
+          )
+        else
+          ...items.map((p) {
+            final provider = p is Map<String, dynamic> ? p : <String, dynamic>{};
+            final name = provider['provider'] as String? ?? 'Unknown';
+            final method = provider['auth_method'] as String? ?? 'none';
+            final available = provider['available'] as bool? ?? false;
+            final authValid = provider['auth_valid'] as bool? ?? false;
+            final models = (provider['models'] as List<dynamic>?)?.cast<String>() ?? [];
+            final failures = provider['consecutive_failures'] as int? ?? 0;
+            final hasFallback = provider['has_fallback'] as bool? ?? false;
+            final rateRemaining = provider['rate_limit_remaining'] as int?;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Icon(
+                        available ? Icons.check_circle_outline : Icons.error_outline,
+                        size: 16,
+                        color: available ? Colors.green : cs.error,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(name, style: ts.titleSmall),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: authValid
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : cs.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          authValid ? 'Auth Valid' : 'Auth Invalid',
+                          style: ts.labelSmall?.copyWith(
+                            color: authValid ? Colors.green : cs.error,
+                          ),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 16, runSpacing: 4, children: [
+                      _ProviderDetail(label: 'Method', value: method),
+                      if (rateRemaining != null)
+                        _ProviderDetail(label: 'Rate Limit', value: '$rateRemaining remaining'),
+                      if (failures > 0)
+                        _ProviderDetail(label: 'Failures', value: '$failures consecutive'),
+                      _ProviderDetail(label: 'Fallback', value: hasFallback ? 'Configured' : 'None'),
+                    ]),
+                    if (models.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: models.map((m) => Chip(
+                          label: Text(m, style: const TextStyle(fontSize: 11)),
+                          padding: EdgeInsets.zero,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        )).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
+class _ProviderDetail extends StatelessWidget {
+  final String label;
+  final String value;
+  const _ProviderDetail({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Text('$label: ', style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+      Text(value, style: ts.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+    ]);
   }
 }
 
