@@ -35,7 +35,7 @@ lib/
 │
 ├── data/                              DATA LAYER
 │   ├── models/                        Immutable domain models (output of repositories)
-│   │   ├── robot.dart                 Robot, RobotStatus, RobotCapability
+│   │   ├── robot.dart                 Robot, RobotStatus, RobotCapability, ContributeStats
 │   │   ├── command.dart               RobotCommand, CommandScope
 │   │   └── consent_request.dart       ConsentRequest
 │   ├── repositories/                  REPOSITORIES — source of truth, abstract interface
@@ -63,6 +63,9 @@ lib/
     ├── robot_detail/                  Feature: Robot detail + chat
     │   ├── robot_detail_view_model.dart  VIEWMODEL — robotDetailProvider, sendChatProvider
     │   └── robot_detail_screen.dart   VIEW
+    ├── robot_capabilities/            Feature: Robot capabilities + hardware
+    │   ├── robot_capabilities_screen.dart  Detected hardware, software stack, contribute
+    │   └── contribute_section.dart    ContributeSection — idle compute stats panel
     ├── control/                       Feature: Arm control
     │   ├── control_view_model.dart    VIEWMODEL — ControlViewModel, ControlState sealed class
     │   └── control_screen.dart        VIEW
