@@ -81,6 +81,27 @@ service cloud.firestore {
             == request.auth.uid;
         allow write: if false;
       }
+
+      // -------------------------------------------------------------------
+      // /robots/{rrn}/telemetry/{doc}  — skills, harness config, etc.
+      // -------------------------------------------------------------------
+      match /telemetry/{doc} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow write: if false; // Bridge (Admin SDK) only
+      }
+
+      // -------------------------------------------------------------------
+      // /robots/{rrn}/invites/{inviteId}  — robot sharing invitations
+      // -------------------------------------------------------------------
+      match /invites/{inviteId} {
+        allow read: if isSignedIn();
+        allow create, delete: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow update: if false;
+      }
     }
 
     // -----------------------------------------------------------------------
