@@ -192,7 +192,9 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       builder: (ctx) => _AddBlockSheet(
         config: _config,
         onAddLayer: (layer) {
-          Navigator.pop(ctx);
+          // Each _BlockEntry already pops the sheet before calling this,
+          // so do NOT pop again here — double-pop navigates away from
+          // the editor screen entirely.
           _addLayer(layer);
         },
         onOpenSkillBrowser: () {
@@ -1367,6 +1369,7 @@ class _AddBlockSheet extends StatelessWidget {
             );
             return;
           }
+          Navigator.pop(context);
           onAddLayer(const HarnessLayer(
             id: 'hook-drift',
             type: 'hook',
@@ -1385,6 +1388,7 @@ class _AddBlockSheet extends StatelessWidget {
         onAdd: () {
           final id =
               'model-secondary-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
           onAddLayer(HarnessLayer(
             id: id,
             type: 'model',
@@ -1408,6 +1412,7 @@ class _AddBlockSheet extends StatelessWidget {
         onAdd: () {
           final id =
               'context-custom-${DateTime.now().millisecondsSinceEpoch}';
+          Navigator.pop(context);
           onAddLayer(HarnessLayer(
             id: id,
             type: 'context',
@@ -1439,6 +1444,7 @@ class _AddBlockSheet extends StatelessWidget {
             return;
           }
           final order = config.skillLayers.length;
+          Navigator.pop(context);
           onAddLayer(HarnessLayer(
             id: 'skill-peer-coordinate',
             type: 'skill',

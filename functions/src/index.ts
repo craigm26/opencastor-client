@@ -28,3 +28,6 @@ export { createMission, sendMissionMessage, listMissions, inviteToMission, joinM
 
 // Harness safety gate — validates + saves harness to Firestore
 export { validateAndSaveHarness } from "./harness_validator";
+
+// Robot API proxy — relays GET requests to robots behind NAT
+export { robotApiGet } from "./robot_api";
