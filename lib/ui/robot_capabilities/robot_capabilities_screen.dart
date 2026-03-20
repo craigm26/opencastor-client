@@ -592,7 +592,11 @@ class _CapabilitiesView extends ConsumerWidget {
 
           // ── Gated Providers ─────────────────────────────────────────
           const SizedBox(height: 16),
-          _GatedProvidersSection(providers: robot.telemetry['gated_providers'] as List<dynamic>?),
+          _GatedProvidersSection(
+            providers: robot.telemetry['gated_providers'] is List
+                ? robot.telemetry['gated_providers'] as List<dynamic>
+                : null,
+          ),
 
           // ── Contribute ────────────────────────────────────────────────
           const SizedBox(height: 16),

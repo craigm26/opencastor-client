@@ -32,6 +32,8 @@ class FlowCanvas extends StatefulWidget {
   final FlowGraph graph;
   final bool editable;
   final void Function(FlowGraph updated)? onGraphChanged;
+  /// Called when a node is tapped in editable mode (to open the edit panel).
+  final void Function(HarnessLayer layer)? onNodeTap;
 
   const FlowCanvas({
     super.key,
@@ -39,6 +41,7 @@ class FlowCanvas extends StatefulWidget {
     required this.graph,
     this.editable = false,
     this.onGraphChanged,
+    this.onNodeTap,
   });
 
   @override
@@ -164,6 +167,11 @@ class _FlowCanvasState extends State<FlowCanvas> {
               for (final pos in _graph.positions)
                 _buildNode(pos),
 
+              // ── Edge connector tap targets (edit mode only) ──────────────
+              if (widget.editable)
+                for (final edge in _graph.edges)
+                  _buildEdgeTapTarget(edge),
+
               // ── Add loop FAB (edit mode only) ───────────────────────────
               if (widget.editable)
                 Positioned(
@@ -205,6 +213,9 @@ class _FlowCanvasState extends State<FlowCanvas> {
       child: GestureDetector(
         onPanUpdate:
             widget.editable ? (d) => _onNodeDragUpdate(id, d.delta) : null,
+        onTap: (widget.editable && layer != null && widget.onNodeTap != null)
+            ? () => widget.onNodeTap!(layer)
+            : null,
         child: _FlowNode(
           id: id,
           label: pos.label ??
@@ -216,6 +227,163 @@ class _FlowCanvasState extends State<FlowCanvas> {
           nodeType: pos.type,
           isAlwaysOn: isAlwaysOn,
           enabled: layer?.enabled ?? true,
+          tappable: widget.editable && layer != null && widget.onNodeTap != null,
+        ),
+      ),
+    );
+  }
+
+  /// Build an invisible tap target at the midpoint of an edge to edit its label.
+  Widget _buildEdgeTapTarget(FlowEdge edge) {
+    final from = _graph.posMap[edge.fromId];
+    final to = _graph.posMap[edge.toId];
+    if (from == null || to == null) return const SizedBox.shrink();
+
+    final midX = ((from.x + _kNodeW / 2) + (to.x + _kNodeW / 2)) / 2 - 20;
+    final midY = ((from.y + _kNodeH) + to.y) / 2 - 10;
+
+    return Positioned(
+      left: midX,
+      top: midY,
+      child: GestureDetector(
+        onTap: () => _editEdgeLabel(edge),
+        child: Container(
+          width: 40,
+          height: 20,
+          decoration: BoxDecoration(
+            color: const Color(0x22FFFFFF),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: edge.isLoop ? _kLoopColor.withValues(alpha: 0.5) : _kEdgeColor.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              edge.label.isEmpty ? '…' : edge.label,
+              style: TextStyle(
+                color: edge.isLoop ? _kLoopColor : _kEdgeColor,
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Show a dialog to edit the edge connector label and optionally delete it.
+  void _editEdgeLabel(FlowEdge edge) {
+    const connectorTypes = [
+      '',
+      'YES',
+      'NO',
+      'loop',
+      'error',
+      'timeout',
+      'data',
+      'fallback',
+    ];
+    String selected = connectorTypes.contains(edge.label) ? edge.label : '';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: const Color(0xFF161B22),
+          title: Row(
+            children: [
+              const Text('Connector', style: TextStyle(color: _kTextColor, fontSize: 15)),
+              const SizedBox(width: 8),
+              Text(
+                '${edge.fromId} → ${edge.toId}',
+                style: const TextStyle(color: _kMutedText, fontSize: 11),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Label / type:',
+                  style: TextStyle(color: _kMutedText, fontSize: 12)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: connectorTypes.map((t) {
+                  final isSelected = selected == t;
+                  Color chipColor;
+                  switch (t) {
+                    case 'YES':
+                      chipColor = _kAccentGreen;
+                    case 'NO':
+                      chipColor = const Color(0xFFF44336);
+                    case 'error':
+                      chipColor = const Color(0xFFF78166);
+                    case 'loop':
+                      chipColor = _kLoopColor;
+                    default:
+                      chipColor = _kEdgeColor;
+                  }
+                  return GestureDetector(
+                    onTap: () => setSt(() => selected = t),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? chipColor.withValues(alpha: 0.2)
+                            : const Color(0xFF1C2128),
+                        border: Border.all(
+                          color: isSelected ? chipColor : const Color(0xFF3D444D),
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        t.isEmpty ? '(none)' : t,
+                        style: TextStyle(
+                          color: isSelected ? chipColor : _kMutedText,
+                          fontSize: 12,
+                          fontWeight: isSelected
+                              ? FontWeight.w700
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                // Delete this edge
+                setState(() => _graph.edges.remove(edge));
+                widget.onGraphChanged?.call(_graph);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Delete',
+                  style: TextStyle(color: Color(0xFFF44336))),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel',
+                  style: TextStyle(color: _kMutedText)),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() => edge.label = selected);
+                widget.onGraphChanged?.call(_graph);
+                Navigator.pop(ctx);
+              },
+              child: const Text('Save',
+                  style: TextStyle(color: _kEdgeColor)),
+            ),
+          ],
         ),
       ),
     );
@@ -368,6 +536,7 @@ class _FlowNode extends StatelessWidget {
   final bool isAlwaysOn;
   final bool enabled;
   final FlowNodeType nodeType;
+  final bool tappable;
 
   const _FlowNode({
     required this.id,
@@ -375,6 +544,7 @@ class _FlowNode extends StatelessWidget {
     required this.nodeType,
     this.isAlwaysOn = false,
     this.enabled = true,
+    this.tappable = false,
   });
 
   // ── Type-specific styling ─────────────────────────────────────────────────
@@ -495,10 +665,17 @@ class _FlowNode extends StatelessWidget {
     return SizedBox(
       width: _kNodeW,
       height: _kNodeH,
-      child: Container(
+      child: Stack(
+        children: [
+      Container(
+        width: _kNodeW,
+        height: _kNodeH,
         decoration: BoxDecoration(
           color: _kNodeBg,
-          border: Border.all(color: _borderColor, width: _borderWidth),
+          border: Border.all(
+            color: tappable ? _borderColor.withValues(alpha: 0.9) : _borderColor,
+            width: _borderWidth,
+          ),
           borderRadius: _borderRadius,
         ),
         child: Center(
@@ -542,6 +719,19 @@ class _FlowNode extends StatelessWidget {
                   ),
                 ),
         ),
+      ),
+          // Tap-to-edit indicator (pencil in top-right corner)
+          if (tappable)
+            Positioned(
+              top: 3,
+              right: 4,
+              child: Icon(
+                Icons.edit_outlined,
+                size: 10,
+                color: _kMutedText.withValues(alpha: 0.7),
+              ),
+            ),
+        ],
       ),
     );
   }

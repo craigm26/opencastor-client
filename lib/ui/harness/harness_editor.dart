@@ -585,6 +585,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
               graph: _flowGraph,
               editable: true,
               onGraphChanged: (g) => setState(() => _flowGraph = g),
+              onNodeTap: _openEditSheet,
             )
           : HarnessViewer(
               config: _config,

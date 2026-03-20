@@ -66,8 +66,8 @@ export const robotApiGet = https.onCall(
       throw new https.HttpsError("not-found", "Robot data missing");
     }
 
-    // Check ownership
-    if (robotData.owner_uid !== auth.uid) {
+    // Check ownership — field is firebase_uid in Firestore (not owner_uid)
+    if (robotData.firebase_uid !== auth.uid) {
       // Check if user has consent/sharing access
       const consentSnap = await db()
         .collection("robots")

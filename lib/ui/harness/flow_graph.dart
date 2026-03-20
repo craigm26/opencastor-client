@@ -97,7 +97,7 @@ class FlowEdge {
   final String id;
   final String fromId; // layerId
   final String toId; // layerId
-  final String label; // e.g. "on_fail", "loop", "→"
+  String label; // e.g. "YES", "NO", "loop", "error" — mutable for in-place editing
   final bool isLoop; // true = draw curved back-arrow
 
   FlowEdge({
