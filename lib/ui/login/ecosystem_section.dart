@@ -45,7 +45,7 @@ const _items = [
     emoji: '📡',
     name: 'RCAN Protocol',
     description: 'Robot communication standard',
-    version: 'v1.6 · 19 spec sections',
+    version: 'v1.8 · 36 message types',
     links: [
       (label: 'Spec', url: AppConstants.rcanSpecUrl),
       (label: 'rcan.dev', url: AppConstants.rcanDevUrl),
