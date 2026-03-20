@@ -39,6 +39,7 @@ import 'ui/setup/setup_screen.dart';
 import 'ui/account/account_screen.dart';
 import 'ui/shared/adaptive_navigation.dart';
 import 'ui/shared/google_sign_in_button.dart';
+import 'ui/fleet_leaderboard/fleet_leaderboard_screen.dart';
 import 'ui/mission/mission_list_screen.dart';
 import 'ui/mission/mission_screen.dart';
 
@@ -207,6 +208,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
                     HarnessConfig.defaults(robotRrn: rrn),
               );
             },
+          ),
+          GoRoute(
+            path: '/fleet/leaderboard',
+            builder: (_, __) => const FleetLeaderboardScreen(),
           ),
           GoRoute(
             path: '/consent',

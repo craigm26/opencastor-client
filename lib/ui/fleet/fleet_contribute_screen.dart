@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 /// Aggregate fleet contribution stats.
 class _FleetContributeStats {
@@ -193,6 +194,19 @@ class FleetContributeScreen extends ConsumerWidget {
                     color: theme.colorScheme.primary,
                   )),
                 ],
+              ),
+              const SizedBox(height: 24),
+
+              // Leaderboard entry point
+              Card(
+                margin: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.leaderboard_outlined),
+                  title: const Text('View Fleet Leaderboard'),
+                  subtitle: const Text('Ranked by contribution score'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/fleet/leaderboard'),
+                ),
               ),
               const SizedBox(height: 24),
 

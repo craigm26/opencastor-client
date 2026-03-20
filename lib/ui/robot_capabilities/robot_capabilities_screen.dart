@@ -188,6 +188,7 @@ class _CapabilitiesView extends ConsumerWidget {
     final hwAsync = ref.watch(hardwareProfileProvider(robot.rrn));
     final skillsAsync = ref.watch(slashCommandsProvider(robot.rrn));
 
+    try {
     return Scaffold(
       appBar: AppBar(
         title: Text('Capabilities — ${robot.name}'),
@@ -446,14 +447,22 @@ class _CapabilitiesView extends ConsumerWidget {
           const SizedBox(height: 16),
           () {
             final t = robot.telemetry;
-            final brainPrimary = t['brain_primary'] as Map<String, dynamic>? ?? {};
-            final activeModel = t['brain_active_model'] as String? ?? brainPrimary['model'] as String? ?? 'Unknown';
+            final brainPrimary = t['brain_primary'] is Map
+                ? Map<String, dynamic>.from(t['brain_primary'] as Map)
+                : <String, dynamic>{};
+            final activeModel = t['brain_active_model'] as String?
+                ?? brainPrimary['model'] as String?
+                ?? 'Unknown';
             final provider = brainPrimary['provider'] as String? ?? 'unknown';
-            final fallback = t['offline_fallback'] as Map<String, dynamic>? ?? {};
+            final fallback = t['offline_fallback'] is Map
+                ? Map<String, dynamic>.from(t['offline_fallback'] as Map)
+                : <String, dynamic>{};
             final fallbackEnabled = fallback['enabled'] as bool? ?? false;
             final fallbackModel = fallback['fallback_model'] as String? ?? '';
             final fallbackProvider = fallback['fallback_provider'] as String? ?? '';
-            final channels = (t['channels_active'] as List<dynamic>?)?.cast<String>() ?? [];
+            final channels = t['channels_active'] is List
+                ? (t['channels_active'] as List<dynamic>).whereType<String>().toList()
+                : <String>[];
             final cameraModel = t['camera_model'] as String?;
             final version = robot.opencastorVersion ?? t['version'] as String?;
             final skills = (skillsAsync.value ?? []).where((s) => s.group == 'Skills').toList();
@@ -510,13 +519,16 @@ class _CapabilitiesView extends ConsumerWidget {
 
             final rows = <_CapabilityRow>[];
             for (final raw in rawProviders) {
-              final p = raw as Map<String, dynamic>? ?? {};
+              final p = raw is Map
+                  ? Map<String, dynamic>.from(raw)
+                  : <String, dynamic>{};
               final name = p['name'] as String? ?? 'Unknown provider';
               final authMethod = p['auth_method'] as String? ?? 'unknown';
               final tokenStatus =
                   (p['token_status'] as String? ?? 'unknown').toLowerCase();
-              final models =
-                  (p['models'] as List<dynamic>?)?.cast<String>() ?? [];
+              final models = p['models'] is List
+                  ? (p['models'] as List<dynamic>).whereType<String>().toList()
+                  : <String>[];
               final fallback = p['fallback'] as String?;
               final rateLimitRemaining = p['rate_limit_remaining'] as int?;
 
@@ -614,6 +626,28 @@ class _CapabilitiesView extends ConsumerWidget {
         ],
       ),
     );
+    } catch (e, st) {
+      FlutterError.reportError(FlutterErrorDetails(exception: e, stack: st));
+      return Scaffold(
+        appBar: AppBar(title: Text('Capabilities — ${robot.name}')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48,
+                  color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              Text('Failed to load capabilities',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text('$e',
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+    }
   }
 
   String _registryTierLabel(String tier) {
