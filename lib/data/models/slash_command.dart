@@ -254,4 +254,12 @@ const List<SlashCommand> kStaticBuiltinCommands = [
     group: 'CLI',
     icon: Icons.camera_alt_outlined,
   ),
+  SlashCommand(
+    cmd: '/contribute',
+    description: 'Show idle compute contribution status',
+    scope: CommandScope.status,
+    instant: true,
+    group: 'CLI',
+    icon: Icons.volunteer_activism_outlined,
+  ),
 ];

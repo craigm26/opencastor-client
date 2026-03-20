@@ -2,6 +2,36 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum RobotCapability { chat, nav, control, vision, status, discover }
 
+/// Idle compute contribution stats from telemetry.contribute.
+class ContributeStats {
+  final bool enabled;
+  final bool active;
+  final String? project;
+  final int workUnitsTotal;
+  final int contributeMinutesToday;
+  final int contributeMinutesLifetime;
+
+  const ContributeStats({
+    this.enabled = false,
+    this.active = false,
+    this.project,
+    this.workUnitsTotal = 0,
+    this.contributeMinutesToday = 0,
+    this.contributeMinutesLifetime = 0,
+  });
+
+  factory ContributeStats.fromMap(Map<String, dynamic> map) => ContributeStats(
+        enabled: map['enabled'] as bool? ?? false,
+        active: map['active'] as bool? ?? false,
+        project: map['project'] as String?,
+        workUnitsTotal: (map['work_units_total'] as num?)?.toInt() ?? 0,
+        contributeMinutesToday:
+            (map['contribute_minutes_today'] as num?)?.toInt() ?? 0,
+        contributeMinutesLifetime:
+            (map['contribute_minutes_lifetime'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class RobotStatus {
   final bool online;
   final DateTime lastSeen;
@@ -79,6 +109,9 @@ class Robot {
   /// OpenCastor runtime version reported by the robot bridge, e.g. "2026.3.17.1".
   final String? opencastorVersion;
 
+  /// Idle compute contribution stats (from telemetry.contribute).
+  final ContributeStats contribute;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -104,6 +137,7 @@ class Robot {
     this.multimodalEnabled = true,
     this.registryTier = 'community',
     this.opencastorVersion,
+    this.contribute = const ContributeStats(),
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -146,6 +180,10 @@ class Robot {
           m['telemetry']?['opencastor_version'] as String?,
           m['telemetry']?['version'] as String?,
         ),
+      contribute: () {
+        final raw = m['telemetry']?['contribute'] as Map<String, dynamic>?;
+        return raw != null ? ContributeStats.fromMap(raw) : const ContributeStats();
+      }(),
     );
   }
 

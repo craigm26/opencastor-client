@@ -19,6 +19,7 @@ import '../../ui/core/widgets/health_indicator.dart';
 import '../harness/hardware_provider.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import '../robot_detail/slash_command_provider.dart';
+import 'contribute_section.dart';
 
 class RobotCapabilitiesScreen extends ConsumerWidget {
   final String rrn;
@@ -484,6 +485,10 @@ class _CapabilitiesView extends ConsumerWidget {
             ];
             return _CapSection(title: 'Software Stack', icon: Icons.layers_outlined, rows: rows);
           }(),
+
+          // ── Contribute ────────────────────────────────────────────────
+          const SizedBox(height: 16),
+          ContributeSection(stats: robot.contribute),
 
           const SizedBox(height: 32),
         ],
