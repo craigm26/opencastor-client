@@ -20,6 +20,8 @@ import '../harness/hardware_provider.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import '../robot_detail/slash_command_provider.dart';
 import 'contribute_section.dart';
+import 'contribute_settings_view.dart';
+import 'contribute_history_view.dart';
 
 class RobotCapabilitiesScreen extends ConsumerWidget {
   final String rrn;
@@ -489,6 +491,14 @@ class _CapabilitiesView extends ConsumerWidget {
           // ── Contribute ────────────────────────────────────────────────
           const SizedBox(height: 16),
           ContributeSection(stats: robot.contribute),
+
+          // ── Contribute Settings (toggle + project selection) ────────
+          const SizedBox(height: 12),
+          ContributeSettingsView(robot: robot),
+
+          // ── Contribution History ────────────────────────────────────
+          const SizedBox(height: 12),
+          ContributeHistoryView(rrn: robot.rrn),
 
           const SizedBox(height: 32),
         ],
