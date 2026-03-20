@@ -38,6 +38,7 @@ import 'ui/settings/theme_mode_provider.dart';
 import 'ui/setup/setup_screen.dart';
 import 'ui/account/account_screen.dart';
 import 'ui/shared/adaptive_navigation.dart';
+import 'ui/shared/google_sign_in_button.dart';
 import 'ui/mission/mission_list_screen.dart';
 import 'ui/mission/mission_screen.dart';
 
@@ -639,102 +640,16 @@ class _LoginState extends State<_LoginScreen> {
 }
 
 // Official Google branding button
+/// Thin wrapper so call-sites in app.dart don't need to change.
 class _GoogleSignInButton extends StatelessWidget {
   const _GoogleSignInButton({required this.onPressed});
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: const Color(0xFF1F1F1F),
-          elevation: 1,
-          shadowColor: Colors.black26,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4),
-            side: const BorderSide(color: Color(0xFFDADCE0)),
-          ),
-          padding: EdgeInsets.zero,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: _GoogleLogo(),
-            ),
-            const Expanded(
-              child: Text(
-                'Sign in with Google',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF1F1F1F),
-                  letterSpacing: 0.25,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      GoogleSignInButton(onPressed: onPressed);
 }
 
-class _GoogleLogo extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-        width: 18,
-        height: 18,
-        child: CustomPaint(painter: _GoogleLogoPainter()));
-  }
-}
-
-class _GoogleLogoPainter extends CustomPainter {
-  static const _blue   = Color(0xFF4285F4);
-  static const _red    = Color(0xFFEA4335);
-  static const _yellow = Color(0xFFFBBC05);
-  static const _green  = Color(0xFF34A853);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.22;
-    paint.color = _red;
-    canvas.drawArc(
-        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
-        -1.5708, 1.5708, false, paint);
-    paint.color = _yellow;
-    canvas.drawArc(
-        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
-        0, 1.5708, false, paint);
-    paint.color = _green;
-    canvas.drawArc(
-        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
-        1.5708, 1.5708, false, paint);
-    paint.color = _blue;
-    canvas.drawArc(
-        Rect.fromLTWH(s * 0.11, s * 0.11, s * 0.78, s * 0.78),
-        3.14159, 1.5708, false, paint);
-    paint
-      ..style = PaintingStyle.fill
-      ..color = Colors.white;
-    canvas.drawRect(
-        Rect.fromLTWH(s * 0.5, s * 0.38, s * 0.5, s * 0.24), paint);
-    canvas.drawCircle(Offset(s / 2, s / 2), s * 0.28, paint);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
-}
+/// Renders the official Google G logo using the standard multicolor SVG paths.
+/// Faithfully replicates the Google G at 18×18 logical pixels per branding spec.
+// _GoogleGLogo and _GoogleGPainter are now in ui/shared/google_sign_in_button.dart

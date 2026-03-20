@@ -14,6 +14,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../shared/google_sign_in_button.dart';
 
 class SetupScreen extends StatefulWidget {
   final String? robotName;
@@ -233,19 +234,9 @@ class _SignInCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
             ],
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: signingIn ? null : onSignIn,
-                icon: signingIn
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.g_mobiledata, size: 24),
-                label: Text(signingIn ? 'Signing in…' : 'Sign in with Google'),
-              ),
+            GoogleSignInButton(
+              onPressed: onSignIn,
+              isLoading: signingIn,
             ),
           ],
         ),
