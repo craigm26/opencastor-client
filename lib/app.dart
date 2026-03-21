@@ -409,11 +409,12 @@ class _AppShell extends StatelessWidget {
       selectedIndex = 0;
     } else if (location.startsWith('/explore')) {
       selectedIndex = 1;
-    } else if (location.startsWith('/alerts')) {
+    } else if (location.startsWith('/compete') ||
+        location.startsWith('/fleet/leaderboard')) {
       selectedIndex = 2;
-    } else if (location.startsWith('/settings')) {
+    } else if (location.startsWith('/alerts')) {
       selectedIndex = 3;
-    } else if (location.startsWith('/missions')) {
+    } else if (location.startsWith('/settings')) {
       selectedIndex = 4;
     }
 
@@ -429,6 +430,11 @@ class _AppShell extends StatelessWidget {
         label: 'Explore',
       ),
       NavigationDestination(
+        icon: Icon(Icons.leaderboard_outlined),
+        selectedIcon: Icon(Icons.leaderboard),
+        label: 'Compete',
+      ),
+      NavigationDestination(
         icon: Icon(Icons.notifications_outlined),
         selectedIcon: Icon(Icons.notifications),
         label: 'Alerts',
@@ -437,11 +443,6 @@ class _AppShell extends StatelessWidget {
         icon: Icon(Icons.settings_outlined),
         selectedIcon: Icon(Icons.settings),
         label: 'Settings',
-      ),
-      NavigationDestination(
-        icon: Icon(Icons.track_changes_outlined),
-        selectedIcon: Icon(Icons.track_changes),
-        label: 'Missions',
       ),
     ];
 
@@ -454,11 +455,11 @@ class _AppShell extends StatelessWidget {
           case 1:
             context.go('/explore');
           case 2:
-            context.go('/alerts');
+            context.go('/fleet/leaderboard');
           case 3:
-            context.go('/settings');
+            context.go('/alerts');
           case 4:
-            context.go('/missions');
+            context.go('/settings');
         }
       },
       destinations: destinations,
