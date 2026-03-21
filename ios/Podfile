@@ -39,16 +39,34 @@ target 'Runner' do
 end
 
 post_install do |installer|
-  # Project-level: allow non-modular headers (firebase_messaging + Firebase.h)
-  installer.pods_project.build_configurations.each do |config|
-    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+  # Patch firebase_messaging: FLTFirebaseMessagingPlugin.h imports the Firebase umbrella
+  # header (<Firebase/Firebase.h>) which is non-modular inside a framework module.
+  # Replace with specific module imports to fix the Xcode build error.
+  installer.pods_project.targets.each do |target|
+    next unless target.name == 'firebase_messaging'
+    target.source_build_phase.files.each do |file|
+      next unless file.file_ref&.path&.end_with?('FLTFirebaseMessagingPlugin.h')
+      header_path = file.file_ref.real_path.to_s
+      if File.exist?(header_path)
+        content = File.read(header_path)
+        if content.include?('#import <Firebase/Firebase.h>')
+          patched = content.gsub(
+            '#import <Firebase/Firebase.h>',
+            "#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>"
+          )
+          File.write(header_path, patched)
+          puts "Patched FLTFirebaseMessagingPlugin.h: replaced Firebase umbrella import"
+        end
+      end
+    end
   end
+
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      # Required for Firebase on iOS 14+
+      # Required for Firebase Messaging on iOS 14+
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_NOTIFICATIONS=1',
