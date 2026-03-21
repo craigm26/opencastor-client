@@ -109,32 +109,7 @@ jobs:
       # FLTFirebaseMessagingPlugin.h imports <Firebase/Firebase.h> (non-modular
       # umbrella header) inside a framework module. Patch it to use specific
       # module imports before CocoaPods processes the file.
-      - name: Patch firebase_messaging non-modular header
-        run: |
-          # Patch .h: replace Firebase umbrella with modular-safe subset (no FirebaseAuth — causes Swift overlay conflict)
-          HEADER=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" \
-            -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
-          if [ -n "$HEADER" ]; then
-            sed -i '' \
-              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>|' \
-              "$HEADER"
-            echo "Patched .h: $HEADER"
-            grep "import" "$HEADER" | head -6
-          else
-            echo "iOS .h not found"
-          fi
-          # Patch .m: add FirebaseAuth + FirebaseInstallations (safe in impl file, not in module header)
-          IMPL=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.m" \
-            -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
-          if [ -n "$IMPL" ]; then
-            sed -i '' \
-              's|#import "FLTFirebaseMessagingPlugin.h"|#import "FLTFirebaseMessagingPlugin.h"\n#import <FirebaseAuth/FirebaseAuth.h>\n#import <FirebaseInstallations/FirebaseInstallations.h>|' \
-              "$IMPL"
-            echo "Patched .m: $IMPL"
-            grep "import" "$IMPL" | head -6
-          else
-            echo "iOS .m not found"
-          fi
+      # No source patching needed — DEFINES_MODULE=NO in Podfile handles this
 
       # ── Install CocoaPods dependencies ───────────────────────────────────
       - name: Install CocoaPods

@@ -43,7 +43,12 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+      # firebase_messaging imports <Firebase/Firebase.h> (non-modular umbrella header)
+      # inside FLTFirebaseMessagingPlugin.h. Setting DEFINES_MODULE=NO prevents Xcode
+      # from treating this pod as a framework module, eliminating the constraint entirely.
+      if target.name == 'firebase_messaging'
+        config.build_settings['DEFINES_MODULE'] = 'NO'
+      end
       # Required for Firebase Messaging on iOS 14+
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
