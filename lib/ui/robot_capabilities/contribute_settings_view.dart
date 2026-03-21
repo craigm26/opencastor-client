@@ -131,7 +131,7 @@ class _ContributeSettingsViewState
                     size: 20, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Idle Compute Contribution',
+                  child: Text('Compute Contribution Settings',
                       style: theme.textTheme.titleMedium
                           ?.copyWith(fontWeight: FontWeight.w600)),
                 ),
@@ -153,8 +153,8 @@ class _ContributeSettingsViewState
             const SizedBox(height: 4),
             Text(
               _enabled
-                  ? 'Donating idle compute to selected science projects'
-                  : 'Enable to donate idle compute to distributed science',
+                  ? 'Robot is contributing — earning rank and Castor Credits'
+                  : 'Enable to earn rank and Castor Credits from idle compute',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),

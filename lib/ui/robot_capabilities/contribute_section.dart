@@ -57,12 +57,25 @@ class ContributeSection extends StatelessWidget {
                 Icon(Icons.volunteer_activism_outlined,
                     size: 20, color: colorScheme.primary),
                 const SizedBox(width: 8),
-                Text(
-                  'Idle Compute Contribution',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your robot earns rank and credits when idle',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        'Each work unit improves your fleet score and earns Castor Credits',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

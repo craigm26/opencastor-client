@@ -388,7 +388,7 @@ class _MiniCardBody extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Personal Research',
+                  'My Best Run',
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontFamily: 'Space Grotesk',
                     fontWeight: FontWeight.w600,

@@ -246,10 +246,16 @@ class _FleetLeaderboardScreenState
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                // Personal research card — always at top of leaderboard
+                // My Best Run — personal research card
                 PersonalResearchCard(
                   communityChampionScore: championScore,
                 ),
+                const SizedBox(height: 8),
+                // Active competition card (#25)
+                const _CompetitionCard(),
+                const SizedBox(height: 8),
+                // Community Board header (#26)
+                const _CommunityBoardHeader(),
                 for (final tier in filteredTiers.keys) ...[
                   _TierHeader(tier: tier),
                   ...filteredTiers[tier]!.asMap().entries.map(
@@ -569,5 +575,142 @@ class _EntryRow extends StatelessWidget {
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+}
+
+// ── Competition Card (#25) ────────────────────────────────────────────────────
+
+class _CompetitionCard extends StatelessWidget {
+  const _CompetitionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    // Placeholder top-3 data — will be replaced by live Firestore query
+    const top3 = [
+      ('RRN-000000000005', 0.934),
+      ('RRN-000000000001', 0.912),
+      ('RRN-000000000007', 0.887),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: cs.surfaceContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.emoji_events_outlined,
+                      size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Season 1 — Sprint Series',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontFamily: 'Space Grotesk',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'ACTIVE',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              ...top3.asMap().entries.map((e) {
+                final rank = e.key + 1;
+                final (rrn, score) = e.value;
+                final medal =
+                    rank == 1 ? '🥇' : rank == 2 ? '🥈' : '🥉';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Row(
+                    children: [
+                      Text(medal,
+                          style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 8),
+                      Text(
+                        rrn,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontFamily: 'monospace',
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        score.toStringAsFixed(3),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    // TODO: navigate to full season standings
+                  },
+                  child: const Text('View All'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Community Board Header (#26) ──────────────────────────────────────────────
+
+class _CommunityBoardHeader extends StatelessWidget {
+  const _CommunityBoardHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          Icon(Icons.public_outlined, size: 16, color: cs.onSurfaceVariant),
+          const SizedBox(width: 6),
+          Text(
+            'Community Board',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
