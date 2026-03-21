@@ -23,6 +23,16 @@ import 'contribute_section.dart';
 import 'contribute_settings_view.dart';
 import 'contribute_history_view.dart';
 
+/// Safely converts any Firestore value to a [List<dynamic>].
+/// Handles the case where the server returns a Map instead of a List
+/// (e.g. `{"0": "val"}` instead of `["val"]`).
+List<dynamic> _asList(dynamic value) {
+  if (value == null) return [];
+  if (value is List) return value;
+  if (value is Map) return value.values.toList();
+  return [value];
+}
+
 class RobotCapabilitiesScreen extends ConsumerWidget {
   final String rrn;
 
@@ -396,8 +406,8 @@ class _CapabilitiesView extends ConsumerWidget {
               final ramAvail = (hw['ram_available_gb'] as num?)?.toStringAsFixed(1) ?? '?';
               final storageFree = (hw['storage_free_gb'] as num?)?.toStringAsFixed(1) ?? '?';
               final tier = hw['hardware_tier'] as String? ?? 'unknown';
-              final accel = (hw['accelerators'] as List<dynamic>?) ?? [];
-              final ollama = (hw['ollama_models'] as List<dynamic>?) ?? [];
+              final accel = _asList(hw['accelerators']);
+              final ollama = _asList(hw['ollama_models']);
 
               String tierLabel(String t) => switch (t) {
                 'pi5-hailo' => 'Pi 5 + Hailo-8 NPU',
@@ -460,9 +470,7 @@ class _CapabilitiesView extends ConsumerWidget {
             final fallbackEnabled = fallback['enabled'] as bool? ?? false;
             final fallbackModel = fallback['fallback_model'] as String? ?? '';
             final fallbackProvider = fallback['fallback_provider'] as String? ?? '';
-            final channels = t['channels_active'] is List
-                ? (t['channels_active'] as List<dynamic>).whereType<String>().toList()
-                : <String>[];
+            final channels = _asList(t['channels_active']).whereType<String>().toList();
             final cameraModel = t['camera_model'] as String?;
             final version = robot.opencastorVersion ?? t['version'] as String?;
             final skills = (skillsAsync.value ?? []).where((s) => s.group == 'Skills').toList();
@@ -500,8 +508,7 @@ class _CapabilitiesView extends ConsumerWidget {
           // ── Gated Providers ───────────────────────────────────────────
           const SizedBox(height: 16),
           () {
-            final rawProviders =
-                (robot.telemetry['providers'] as List<dynamic>?) ?? [];
+            final rawProviders = _asList(robot.telemetry['providers']);
             if (rawProviders.isEmpty) {
               return _CapSection(
                 title: 'Gated Providers',
@@ -526,9 +533,7 @@ class _CapabilitiesView extends ConsumerWidget {
               final authMethod = p['auth_method'] as String? ?? 'unknown';
               final tokenStatus =
                   (p['token_status'] as String? ?? 'unknown').toLowerCase();
-              final models = p['models'] is List
-                  ? (p['models'] as List<dynamic>).whereType<String>().toList()
-                  : <String>[];
+              final models = _asList(p['models']).whereType<String>().toList();
               final fallback = p['fallback'] as String?;
               final rateLimitRemaining = p['rate_limit_remaining'] as int?;
 
@@ -605,9 +610,7 @@ class _CapabilitiesView extends ConsumerWidget {
           // ── Gated Providers ─────────────────────────────────────────
           const SizedBox(height: 16),
           _GatedProvidersSection(
-            providers: robot.telemetry['gated_providers'] is List
-                ? robot.telemetry['gated_providers'] as List<dynamic>
-                : null,
+            providers: _asList(robot.telemetry['gated_providers']),
           ),
 
           // ── Contribute ────────────────────────────────────────────────
@@ -1136,14 +1139,14 @@ class _StepItem extends StatelessWidget {
 }
 
 class _GatedProvidersSection extends StatelessWidget {
-  final List<dynamic>? providers;
-  const _GatedProvidersSection({this.providers});
+  final List<dynamic> providers;
+  const _GatedProvidersSection({required this.providers});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
-    final items = providers ?? [];
+    final items = providers;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1174,7 +1177,7 @@ class _GatedProvidersSection extends StatelessWidget {
             final method = provider['auth_method'] as String? ?? 'none';
             final available = provider['available'] as bool? ?? false;
             final authValid = provider['auth_valid'] as bool? ?? false;
-            final models = (provider['models'] as List<dynamic>?)?.cast<String>() ?? [];
+            final models = _asList(provider['models']).whereType<String>().toList();
             final failures = provider['consecutive_failures'] as int? ?? 0;
             final hasFallback = provider['has_fallback'] as bool? ?? false;
             final rateRemaining = provider['rate_limit_remaining'] as int?;
