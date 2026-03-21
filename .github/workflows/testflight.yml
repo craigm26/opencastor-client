@@ -33,6 +33,19 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # ── Generate iOS project files if missing ────────────────────────────
+      - name: Generate iOS Xcode project
+        run: |
+          # flutter create regenerates ios/ project files without touching Dart code
+          flutter create --project-name opencastor_client \
+            --org com.craigm26 \
+            --platforms ios \
+            . || true
+          # Verify project.pbxproj was created
+          ls ios/Runner.xcodeproj/project.pbxproj
+          # Re-run pub get so Generated.xcconfig reflects the CI Flutter root
+          flutter pub get
+
       # ── Firebase credentials ─────────────────────────────────────────────
       - name: Write Firebase credentials
         env:
@@ -50,17 +63,6 @@ jobs:
             echo "$GOOGLE_SERVICE_INFO_PLIST" > ios/Runner/GoogleService-Info.plist
           fi
         shell: bash
-
-      # ── Generate iOS project files if missing ────────────────────────────
-      - name: Generate iOS Xcode project
-        run: |
-          # flutter create regenerates ios/ project files without touching Dart code
-          flutter create --project-name opencastor_client \
-            --org com.craigm26 \
-            --platforms ios \
-            . || true
-          # Verify project.pbxproj was created
-          ls ios/Runner.xcodeproj/project.pbxproj
 
       # ── Set bundle ID and version ────────────────────────────────────────
       - name: Configure bundle ID and version
