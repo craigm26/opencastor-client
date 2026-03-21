@@ -31,3 +31,6 @@ functions/node_modules/
 # OS
 .DS_Store
 Thumbs.db
+
+# Firebase config — real values injected by CI from FIREBASE_OPTIONS_DART secret
+lib/firebase_options.dart
