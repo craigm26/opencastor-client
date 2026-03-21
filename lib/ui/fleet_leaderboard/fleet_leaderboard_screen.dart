@@ -151,18 +151,64 @@ class FleetLeaderboardScreen extends ConsumerStatefulWidget {
 
 class _FleetLeaderboardScreenState
     extends ConsumerState<FleetLeaderboardScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final tiersAsync = ref.watch(_leaderboardProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Fleet Leaderboard')),
+      appBar: AppBar(
+        title: Text(
+          'Fleet Leaderboard',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontFamily: 'Space Grotesk',
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: _SearchBar(controller: _searchController),
+          ),
+        ),
+      ),
       body: tiersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (tiers) {
-          if (tiers.isEmpty) {
+          // Filter tiers and entries based on search
+          final filteredTiers = <String, List<_LeaderboardEntry>>{};
+          for (final entry in tiers.entries) {
+            final tierNameMatch = entry.key.toLowerCase().contains(_searchQuery);
+            final matchingEntries = entry.value.where((robot) {
+              return tierNameMatch || robot.rrn.toLowerCase().contains(_searchQuery);
+            }).toList();
+
+            if (matchingEntries.isNotEmpty) {
+              filteredTiers[entry.key] = matchingEntries;
+            }
+          }
+
+          if (filteredTiers.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -170,13 +216,19 @@ class _FleetLeaderboardScreenState
                   Icon(Icons.leaderboard_outlined,
                       size: 48, color: theme.colorScheme.outline),
                   const SizedBox(height: 12),
-                  Text('No leaderboard data',
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(color: theme.colorScheme.outline)),
-                  const SizedBox(height: 4),
-                  Text('Contribute compute to appear here.',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.outline)),
+                  Text(
+                    _searchQuery.isNotEmpty 
+                        ? 'No robots match "$_searchQuery"'
+                        : 'No leaderboard data',
+                    style: theme.textTheme.bodyLarge
+                        ?.copyWith(color: theme.colorScheme.outline),
+                  ),
+                  if (_searchQuery.isEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text('Contribute compute to appear here.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.outline)),
+                  ]
                 ],
               ),
             );
@@ -187,9 +239,9 @@ class _FleetLeaderboardScreenState
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                for (final tier in tiers.keys) ...[
+                for (final tier in filteredTiers.keys) ...[
                   _TierHeader(tier: tier),
-                  ...tiers[tier]!.asMap().entries.map(
+                  ...filteredTiers[tier]!.asMap().entries.map(
                         (e) => _EntryRow(
                           rank: e.key + 1,
                           entry: e.value,
@@ -205,6 +257,75 @@ class _FleetLeaderboardScreenState
     );
   }
 }
+
+// ── Search Bar ────────────────────────────────────────────────────────────────
+
+class _SearchBar extends StatefulWidget {
+  final TextEditingController controller;
+
+  const _SearchBar({required this.controller});
+
+  @override
+  State<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends State<_SearchBar> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() {
+        _isFocused = _focusNode.hasFocus;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        border: Border(
+          bottom: BorderSide(
+            color: _isFocused ? cs.primary : cs.outline,
+            width: 2.0,
+          ),
+        ),
+      ),
+      child: TextField(
+        controller: widget.controller,
+        focusNode: _focusNode,
+        style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'Inter'),
+        decoration: InputDecoration(
+          hintText: 'Search robots or tiers...',
+          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontFamily: 'Inter',
+          ),
+          prefixIcon: Icon(
+            Icons.search,
+            color: _isFocused ? cs.primary : cs.onSurfaceVariant,
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+    );
+  }
+}
+
 
 // ── Tier header ───────────────────────────────────────────────────────────────
 
@@ -227,12 +348,13 @@ class _TierHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         _label(tier),
-        style: theme.textTheme.labelLarge?.copyWith(
+        style: theme.textTheme.headlineSmall?.copyWith(
           color: theme.colorScheme.primary,
           letterSpacing: 0.5,
+          fontFamily: 'Space Grotesk',
         ),
       ),
     );
@@ -247,27 +369,86 @@ class _EntryRow extends StatelessWidget {
 
   const _EntryRow({required this.rank, required this.entry});
 
+  Widget _buildBadge(double score) {
+    Color bgColor;
+    Color fgColor;
+    String label;
+
+    if (score > 0.9) {
+      // Diamond
+      bgColor = const Color(0xFFb9f2ff); // Light cyan
+      fgColor = const Color(0xFF004d57);
+      label = 'DIAMOND';
+    } else if (score > 0.75) {
+      // Gold
+      bgColor = const Color(0xFFffdf99); // Light amber
+      fgColor = const Color(0xFF5d3f00);
+      label = 'GOLD';
+    } else if (score > 0.5) {
+      // Silver
+      bgColor = const Color(0xFFe3e2e6); // Light greyish
+      fgColor = const Color(0xFF44474f);
+      label = 'SILVER';
+    } else {
+      // Bronze
+      bgColor = const Color(0xFFffb4a1); // Light deep orange/bronze
+      fgColor = const Color(0xFF631000);
+      label = 'BRONZE';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fgColor,
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          fontFamily: 'Inter',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final pct = entry.score.clamp(0.0, 1.0);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Rank
+          // Rank & Badge column
           SizedBox(
-            width: 28,
-            child: Text(
-              '#$rank',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.right,
+            width: 60,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '#$rank',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontFamily: 'Space Grotesk',
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _buildBadge(pct),
+              ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
 
           // RRN + progress + meta
           Expanded(
@@ -279,54 +460,84 @@ class _EntryRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         entry.rrn,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontFamily: 'monospace'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontFamily: 'Inter',
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (!entry.trusted)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Tooltip(
-                          message: 'Untrusted',
-                          child: Icon(Icons.warning_amber_rounded,
-                              size: 16, color: theme.colorScheme.error),
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: cs.errorContainer,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.warning_amber_rounded,
+                                size: 12, color: cs.onErrorContainer),
+                            const SizedBox(width: 4),
+                            Text(
+                              'UNTRUSTED',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onErrorContainer,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 LinearProgressIndicator(
                   value: pct,
                   backgroundColor: cs.surfaceContainerHighest,
                   minHeight: 4,
                   borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Text(
-                      '${(pct * 100).toStringAsFixed(1)}%',
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_fmtCount(entry.candidatesEvaluated)} evaluated',
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      '${_fmtCount(entry.candidatesEvaluated)} eval',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontFamily: 'Inter',
+                      ),
                     ),
                     if (entry.lastEval != null) ...[
                       const SizedBox(width: 8),
                       Text(
+                        '•',
+                        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 10),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
                         _timeAgo(entry.lastEval!),
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontFamily: 'Inter',
+                        ),
                       ),
                     ],
                   ],
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Score
+          Text(
+            pct.toStringAsFixed(2),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontFamily: 'Space Grotesk',
+              color: cs.primary,
             ),
           ),
         ],

@@ -1,11 +1,10 @@
-// ⚠️  This is a BUILD PLACEHOLDER — do not use in production.
+// ⚠️  Real credentials — do NOT commit this file with real values.
 //
-// Real values are stored as GitHub secret: FIREBASE_OPTIONS_DART
-// The CI workflow injects the real file before building.
+// The CI workflow injects the full file from the FIREBASE_OPTIONS_DART secret.
+// This local copy is used for manual builds on the Pi only.
 //
-// To regenerate locally:
+// To regenerate:
 //   flutterfire configure --project=opencastor --platforms=web,android,ios
-//   (requires Firebase CLI + flutterfire_cli + macOS for iOS)
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -29,8 +28,8 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'PLACEHOLDER',
-    appId: 'PLACEHOLDER',
+    apiKey: 'AIzaSyBKu6FelY5d4RwKPPO_MwapXO-wklHCFbE',
+    appId: '1:360358330839:web:f35773ab2c6a78092c0b92',
     messagingSenderId: '360358330839',
     projectId: 'opencastor',
     authDomain: 'opencastor.firebaseapp.com',
@@ -39,30 +38,31 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'PLACEHOLDER',
-    appId: 'PLACEHOLDER',
+    apiKey: 'AIzaSyDcFiuWRXADtoRzgRmKRoZsyv27I6xQrnY',
+    appId: '1:360358330839:android:30060e51644ca3952c0b92',
     messagingSenderId: '360358330839',
     projectId: 'opencastor',
     storageBucket: 'opencastor.firebasestorage.app',
   );
 
+  // iOS — add GoogleService-Info.plist for real values; using web key as fallback
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'PLACEHOLDER',
-    appId: 'PLACEHOLDER',
+    apiKey: 'AIzaSyBKu6FelY5d4RwKPPO_MwapXO-wklHCFbE',
+    appId: '1:360358330839:ios:a0edb9b7371b28622c0b92',
     messagingSenderId: '360358330839',
     projectId: 'opencastor',
     storageBucket: 'opencastor.firebasestorage.app',
-    iosClientId: 'PLACEHOLDER',
+    iosClientId: '360358330839-08cfje1k0efm6c0kaj97kkmmfh4o1g94.apps.googleusercontent.com',
     iosBundleId: 'com.craigm26.opencastorClient',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'PLACEHOLDER',
-    appId: 'PLACEHOLDER',
+    apiKey: 'AIzaSyBKu6FelY5d4RwKPPO_MwapXO-wklHCFbE',
+    appId: '1:360358330839:ios:a0edb9b7371b28622c0b92',
     messagingSenderId: '360358330839',
     projectId: 'opencastor',
     storageBucket: 'opencastor.firebasestorage.app',
-    iosClientId: 'PLACEHOLDER',
+    iosClientId: '360358330839-08cfje1k0efm6c0kaj97kkmmfh4o1g94.apps.googleusercontent.com',
     iosBundleId: 'com.craigm26.opencastorClient',
   );
 }
