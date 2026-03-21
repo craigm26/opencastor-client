@@ -111,16 +111,18 @@ jobs:
       # module imports before CocoaPods processes the file.
       - name: Patch firebase_messaging non-modular header
         run: |
+          # Must patch the ios/ copy specifically — macos/ copy also exists and gets found first
           HEADER=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" \
-            -path "*/firebase_messaging*" 2>/dev/null | head -1)
+            -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
           if [ -n "$HEADER" ]; then
             sed -i '' \
               's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>|' \
               "$HEADER"
-            echo "Patched: $HEADER"
+            echo "Patched iOS header: $HEADER"
             grep "import" "$HEADER" | head -5
           else
-            echo "Header not found at expected path — skipping patch"
+            echo "iOS header not found — skipping patch"
+            find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" 2>/dev/null
           fi
 
       # ── Install CocoaPods dependencies ───────────────────────────────────
