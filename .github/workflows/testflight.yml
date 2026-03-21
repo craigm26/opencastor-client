@@ -111,18 +111,29 @@ jobs:
       # module imports before CocoaPods processes the file.
       - name: Patch firebase_messaging non-modular header
         run: |
-          # Must patch the ios/ copy specifically — macos/ copy also exists and gets found first
+          # Patch .h: replace Firebase umbrella with modular-safe subset (no FirebaseAuth — causes Swift overlay conflict)
           HEADER=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" \
             -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
           if [ -n "$HEADER" ]; then
             sed -i '' \
-              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseAuth/FirebaseAuth.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>\n#import <FirebaseInstallations/FirebaseInstallations.h>|' \
+              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>|' \
               "$HEADER"
-            echo "Patched iOS header: $HEADER"
-            grep "import" "$HEADER" | head -5
+            echo "Patched .h: $HEADER"
+            grep "import" "$HEADER" | head -6
           else
-            echo "iOS header not found — skipping patch"
-            find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" 2>/dev/null
+            echo "iOS .h not found"
+          fi
+          # Patch .m: add FirebaseAuth + FirebaseInstallations (safe in impl file, not in module header)
+          IMPL=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.m" \
+            -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
+          if [ -n "$IMPL" ]; then
+            sed -i '' \
+              's|#import "FLTFirebaseMessagingPlugin.h"|#import "FLTFirebaseMessagingPlugin.h"\n#import <FirebaseAuth/FirebaseAuth.h>\n#import <FirebaseInstallations/FirebaseInstallations.h>|' \
+              "$IMPL"
+            echo "Patched .m: $IMPL"
+            grep "import" "$IMPL" | head -6
+          else
+            echo "iOS .m not found"
           fi
 
       # ── Install CocoaPods dependencies ───────────────────────────────────
