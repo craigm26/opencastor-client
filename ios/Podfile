@@ -30,7 +30,6 @@ flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks! :linkage => :static
-  use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
@@ -40,11 +39,14 @@ target 'Runner' do
 end
 
 post_install do |installer|
+  # Project-level: allow non-modular headers (firebase_messaging + Firebase.h)
+  installer.pods_project.build_configurations.each do |config|
+    config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+  end
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
-      # Fix: non-modular header inside framework module (firebase_messaging + Firebase.h)
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       # Required for Firebase on iOS 14+
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
