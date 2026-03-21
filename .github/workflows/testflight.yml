@@ -105,6 +105,24 @@ jobs:
             "s/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Automatic;/g" \
             Runner.xcodeproj/project.pbxproj || true
 
+      # ── Patch firebase_messaging header ─────────────────────────────────
+      # FLTFirebaseMessagingPlugin.h imports <Firebase/Firebase.h> (non-modular
+      # umbrella header) inside a framework module. Patch it to use specific
+      # module imports before CocoaPods processes the file.
+      - name: Patch firebase_messaging non-modular header
+        run: |
+          HEADER=$(find "$HOME/.pub-cache" -name "FLTFirebaseMessagingPlugin.h" \
+            -path "*/firebase_messaging*" 2>/dev/null | head -1)
+          if [ -n "$HEADER" ]; then
+            sed -i '' \
+              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>|' \
+              "$HEADER"
+            echo "Patched: $HEADER"
+            grep "import" "$HEADER" | head -5
+          else
+            echo "Header not found at expected path — skipping patch"
+          fi
+
       # ── Install CocoaPods dependencies ───────────────────────────────────
       - name: Install CocoaPods
         run: |
