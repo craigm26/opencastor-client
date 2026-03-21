@@ -30,7 +30,16 @@ import 'ui/login/ecosystem_section.dart';
 import 'ui/physical_control/physical_control_screen.dart';
 import 'ui/harness/harness_editor.dart';
 import 'ui/harness/harness_viewer.dart';
+import 'ui/robot_capabilities/ai_screen.dart';
+import 'ui/robot_capabilities/contribute_screen.dart';
+import 'ui/robot_capabilities/conformance_screen.dart';
+import 'ui/robot_capabilities/hardware_screen.dart';
+import 'ui/robot_capabilities/identity_screen.dart';
+import 'ui/robot_capabilities/providers_screen.dart';
 import 'ui/robot_capabilities/robot_capabilities_screen.dart';
+import 'ui/robot_capabilities/safety_screen.dart';
+import 'ui/robot_capabilities/software_screen.dart';
+import 'ui/robot_capabilities/transport_screen.dart';
 import 'ui/robot_detail/robot_detail_screen.dart';
 import 'ui/robot_status/robot_status_screen.dart';
 import 'ui/settings/settings_screen.dart';
@@ -189,6 +198,51 @@ final _routerProvider = Provider<GoRouter>((ref) {
                   ? state.uri.fragment
                   : null,
             ),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/conformance',
+            builder: (_, state) =>
+                ConformanceScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/identity',
+            builder: (_, state) =>
+                IdentityScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/safety',
+            builder: (_, state) =>
+                SafetyScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/transport',
+            builder: (_, state) =>
+                TransportScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/ai',
+            builder: (_, state) =>
+                AiCapabilitiesScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/hardware',
+            builder: (_, state) =>
+                HardwareScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/software',
+            builder: (_, state) =>
+                SoftwareScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/providers',
+            builder: (_, state) =>
+                ProvidersScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/contribute',
+            builder: (_, state) =>
+                CapContributeScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/harness',
