@@ -418,16 +418,13 @@ class _HarnessViewerState extends State<HarnessViewer> {
 class _Arrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return SizedBox(
       height: 24,
       child: Center(
-        child: Column(
-          children: [
-            Container(width: 2, height: 10, color: cs.outlineVariant),
-            Icon(Icons.arrow_downward,
-                size: 14, color: cs.outlineVariant),
-          ],
+        child: Icon(
+          Icons.arrow_downward,
+          size: 14,
+          color: Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
     );
@@ -454,117 +451,105 @@ class _LayerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = _borderColorForType(layer.type);
     final icon = _iconForLayer(layer);
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: borderColor, width: 4)),
       ),
-      color: isDark ? const Color(0xFF12142b) : cs.surface,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(left: BorderSide(color: borderColor, width: 4)),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(12),
-            bottomLeft: Radius.circular(12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header row ──────────────────────────────────────────────
-            InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 18, color: borderColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                layer.label,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14),
-                              ),
-                              const SizedBox(width: 8),
-                              _Badge(
-                                layer: layer,
-                                showOptional: onEdit != null,
-                              ),
-                            ],
-                          ),
-                          if (!expanded)
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header row ──────────────────────────────────────────────
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(icon, size: 18, color: borderColor),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
                             Text(
-                              layer.description,
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: cs.onSurfaceVariant),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              layer.label,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  fontFamily: 'Space Grotesk'),
                             ),
-                        ],
-                      ),
+                            const SizedBox(width: 8),
+                            _Badge(
+                              layer: layer,
+                              showOptional: onEdit != null,
+                            ),
+                          ],
+                        ),
+                        if (!expanded)
+                          Text(
+                            layer.description,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
                     ),
-                    // Info icon
+                  ),
+                  // Info icon
+                  IconButton(
+                    icon: const Icon(Icons.info_outline, size: 16),
+                    tooltip: 'About this block',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onInfo,
+                  ),
+                  if (onEdit != null)
                     IconButton(
-                      icon: const Icon(Icons.info_outline, size: 16),
-                      tooltip: 'About this block',
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      tooltip: 'Edit layer',
                       visualDensity: VisualDensity.compact,
-                      onPressed: onInfo,
+                      onPressed: onEdit,
                     ),
-                    if (onEdit != null)
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined, size: 16),
-                        tooltip: 'Edit layer',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: onEdit,
-                      ),
-                    Icon(
-                      expanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ],
-                ),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
               ),
             ),
+          ),
 
-            // ── Expanded detail panel ────────────────────────────────────
-            if (expanded)
-              Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(layer.description,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurfaceVariant)),
-                    if (layer.config.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      _ConfigTable(config: layer.config),
-                    ],
+          // ── Expanded detail panel ────────────────────────────────────
+          if (expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(layer.description,
+                      style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant)),
+                  if (layer.config.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    _ConfigTable(config: layer.config),
                   ],
-                ),
+                ],
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -596,50 +581,40 @@ class _SkillGroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final borderColor = _borderColorForType('skill');
     final activeSkills = layers.where((l) => l.enabled).toList();
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: borderColor, width: 4)),
       ),
-      color: isDark ? const Color(0xFF12142b) : cs.surface,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(left: BorderSide(color: borderColor, width: 4)),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(12),
-            bottomLeft: Radius.circular(12),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──────────────────────────────────────────────────
-            InkWell(
-              onTap: onToggle,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(
-                  children: [
-                    Icon(Icons.build_outlined,
-                        size: 18, color: borderColor),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Skills (${activeSkills.length} active)',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14),
-                          ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header ──────────────────────────────────────────────────
+          InkWell(
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.build_outlined,
+                      size: 18, color: borderColor),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Skills (${activeSkills.length} active)',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              fontFamily: 'Space Grotesk'),
+                        ),
                           if (!expanded)
                             Text(
                               activeSkills.isEmpty
@@ -738,7 +713,6 @@ class _SkillGroupCard extends StatelessWidget {
               ),
           ],
         ),
-      ),
     );
   }
 }

@@ -551,7 +551,10 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Edit Harness — ${widget.robotName}'),
+        title: Text(
+          'Edit Harness — ${widget.robotName}',
+          style: const TextStyle(fontFamily: 'Space Grotesk'),
+        ),
         actions: [
           // Flow / list view toggle
           IconButton(
@@ -612,7 +615,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
               onToggleLayer: _toggleLayerEnabled,
               onReorderSkills: _reorderSkills,
               onAddSkill: _showSkillBrowser,
-              onAddBlock: _showAddBlockSheet,
             ),
     );
   }
