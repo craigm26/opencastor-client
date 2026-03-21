@@ -13,6 +13,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'personal_research_card.dart';
+
 // ── Data model ────────────────────────────────────────────────────────────────
 
 class _LeaderboardEntry {
@@ -234,11 +236,20 @@ class _FleetLeaderboardScreenState
             );
           }
 
+          // Champion score = highest score across all tiers
+          final championScore = tiers.values
+              .expand((list) => list)
+              .fold<double>(0.0, (max, e) => e.score > max ? e.score : max);
+
           return RefreshIndicator(
             onRefresh: () => ref.refresh(_leaderboardProvider.future),
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
+                // Personal research card — always at top of leaderboard
+                PersonalResearchCard(
+                  communityChampionScore: championScore,
+                ),
                 for (final tier in filteredTiers.keys) ...[
                   _TierHeader(tier: tier),
                   ...filteredTiers[tier]!.asMap().entries.map(

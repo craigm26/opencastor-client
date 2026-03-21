@@ -39,6 +39,7 @@ import '../widgets/thinking_indicator.dart';
 import 'robot_detail_view_model.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
+import '../fleet_leaderboard/personal_research_card.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -829,6 +830,9 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 _imageAnnotation = '';
               }),
             ),
+
+          // ── Personal Research mini-card ───────────────────────────────────
+          PersonalResearchMiniCard(rrn: widget.rrn),
 
           // ── Chat input with slash command palette ─────────────────────────
           if (robot.hasCapability(RobotCapability.chat) &&
