@@ -26,6 +26,11 @@ class FleetScreen extends ConsumerWidget {
         title: const Text('OpenCastor Fleet'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.track_changes_outlined),
+            tooltip: 'Missions',
+            onPressed: () => context.push('/missions'),
+          ),
+          IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: 'Fleet Docs',
             onPressed: () => launchUrl(Uri.parse(AppConstants.docsRoot)),
@@ -43,6 +48,9 @@ class FleetScreen extends ConsumerWidget {
                   onRefresh: () => ref.invalidate(fleetProvider),
                 )
               : const SizedBox.shrink(),
+
+          // ── Missions quick-access strip ───────────────────────────────
+          _MissionsStrip(),
 
           // ── Main content with AnimatedSwitcher ────────────────────────
           Expanded(
@@ -642,5 +650,46 @@ class _ProfileAvatarButton extends StatelessWidget {
       return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
     return name[0].toUpperCase();
+  }
+}
+
+// ── Missions quick-access strip ───────────────────────────────────────────────
+
+class _MissionsStrip extends StatelessWidget {
+  const _MissionsStrip();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/missions'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(Icons.track_changes_outlined,
+                  color: cs.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Missions',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
