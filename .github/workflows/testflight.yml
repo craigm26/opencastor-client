@@ -116,7 +116,7 @@ jobs:
             -path "*/firebase_messaging*/ios/Classes/*" 2>/dev/null | head -1)
           if [ -n "$HEADER" ]; then
             sed -i '' \
-              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>|' \
+              's|#import <Firebase/Firebase.h>|#import <FirebaseCore/FirebaseCore.h>\n#import <FirebaseAuth/FirebaseAuth.h>\n#import <FirebaseMessaging/FirebaseMessaging.h>\n#import <FirebaseInstallations/FirebaseInstallations.h>|' \
               "$HEADER"
             echo "Patched iOS header: $HEADER"
             grep "import" "$HEADER" | head -5
