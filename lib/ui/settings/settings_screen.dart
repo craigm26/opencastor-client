@@ -122,6 +122,20 @@ class SettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: 8),
 
+          // ── Pro ───────────────────────────────────────────────────────
+          _SectionHeader(label: 'Subscription'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.workspace_premium_outlined),
+              title: const Text('OpenCastor Pro'),
+              subtitle: const Text('Waitlist · \$19/month launching soon'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/pro'),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
           // ── About ─────────────────────────────────────────────────────
           _SectionHeader(label: 'About'),
           Card(

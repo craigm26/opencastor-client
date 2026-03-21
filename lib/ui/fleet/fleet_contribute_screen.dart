@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../fleet_contribute/credits_card.dart';
+
 /// Aggregate fleet contribution stats.
 class _FleetContributeStats {
   final int totalRobots;
@@ -152,9 +154,15 @@ class FleetContributeScreen extends ConsumerWidget {
             );
           }
 
-          return ListView(
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(_fleetContributeProvider),
+            child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Credits card
+              const CreditsCard(),
+              const SizedBox(height: 16),
+
               // Summary cards
               Row(
                 children: [
@@ -254,7 +262,19 @@ class FleetContributeScreen extends ConsumerWidget {
                       ),
                     ),
                   )),
+
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.workspace_premium_outlined),
+                  label: const Text('Go Pro'),
+                  onPressed: () => context.push('/pro'),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
+          ),
           );
         },
       ),

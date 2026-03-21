@@ -42,6 +42,7 @@ import 'ui/shared/google_sign_in_button.dart';
 import 'ui/fleet_leaderboard/fleet_leaderboard_screen.dart';
 import 'ui/mission/mission_list_screen.dart';
 import 'ui/mission/mission_screen.dart';
+import 'ui/pro/pro_screen.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
@@ -232,6 +233,10 @@ final _routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account',
             builder: (_, __) => const AccountScreen(),
+          ),
+          GoRoute(
+            path: '/pro',
+            builder: (_, __) => const ProScreen(),
           ),
           GoRoute(
             path: '/missions',
