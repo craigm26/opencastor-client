@@ -1,0 +1,198 @@
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: "Build note (e.g. 'competition UI')"
+        required: false
+        default: ""
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  testflight:
+    name: Build & Upload to TestFlight
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      # ── Flutter ─────────────────────────────────────────────────────────
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.x'
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # ── Firebase credentials ─────────────────────────────────────────────
+      - name: Write Firebase credentials
+        env:
+          FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$FIREBASE_OPTIONS_DART" ]; then
+            echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
+          fi
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          fi
+          # Write GoogleService-Info.plist for iOS
+          if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
+            echo "$GOOGLE_SERVICE_INFO_PLIST" > ios/Runner/GoogleService-Info.plist
+          fi
+        shell: bash
+
+      # ── Generate iOS project files if missing ────────────────────────────
+      - name: Generate iOS Xcode project
+        run: |
+          # flutter create regenerates ios/ project files without touching Dart code
+          flutter create --project-name opencastor_client \
+            --org com.craigm26 \
+            --platforms ios \
+            . || true
+          # Verify project.pbxproj was created
+          ls ios/Runner.xcodeproj/project.pbxproj
+
+      # ── Set bundle ID and version ────────────────────────────────────────
+      - name: Configure bundle ID and version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
+          BUILD=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f2)
+          echo "VERSION=$VERSION BUILD=$BUILD"
+          # Set bundle ID
+          /usr/libexec/PlistBuddy -c \
+            "Set :CFBundleIdentifier com.craigm26.opencastorClient" \
+            ios/Runner/Info.plist
+          # Set version
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" ios/Runner/Info.plist
+
+      # ── App Store Connect API key ────────────────────────────────────────
+      - name: Write App Store Connect API key
+        env:
+          ASC_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY_CONTENT }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_API_KEY_CONTENT" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8
+
+      # ── Code signing (automatic with API key) ───────────────────────────
+      - name: Configure automatic code signing
+        env:
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+        run: |
+          # Update Xcode project to use automatic signing with our team
+          cd ios
+          # Use xcodebuild to set team ID
+          sed -i '' \
+            "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $APPLE_DEVELOPER_TEAM_ID;/g" \
+            Runner.xcodeproj/project.pbxproj || true
+          # Set automatic signing
+          sed -i '' \
+            "s/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Automatic;/g" \
+            Runner.xcodeproj/project.pbxproj || true
+
+      # ── Install CocoaPods dependencies ───────────────────────────────────
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+
+      # ── Flutter build iOS ────────────────────────────────────────────────
+      - name: Flutter build iOS (release)
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+        run: |
+          flutter build ios --release --no-codesign
+
+      # ── Xcode archive ────────────────────────────────────────────────────
+      - name: Xcode archive
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+        run: |
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/Runner.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8 \
+            -authenticationKeyID "${ASC_API_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_API_KEY_ISSUER_ID}" \
+            DEVELOPMENT_TEAM="${APPLE_DEVELOPER_TEAM_ID}" \
+            CODE_SIGN_STYLE=Automatic \
+            | xcpretty || true
+          ls build/Runner.xcarchive
+
+      # ── Export IPA ───────────────────────────────────────────────────────
+      - name: Export IPA
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
+        run: |
+          cat > /tmp/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${APPLE_DEVELOPER_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath build/ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8 \
+            -authenticationKeyID "${ASC_API_KEY_ID}" \
+            -authenticationKeyIssuerID "${ASC_API_KEY_ISSUER_ID}" \
+            | xcpretty || true
+          ls build/ipa/
+
+      # ── Upload to TestFlight ─────────────────────────────────────────────
+      - name: Upload to TestFlight
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+        run: |
+          IPA_PATH=$(find build/ipa -name "*.ipa" | head -1)
+          echo "Uploading $IPA_PATH to TestFlight..."
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "${ASC_API_KEY_ID}" \
+            --apiIssuer "${ASC_API_KEY_ISSUER_ID}" \
+            --verbose
+
+      - name: Summary
+        run: |
+          echo "✅ Build uploaded to TestFlight"
+          echo "Check status at: https://appstoreconnect.apple.com/apps"
