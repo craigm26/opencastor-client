@@ -43,11 +43,18 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
-      # All Flutter Firebase plugins import <Firebase/Firebase.h> (non-modular umbrella)
-      # inside their framework module headers. DEFINES_MODULE=NO prevents Xcode from
-      # treating these pods as framework modules, eliminating the constraint entirely.
-      if target.name.start_with?('firebase_', 'cloud_', 'FirebaseCore', 'FirebaseMessaging',
-                                  'FirebaseAuth', 'FirebaseFirestore', 'FirebaseFunctions')
+      # Flutter Firebase plugin wrappers (ObjC) import <Firebase/Firebase.h> inside
+      # their framework module headers. DEFINES_MODULE=NO removes the module constraint.
+      # Use exact pod names — prefix matching would hit FirebaseAuthInterop etc.
+      flutter_firebase_pods = %w[
+        firebase_auth
+        firebase_core
+        firebase_messaging
+        cloud_firestore
+        cloud_functions
+        firebase_messaging_platform_interface
+      ]
+      if flutter_firebase_pods.include?(target.name)
         config.build_settings['DEFINES_MODULE'] = 'NO'
       end
       # Required for Firebase Messaging on iOS 14+
