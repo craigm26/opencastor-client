@@ -32,6 +32,7 @@ import '../../ui/core/widgets/health_indicator.dart';
 import '../../ui/chat/image_annotation_screen.dart';
 import '../../data/models/command.dart' hide CommandScope;
 import '../../data/models/slash_command.dart';
+import '../../data/services/github_release_service.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import '../widgets/thinking_indicator.dart';
@@ -64,10 +65,19 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   bool _showPalette = false;
   String _paletteQuery = '';
 
+  // Version update banner
+  String? _latestVersion;
+
   @override
   void initState() {
     super.initState();
     _ctrl.addListener(_onTextChanged);
+    _fetchLatestVersion();
+  }
+
+  Future<void> _fetchLatestVersion() async {
+    final v = await GitHubReleaseService.getLatestVersion();
+    if (mounted && v != null) setState(() => _latestVersion = v);
   }
 
   void _onTextChanged() {
@@ -758,9 +768,13 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
       ),
       body: Column(
         children: [
-          // ── Revocation/offline banners ─────────────────────────────────────
+          // ── Revocation/offline/update banners ─────────────────────────────
           _RevocationBanner(robot: robot),
           _OfflineBanner(robot: robot),
+          _UpdateBanner(
+            currentVersion: robot.opencastorVersion,
+            latestVersion: _latestVersion,
+          ),
 
           // ── Telemetry + condensed badge row ───────────────────────────────
           _TelemetryPanel(robot: robot),
@@ -913,6 +927,65 @@ class _OfflineBanner extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: AppTheme.warning),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Update banner ─────────────────────────────────────────────────────────────
+
+class _UpdateBanner extends StatelessWidget {
+  final String? currentVersion;
+  final String? latestVersion;
+
+  const _UpdateBanner({this.currentVersion, this.latestVersion});
+
+  @override
+  Widget build(BuildContext context) {
+    if (latestVersion == null) return const SizedBox.shrink();
+    final current = currentVersion;
+    if (current == null || current == 'unknown' || current == latestVersion) {
+      return const SizedBox.shrink();
+    }
+    const color = Color(0xFFE65100); // deep orange
+    return Material(
+      color: color.withOpacity(0.10),
+      child: InkWell(
+        onTap: () => launchUrl(
+          Uri.parse('https://github.com/craigm26/OpenCastor/releases/latest'),
+          mode: LaunchMode.externalApplication,
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+              border: Border(
+                  bottom: BorderSide(color: color.withOpacity(0.35)))),
+          child: Row(
+            children: [
+              Icon(Icons.system_update_alt_outlined, size: 15, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Update available: v$current → v$latestVersion',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color),
+                ),
+              ),
+              Text(
+                'View release notes',
+                style: TextStyle(
+                    fontSize: 12,
+                    decoration: TextDecoration.underline,
+                    color: color),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.open_in_new, size: 12, color: color),
+            ],
+          ),
         ),
       ),
     );
