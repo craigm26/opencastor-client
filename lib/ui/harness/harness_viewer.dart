@@ -307,31 +307,7 @@ class _HarnessViewerState extends State<HarnessViewer> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // Flow view (read-only) — toggled by the graph icon in the corner.
-    if (_showFlow) {
-      return Stack(
-        children: [
-          FlowCanvas(
-            layers: widget.config.layers,
-            graph: _flowGraph,
-            editable: false,
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: FloatingActionButton.small(
-              heroTag: 'viewer_flow_toggle',
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
-              foregroundColor: Theme.of(context).colorScheme.onSurface,
-              tooltip: 'List view',
-              onPressed: () => setState(() => _showFlow = false),
-              child: const Icon(Icons.list, size: 18),
-            ),
-          ),
-        ],
-      );
-    }
+    // Flow view removed — list view only (#24)
 
     // Build the ordered display groups:
     // [P66] → [Context] → [Skills group] → [Drift hook] → [Model] → [Trajectory]
@@ -395,21 +371,7 @@ class _HarnessViewerState extends State<HarnessViewer> {
             ],
           ),
         ),
-        // Flow-view toggle button (read-only explore / robot-detail)
-        Positioned(
-          top: 8,
-          right: 8,
-          child: FloatingActionButton.small(
-            heroTag: 'viewer_list_toggle',
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerHighest,
-            foregroundColor:
-                Theme.of(context).colorScheme.onSurface,
-            tooltip: 'Flow view',
-            onPressed: () => setState(() => _showFlow = true),
-            child: const Icon(Icons.account_tree_outlined, size: 18),
-          ),
-        ),
+        // Flow-view toggle removed per UX review (#24)
       ],
     );
   }
