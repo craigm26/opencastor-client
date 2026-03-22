@@ -266,6 +266,12 @@ class _FleetLeaderboardScreenState
                       ),
                   const SizedBox(height: 8),
                 ],
+                // Research Projects section (#32)
+                const SizedBox(height: 4),
+                const _ResearchProjectsHeader(),
+                const SizedBox(height: 8),
+                const _ResearchProjectsSection(),
+                const SizedBox(height: 24),
               ],
             ),
           );
@@ -710,6 +716,517 @@ class _CommunityBoardHeader extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Research Projects Section (#32) ──────────────────────────────────────────
+
+class _ResearchProjectsHeader extends StatelessWidget {
+  const _ResearchProjectsHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Row(
+        children: [
+          Icon(Icons.science_outlined, size: 16, color: cs.primary),
+          const SizedBox(width: 6),
+          Text(
+            'Research Projects',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: cs.primary,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            'Contribute compute · earn credits',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Static project definition — no network required for the list itself.
+class _Project {
+  final String id;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String description;
+  final bool featured;
+
+  const _Project({
+    required this.id,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.description,
+    this.featured = false,
+  });
+}
+
+const _kProjects = [
+  _Project(
+    id: 'harness_research',
+    icon: Icons.smart_toy_outlined,
+    iconColor: Color(0xFF55d7ed),
+    title: 'Harness Design Research',
+    description: 'Help train next-generation AI agent harness configs for robots',
+    featured: true,
+  ),
+  _Project(
+    id: 'climate_modeling',
+    icon: Icons.public_outlined,
+    iconColor: Color(0xFF4caf50),
+    title: 'Climate Modeling',
+    description: 'Distributed climate simulation — weather pattern prediction',
+  ),
+  _Project(
+    id: 'protein_folding',
+    icon: Icons.biotech_outlined,
+    iconColor: Color(0xFFab47bc),
+    title: 'Protein Folding & Science',
+    description: 'Protein structure prediction for drug discovery research',
+  ),
+];
+
+class _ResearchProjectsSection extends StatelessWidget {
+  const _ResearchProjectsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (final project in _kProjects) ...[
+          project.featured
+              ? _FeaturedProjectCard(project: project)
+              : _StandardProjectCard(project: project),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+/// Featured card for Harness Design Research — elevated, amber chip, champion info.
+class _FeaturedProjectCard extends StatefulWidget {
+  final _Project project;
+  const _FeaturedProjectCard({required this.project});
+
+  @override
+  State<_FeaturedProjectCard> createState() => _FeaturedProjectCardState();
+}
+
+class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
+  bool _contributing = true; // Bob is already contributing harness_research
+  bool _loading = false;
+  String? _errorMsg;
+
+  Future<void> _toggle() async {
+    setState(() {
+      _loading = true;
+      _errorMsg = null;
+    });
+    try {
+      final fn = FirebaseFunctions.instance.httpsCallable(
+        'activateCommunityProject',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 10)),
+      );
+      await fn.call(<String, dynamic>{
+        'project_id': widget.project.id,
+        'enabled': !_contributing,
+      });
+      if (mounted) setState(() => _contributing = !_contributing);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMsg = 'Could not update — try again');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    const amber = Color(0xFFffba38);
+    const cyan = Color(0xFF55d7ed);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: cyan.withValues(alpha: 0.18),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row — icon + title + FEATURED chip
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: cyan.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(widget.project.icon,
+                      color: widget.project.iconColor, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.project.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontFamily: 'Space Grotesk',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: amber.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'FEATURED',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: amber,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.project.description,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
+            // Champion info row
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.emoji_events_outlined,
+                      size: 14, color: amber),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Champion: ',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  Text(
+                    'lower_cost',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cyan,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '·  0.9101',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Robot avatar row
+            Row(
+              children: [
+                _RobotBadge(name: 'Bob', contributing: true),
+                const SizedBox(width: 6),
+                _RobotBadge(name: 'Alex', contributing: true),
+                const Spacer(),
+              ],
+            ),
+            // Error message (inline, not snackbar)
+            if (_errorMsg != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_outlined,
+                        size: 14, color: cs.onErrorContainer),
+                    const SizedBox(width: 6),
+                    Text(
+                      _errorMsg!,
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: cs.onErrorContainer),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            // CTA row
+            Row(
+              children: [
+                Expanded(
+                  child: _loading
+                      ? const Center(
+                          child: SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : FilledButton.icon(
+                          icon: Icon(
+                            _contributing
+                                ? Icons.check_circle_outline
+                                : Icons.volunteer_activism_outlined,
+                            size: 16,
+                          ),
+                          label: Text(
+                            _contributing ? 'Contributing ✓' : 'Contribute',
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _contributing
+                                ? const Color(0xFF4caf50).withValues(alpha: 0.85)
+                                : cs.primary,
+                            foregroundColor: Colors.white,
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: _toggle,
+                        ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.arrow_forward, size: 14),
+                  label: const Text('View'),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    side: BorderSide(color: cs.outline),
+                  ),
+                  onPressed: () {
+                    // TODO: navigate to harness research detail
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RobotBadge extends StatelessWidget {
+  final String name;
+  final bool contributing;
+  const _RobotBadge({required this.name, required this.contributing});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: contributing
+            ? const Color(0xFF4caf50).withValues(alpha: 0.12)
+            : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: contributing
+              ? const Color(0xFF4caf50).withValues(alpha: 0.4)
+              : cs.outline.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            contributing ? Icons.check_circle : Icons.circle_outlined,
+            size: 12,
+            color: contributing
+                ? const Color(0xFF4caf50)
+                : cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            name,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: contributing
+                  ? const Color(0xFF4caf50)
+                  : cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Standard project card for Climate Modeling, Protein Folding, etc.
+class _StandardProjectCard extends StatefulWidget {
+  final _Project project;
+  const _StandardProjectCard({required this.project});
+
+  @override
+  State<_StandardProjectCard> createState() => _StandardProjectCardState();
+}
+
+class _StandardProjectCardState extends State<_StandardProjectCard> {
+  bool _contributing = false;
+  bool _loading = false;
+  String? _errorMsg;
+
+  Future<void> _toggle() async {
+    setState(() {
+      _loading = true;
+      _errorMsg = null;
+    });
+    try {
+      final fn = FirebaseFunctions.instance.httpsCallable(
+        'activateCommunityProject',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 10)),
+      );
+      await fn.call(<String, dynamic>{
+        'project_id': widget.project.id,
+        'enabled': !_contributing,
+      });
+      if (mounted) setState(() => _contributing = !_contributing);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMsg = 'Could not activate — try again');
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: widget.project.iconColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Icon(widget.project.icon,
+                      color: widget.project.iconColor, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.project.title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontFamily: 'Space Grotesk',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        widget.project.description,
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_errorMsg != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _errorMsg!,
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: cs.error),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text(
+                  '0 robots',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                const Spacer(),
+                _loading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          side: BorderSide(
+                            color: _contributing
+                                ? const Color(0xFF4caf50)
+                                : cs.primary,
+                          ),
+                          foregroundColor: _contributing
+                              ? const Color(0xFF4caf50)
+                              : cs.primary,
+                        ),
+                        onPressed: _toggle,
+                        child: Text(
+                          _contributing ? 'Contributing ✓' : 'Contribute',
+                        ),
+                      ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
