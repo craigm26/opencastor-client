@@ -193,8 +193,10 @@ List<_Step> _stepsFor(ContributeMode mode) {
       ...shared,
       const _Step(
         icon: Icons.emoji_events_outlined,
-        label: 'Champion promoted',
-        detail: 'Nightly: best score wins. Champion config deploys to ALL robots fleet-wide',
+        label: 'Champion available',
+        detail:
+            'Nightly: best score wins. Champion config is stored as a pending update — '
+            'you choose when to apply it to each robot or the full fleet.',
         isHighlight: true,
       ),
     ];
@@ -332,8 +334,9 @@ class _PipelineSummary extends StatelessWidget {
 
     final icon = isCommunity ? Icons.public_outlined : Icons.lock_outlined;
     final text = isCommunity
-        ? 'Your robot is part of a global search for the best AI agent harness. '
-          'The winning config gets deployed to every robot in the fleet — including yours.'
+        ? 'Your robot searches for the best AI agent harness config. '
+          'When a new champion is found, it\'s stored as a pending update — '
+          'you apply it to individual robots or the full fleet on your own schedule.'
         : 'Your robot\'s research stays private. Scores improve your fleet\'s harness '
           'without contributing to the community leaderboard or earning credits.';
 
