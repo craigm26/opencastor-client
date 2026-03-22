@@ -45,7 +45,19 @@ jobs:
 
       # ── Generate launcher icons ───────────────────────────────────────────
       - name: Generate launcher icons
-        run: dart run flutter_launcher_icons
+        run: |
+          # Apple requires the 1024x1024 icon to have no alpha channel.
+          # Flatten it onto a white background using sips (built-in on macOS).
+          sips -s format png             --setProperty hasAlpha false             assets/images/icon-1024.png             --out /tmp/icon-1024-flat.png 2>/dev/null ||           python3 -c "
+from PIL import Image
+img = Image.open('assets/images/icon-1024.png').convert('RGBA')
+bg = Image.new('RGBA', img.size, (14, 20, 22, 255))
+bg.paste(img, mask=img.split()[3])
+bg.convert('RGB').save('/tmp/icon-1024-flat.png')
+print('Alpha stripped via Pillow')
+"
+          cp /tmp/icon-1024-flat.png assets/images/icon-1024.png
+          dart run flutter_launcher_icons
 
       # ── Firebase credentials ─────────────────────────────────────────────
       - name: Write Firebase credentials
