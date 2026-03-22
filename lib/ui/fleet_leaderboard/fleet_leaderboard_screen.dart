@@ -721,6 +721,34 @@ class _CommunityBoardHeader extends StatelessWidget {
   }
 }
 
+// ── Research status provider ──────────────────────────────────────────────────
+
+/// Fetches /api/research/status via robotApiGet to get explored %, champion.
+final _researchStatusProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  try {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return {};
+    final snap = await FirebaseFirestore.instance
+        .collection('robots')
+        .where('firebase_uid', isEqualTo: uid)
+        .limit(1)
+        .get();
+    if (snap.docs.isEmpty) return {};
+    final rrn = snap.docs.first.id;
+    final callable = FirebaseFunctions.instance.httpsCallable(
+      'robotApiGet',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 8)),
+    );
+    final result = await callable.call(<String, dynamic>{
+      'rrn': rrn,
+      'path': '/api/research/status',
+    });
+    final data = result.data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+  } catch (_) {}
+  return {};
+});
+
 // ── Research Projects Section (#32) ──────────────────────────────────────────
 
 class _ResearchProjectsHeader extends StatelessWidget {
@@ -782,39 +810,79 @@ const _kProjects = [
     icon: Icons.smart_toy_outlined,
     iconColor: Color(0xFF55d7ed),
     title: 'Harness Design Research',
-    description: 'Help train next-generation AI agent harness configs for robots',
+    description:
+        'Distributed search across ~263,424 AI agent harness configs — '
+        'finding the optimal design for robotics tasks.',
     featured: true,
-  ),
-  _Project(
-    id: 'climate_modeling',
-    icon: Icons.public_outlined,
-    iconColor: Color(0xFF4caf50),
-    title: 'Climate Modeling',
-    description: 'Distributed climate simulation — weather pattern prediction',
-  ),
-  _Project(
-    id: 'protein_folding',
-    icon: Icons.biotech_outlined,
-    iconColor: Color(0xFFab47bc),
-    title: 'Protein Folding & Science',
-    description: 'Protein structure prediction for drug discovery research',
   ),
 ];
 
-class _ResearchProjectsSection extends StatelessWidget {
+class _ResearchProjectsSection extends ConsumerWidget {
   const _ResearchProjectsSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(_researchStatusProvider);
+    final status = statusAsync.valueOrNull ?? {};
     return Column(
       children: [
         for (final project in _kProjects) ...[
           project.featured
-              ? _FeaturedProjectCard(project: project)
+              ? _FeaturedProjectCard(project: project, researchStatus: status)
               : _StandardProjectCard(project: project),
           const SizedBox(height: 8),
         ],
+        // Coming soon placeholder
+        _ComingSoonProjectsTile(),
+        const SizedBox(height: 8),
       ],
+    );
+  }
+}
+
+class _ComingSoonProjectsTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: cs.outlineVariant.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.more_horiz, size: 18, color: cs.onSurfaceVariant),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'More projects coming',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontFamily: 'Space Grotesk',
+                    ),
+                  ),
+                  Text(
+                    'Climate modeling + protein folding — BOINC integrations planned Q3 2026',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: cs.outline),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -822,7 +890,11 @@ class _ResearchProjectsSection extends StatelessWidget {
 /// Featured card for Harness Design Research — elevated, amber chip, champion info.
 class _FeaturedProjectCard extends StatefulWidget {
   final _Project project;
-  const _FeaturedProjectCard({required this.project});
+  final Map<String, dynamic> researchStatus;
+  const _FeaturedProjectCard({
+    required this.project,
+    this.researchStatus = const {},
+  });
 
   @override
   State<_FeaturedProjectCard> createState() => _FeaturedProjectCardState();
@@ -925,6 +997,9 @@ class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: cs.onSurfaceVariant),
             ),
+            const SizedBox(height: 10),
+            // Search space progress bar
+            _SearchProgressBar(status: widget.researchStatus),
             const SizedBox(height: 10),
             // Champion info row
             Container(
@@ -1044,6 +1119,80 @@ class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
         ),
       ),
     );
+  }
+}
+
+class _SearchProgressBar extends StatelessWidget {
+  final Map<String, dynamic> status;
+  const _SearchProgressBar({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    const cyan = Color(0xFF55d7ed);
+    const spaceSize = 263424;
+
+    // Parse from API status — graceful fallback
+    final totalEval = (status['total_runs'] as num?)?.toInt() ?? 0;
+    final explored = totalEval;
+    final pct = explored / spaceSize;
+    final pctLabel = explored > 0
+        ? '${(pct * 100).toStringAsFixed(2)}%'
+        : '< 0.01%';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Search space explored',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const Spacer(),
+              Text(
+                '${explored > 0 ? explored.toString() : "—"} / ${_fmt(spaceSize)}  $pctLabel',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cyan,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: pct.clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: cs.surfaceContainerLowest,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                cyan.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(int n) {
+    // Simple thousands separator
+    final s = n.toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 }
 
