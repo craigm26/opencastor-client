@@ -36,14 +36,11 @@ jobs:
       # ── Generate iOS project files if missing ────────────────────────────
       - name: Generate iOS Xcode project
         run: |
-          # flutter create regenerates ios/ project files without touching Dart code
           flutter create --project-name opencastor_client \
             --org com.craigm26 \
             --platforms ios \
             . || true
-          # Verify project.pbxproj was created
           ls ios/Runner.xcodeproj/project.pbxproj
-          # Re-run pub get so Generated.xcconfig reflects the CI Flutter root
           flutter pub get
 
       # ── Firebase credentials ─────────────────────────────────────────────
@@ -51,6 +48,7 @@ jobs:
         env:
           FIREBASE_OPTIONS_DART: ${{ secrets.FIREBASE_OPTIONS_DART }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          GOOGLE_SERVICE_INFO_PLIST: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}
         run: |
           if [ -n "$FIREBASE_OPTIONS_DART" ]; then
             echo "$FIREBASE_OPTIONS_DART" > lib/firebase_options.dart
@@ -58,7 +56,6 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           fi
-          # Write GoogleService-Info.plist for iOS
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             echo "$GOOGLE_SERVICE_INFO_PLIST" > ios/Runner/GoogleService-Info.plist
           fi
@@ -70,11 +67,9 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           BUILD=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f2)
           echo "VERSION=$VERSION BUILD=$BUILD"
-          # Set bundle ID
           /usr/libexec/PlistBuddy -c \
             "Set :CFBundleIdentifier com.craigm26.opencastorClient" \
             ios/Runner/Info.plist
-          # Set version
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" ios/Runner/Info.plist
 
@@ -93,16 +88,10 @@ jobs:
           DIST_CERT_P12: ${{ secrets.DIST_CERT_P12 }}
           DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
         run: |
-          if [ -z "$DIST_CERT_P12" ]; then
-            echo "⚠️  DIST_CERT_P12 not set — signing will use cloud signing only"
-            exit 0
-          fi
-          # Create a temporary keychain
           security create-keychain -p "build" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "build" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
-          # Import the P12
           echo "$DIST_CERT_P12" | base64 --decode > /tmp/dist.p12
           security import /tmp/dist.p12 -k build.keychain \
             -P "$DIST_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/xcodebuild
@@ -110,29 +99,35 @@ jobs:
           rm /tmp/dist.p12
           echo "✅ Distribution certificate imported"
 
-      # ── Code signing (automatic with API key) ───────────────────────────
-      - name: Configure automatic code signing
+      # ── Install provisioning profile ─────────────────────────────────────
+      - name: Install provisioning profile
+        env:
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+          # Extract UUID from profile
+          UUID=$(security cms -D -i /tmp/profile.mobileprovision 2>/dev/null \
+            | plutil -extract UUID xml1 -o - - \
+            | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p')
+          echo "Profile UUID: $UUID"
+          cp /tmp/profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/${UUID}.mobileprovision
+          rm /tmp/profile.mobileprovision
+          echo "PROFILE_UUID=$UUID" >> $GITHUB_ENV
+          echo "✅ Provisioning profile installed: $UUID"
+
+      # ── Configure manual signing ─────────────────────────────────────────
+      - name: Configure manual code signing
         env:
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
         run: |
-          # Update Xcode project to use automatic signing with our team
           cd ios
-          # Use xcodebuild to set team ID
           sed -i '' \
             "s/DEVELOPMENT_TEAM = .*/DEVELOPMENT_TEAM = $APPLE_DEVELOPER_TEAM_ID;/g" \
             Runner.xcodeproj/project.pbxproj || true
-          # Set automatic signing
           sed -i '' \
-            "s/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Automatic;/g" \
+            "s/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Manual;/g" \
             Runner.xcodeproj/project.pbxproj || true
-
-      # ── Patch firebase_messaging header ─────────────────────────────────
-      # FLTFirebaseMessagingPlugin.h imports <Firebase/Firebase.h> (non-modular
-      # umbrella header) inside a framework module. Patch it to use specific
-      # module imports before CocoaPods processes the file.
-      # No source patching needed — DEFINES_MODULE=NO in Podfile handles this
 
       # ── Install CocoaPods dependencies ───────────────────────────────────
       - name: Install CocoaPods
@@ -142,19 +137,15 @@ jobs:
 
       # ── Flutter build iOS ────────────────────────────────────────────────
       - name: Flutter build iOS (release)
-        env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
         run: |
           flutter build ios --release --no-codesign
 
       # ── Xcode archive ────────────────────────────────────────────────────
       - name: Xcode archive
         env:
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
         run: |
           xcodebuild archive \
             -workspace ios/Runner.xcworkspace \
@@ -162,21 +153,19 @@ jobs:
             -sdk iphoneos \
             -configuration Release \
             -archivePath build/Runner.xcarchive \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8 \
-            -authenticationKeyID "${ASC_API_KEY_ID}" \
-            -authenticationKeyIssuerID "${ASC_API_KEY_ISSUER_ID}" \
             DEVELOPMENT_TEAM="${APPLE_DEVELOPER_TEAM_ID}" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="${PROFILE_UUID}" \
             | xcpretty || true
           ls build/Runner.xcarchive
 
       # ── Export IPA ───────────────────────────────────────────────────────
       - name: Export IPA
         env:
+          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
           ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
-          APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
         run: |
           cat > /tmp/ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -188,7 +177,14 @@ jobs:
             <key>teamID</key>
             <string>${APPLE_DEVELOPER_TEAM_ID}</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.craigm26.opencastorClient</key>
+              <string>${PROFILE_UUID}</string>
+            </dict>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>uploadSymbols</key>
             <true/>
             <key>uploadBitcode</key>
@@ -201,7 +197,6 @@ jobs:
             -archivePath build/Runner.xcarchive \
             -exportOptionsPlist /tmp/ExportOptions.plist \
             -exportPath build/ipa \
-            -allowProvisioningUpdates \
             -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8 \
             -authenticationKeyID "${ASC_API_KEY_ID}" \
             -authenticationKeyIssuerID "${ASC_API_KEY_ISSUER_ID}" \
@@ -215,6 +210,11 @@ jobs:
           ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
         run: |
           IPA_PATH=$(find build/ipa -name "*.ipa" | head -1)
+          if [ -z "$IPA_PATH" ]; then
+            echo "❌ No IPA found in build/ipa/"
+            ls -la build/ipa/ || true
+            exit 1
+          fi
           echo "Uploading $IPA_PATH to TestFlight..."
           xcrun altool --upload-app \
             --type ios \
