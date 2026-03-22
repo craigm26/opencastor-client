@@ -46,13 +46,10 @@ jobs:
       # ── Generate launcher icons ───────────────────────────────────────────
       - name: Generate launcher icons
         run: |
-          # Apple requires the 1024x1024 icon to have no alpha channel (no transparency).
-          # sips is built into macOS — flatten onto obsidian #0e1416 background.
-          sips assets/images/icon-1024.png \
-            -s format png \
-            --setProperty hasAlpha false \
-            --out assets/images/icon-1024.png \
-            2>/dev/null || true
+          # Apple rejects icons with alpha. JPEG round-trip strips alpha (JPEG has no alpha).
+          sips -s format jpeg assets/images/icon-1024.png --out /tmp/icon-flat.jpg
+          sips -s format png  /tmp/icon-flat.jpg --out assets/images/icon-1024.png
+          # pubspec also sets remove_alpha_ios: true as belt-and-suspenders.
           dart run flutter_launcher_icons
 
       # ── Firebase credentials ─────────────────────────────────────────────
