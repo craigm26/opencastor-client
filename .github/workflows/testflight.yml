@@ -33,6 +33,10 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      # ── Generate launcher icons ───────────────────────────────────────────
+      - name: Generate launcher icons
+        run: dart run flutter_launcher_icons
+
       # ── Generate iOS project files if missing ────────────────────────────
       - name: Generate iOS Xcode project
         run: |
