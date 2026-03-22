@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'personal_research_card.dart';
+import '../shared/pipeline_explainer.dart';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -997,6 +998,9 @@ class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: cs.onSurfaceVariant),
             ),
+            const SizedBox(height: 10),
+            // Pipeline explainer — community mode (this is the community card)
+            const PipelineExplainer(mode: ContributeMode.community),
             const SizedBox(height: 10),
             // Search space progress bar
             _SearchProgressBar(status: widget.researchStatus),

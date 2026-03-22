@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../fleet_contribute/credits_card.dart';
+import '../shared/pipeline_explainer.dart';
 
 /// Aggregate fleet contribution stats.
 class _FleetContributeStats {
@@ -159,6 +160,9 @@ class FleetContributeScreen extends ConsumerWidget {
             child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              // Pipeline explainer — always at top
+              const PipelineExplainer(mode: ContributeMode.community),
+              const SizedBox(height: 16),
               // Credits card
               const CreditsCard(),
               const SizedBox(height: 16),
