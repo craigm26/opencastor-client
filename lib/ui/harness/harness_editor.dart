@@ -622,12 +622,60 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
               onGraphChanged: (g) => setState(() => _flowGraph = g),
               onNodeTap: _openEditSheet,
             )
-          : HarnessViewer(
-              config: _config,
-              onEditLayer: _openEditSheet,
-              onToggleLayer: _toggleLayerEnabled,
-              onReorderSkills: _reorderSkills,
-              onAddSkill: _showSkillBrowser,
+          : ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              children: [
+                // ── Community inspiration panel ──────────────────────
+                _CommunityInspirationPanel(
+                  onApplyPreset: (id, name) async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: const Color(0xFF131c1f),
+                        title: Text('Use "$name" as starting point?'),
+                        content: Text(
+                          'This will replace your current harness config '
+                          'with the "$name" community preset. '
+                          'You can continue editing after applying.',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 13),
+                        ),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel')),
+                          FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Apply')),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (_) =>
+                              ConfigLibraryView(robotId: widget.rrn),
+                        ),
+                      );
+                    }
+                  },
+                  onOpenLibrary: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => ConfigLibraryView(robotId: widget.rrn),
+                    ),
+                  ),
+                ),
+                // ── Harness pipeline layers ─────────────────────────
+                HarnessViewer(
+                  config: _config,
+                  onEditLayer: _openEditSheet,
+                  onToggleLayer: _toggleLayerEnabled,
+                  onReorderSkills: _reorderSkills,
+                  onAddSkill: _showSkillBrowser,
+                ),
+              ],
             ),
     );
   }
@@ -1297,6 +1345,22 @@ class _ModelEditorState extends State<_ModelEditor> {
           onChanged: (v) =>
               widget.onUpdate('confidence_threshold', v),
         ),
+        const _CommunityHint(
+          fieldName: 'model',
+          hints: {
+            'Champion': 'gemini-2.5-flash',
+            'Local Only': 'gemma3:1b (ollama)',
+            'Industrial': 'gemini-2.5-flash',
+            'Home': 'gemma3:1b (local)',
+            'Quality First': 'claude-sonnet-4-6',
+          },
+        ),
+        const Text(
+          '💡 Local models (gemma3:1b) win on home tasks where '
+          'latency < 0.5s matters more than raw intelligence. '
+          'Cloud models dominate industrial and general reasoning.',
+          style: TextStyle(fontSize: 11, color: Colors.white38, height: 1.5),
+        ),
       ],
     );
   }
@@ -1359,6 +1423,21 @@ class _DriftEditor extends StatelessWidget {
           style: TextStyle(
               fontSize: 11,
               color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 4),
+        const _CommunityHint(
+          fieldName: 'drift_detection',
+          hints: {
+            'Champion': 'true',
+            'Local Only': 'true',
+            'Industrial': 'true',
+            'Home': 'true',
+          },
+        ),
+        const Text(
+          '💡 All community presets enable drift detection — '
+          'it catches model degradation in long sessions at near-zero cost.',
+          style: TextStyle(fontSize: 11, color: Colors.white38, height: 1.5),
         ),
       ],
     );
@@ -2183,6 +2262,485 @@ class _SkillCard extends StatelessWidget {
                   ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Community Inspiration Panel ───────────────────────────────────────────────
+//
+// Shown inside the HarnessViewer list view (above the layer list) so users
+// see shared harness patterns while editing their own pipeline.
+// Tapping a preset shows how it configures each dimension, or opens the
+// full Config Library to apply it as a starting point.
+
+class _CommunityInspirationPanel extends StatefulWidget {
+  const _CommunityInspirationPanel({
+    required this.onApplyPreset,
+    required this.onOpenLibrary,
+  });
+
+  final void Function(String presetId, String presetName) onApplyPreset;
+  final VoidCallback onOpenLibrary;
+
+  @override
+  State<_CommunityInspirationPanel> createState() =>
+      _CommunityInspirationPanelState();
+}
+
+class _CommunityInspirationPanelState
+    extends State<_CommunityInspirationPanel> {
+  bool _expanded = false;
+  int _selected = 0;
+
+  static const _presets = [
+    _PresetSnippet(
+      id: 'lower_cost',
+      name: 'Lower Cost',
+      emoji: '⚖️',
+      tagline: 'Champion · all hardware',
+      scoreLabel: '0.6541',
+      scoreColor: Color(0xFFffba38),
+      params: {
+        'thinking_budget': '1024',
+        'context_budget': '8192',
+        'max_iterations': '6',
+        'cost_gate_usd': '0.01',
+        'drift_detection': 'true',
+        'retry_on_error': 'true',
+      },
+      skillOrder: ['p66-consent', 'context-builder', 'model-router', 'skill-executor', 'error-handler'],
+      bestFor: 'General · Home · Industrial',
+      why: 'Winning config across all tiers. Strict cost gate prevents runaway API spend on Pi-class hardware.',
+    ),
+    _PresetSnippet(
+      id: 'local_only',
+      name: 'Local Only',
+      emoji: '🔒',
+      tagline: 'Fully offline · no API key',
+      scoreLabel: '0.8103',
+      scoreColor: Color(0xFF4ade80),
+      params: {
+        'thinking_budget': '512',
+        'context_budget': '4096',
+        'force_local': 'true',
+        'local_model': 'gemma3:1b',
+        'cost_gate_usd': '0.00',
+        'drift_detection': 'true',
+      },
+      skillOrder: ['p66-consent', 'local-model-router', 'skill-executor'],
+      bestFor: 'Home',
+      why: 'Removes the cloud model-router layer entirely. '
+          'Sub-second latency for grip calls and appliance control.',
+    ),
+    _PresetSnippet(
+      id: 'industrial_optimized',
+      name: 'Industrial',
+      emoji: '🏭',
+      tagline: '+12% industrial median',
+      scoreLabel: '0.8812',
+      scoreColor: Color(0xFF4ade80),
+      params: {
+        'thinking_budget': '2048',
+        'context_budget': '16384',
+        'max_iterations': '8',
+        'retry_on_error': 'true',
+        'drift_detection': 'true',
+        'cost_gate_usd': '0.10',
+      },
+      skillOrder: ['p66-consent', 'context-builder', 'model-router', 'alert-hook', 'skill-executor', 'error-handler', 'retry-hook'],
+      bestFor: 'Industrial',
+      why: 'retry_on_error is the single biggest lever for industrial tasks. '
+          'alert-hook and retry-hook added after model-router.',
+    ),
+    _PresetSnippet(
+      id: 'home_optimized',
+      name: 'Home',
+      emoji: '🏠',
+      tagline: 'Low-latency · strict P66',
+      scoreLabel: '0.8644',
+      scoreColor: Color(0xFF4ade80),
+      params: {
+        'thinking_budget': '512',
+        'context_budget': '4096',
+        'max_iterations': '4',
+        'retry_on_error': 'false',
+        'local_model': 'gemma3:1b',
+        'cost_gate_usd': '0.02',
+      },
+      skillOrder: ['p66-consent', 'local-model-router', 'grip-hook', 'skill-executor'],
+      bestFor: 'Home',
+      why: 'Grip-hook placed immediately after model router so P66 consent '
+          'and grip calls happen in the same pass — minimises latency.',
+    ),
+    _PresetSnippet(
+      id: 'quality_first',
+      name: 'Quality First',
+      emoji: '☁️',
+      tagline: 'Server / cloud · max score',
+      scoreLabel: '0.9801',
+      scoreColor: Color(0xFF55d7ed),
+      params: {
+        'thinking_budget': '4096',
+        'context_budget': '32768',
+        'max_iterations': '8',
+        'retry_on_error': 'true',
+        'drift_detection': 'true',
+        'cost_gate_usd': '1.00',
+      },
+      skillOrder: ['p66-consent', 'context-builder', 'model-router', 'skill-executor', 'error-handler', 'retry-hook', 'audit-logger'],
+      bestFor: 'Industrial · General',
+      why: 'Full layer stack with audit-logger at the end. '
+          'No cost constraints — prioritises OHB-1 score over spend.',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final preset = _presets[_selected];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(0, 0, 0, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131c1f),
+        border: Border.all(color: const Color(0xFF55d7ed).withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header (always visible) ───────────────────────────────
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  const Text('💡', style: TextStyle(fontSize: 16)),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Inspired by shared harnesses',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: Color(0xFF55d7ed)),
+                        ),
+                        Text(
+                          'See how community configs order skills and set parameters',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white38),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.white38,
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          if (_expanded) ...[
+            const Divider(height: 1, color: Color(0xFF1a2527)),
+
+            // ── Preset selector tabs ───────────────────────────────
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              child: Row(
+                children: List.generate(_presets.length, (i) {
+                  final p = _presets[i];
+                  final active = i == _selected;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selected = i),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? const Color(0xFF55d7ed).withValues(alpha: 0.12)
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: active
+                              ? const Color(0xFF55d7ed).withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.1),
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(p.emoji,
+                              style: const TextStyle(fontSize: 13)),
+                          const SizedBox(width: 5),
+                          Text(p.name,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: active
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: active
+                                      ? const Color(0xFF55d7ed)
+                                      : Colors.white70)),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+            // ── Selected preset detail ─────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Text(preset.tagline,
+                              style: const TextStyle(
+                                  fontSize: 11, color: Colors.white38)),
+                          const SizedBox(width: 8),
+                          Text(preset.scoreLabel,
+                              style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: preset.scoreColor)),
+                          const Text(' OHB-1',
+                              style: TextStyle(
+                                  fontSize: 10, color: Colors.white38)),
+                        ]),
+                        const SizedBox(height: 6),
+                        // Skill order
+                        const Text('Skill order:',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white38,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: List.generate(
+                              preset.skillOrder.length,
+                              (i) => Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1a2527),
+                                      borderRadius:
+                                          BorderRadius.circular(6),
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.1)),
+                                    ),
+                                    child: Text(
+                                      preset.skillOrder[i],
+                                      style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 10,
+                                          color: Color(0xFF55d7ed)),
+                                    ),
+                                  ),
+                                  if (i < preset.skillOrder.length - 1)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 4),
+                                      child: Text('→',
+                                          style: TextStyle(
+                                              color: Colors.white24,
+                                              fontSize: 11)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Key params
+                  SizedBox(
+                    width: 160,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: preset.params.entries
+                          .map((e) => Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 3),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                        child: Text(e.key,
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.white38,
+                                                fontFamily: 'monospace'))),
+                                    Text(e.value,
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            color: preset.scoreColor,
+                                            fontFamily: 'monospace',
+                                            fontWeight:
+                                                FontWeight.w600)),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Why it works ──────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0e1416),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '💡 ${preset.why}',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white60,
+                      height: 1.5),
+                ),
+              ),
+            ),
+
+            // ── Action row ────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () =>
+                          widget.onApplyPreset(preset.id, preset.name),
+                      style: FilledButton.styleFrom(
+                        backgroundColor:
+                            const Color(0xFF55d7ed).withValues(alpha: 0.15),
+                        foregroundColor: const Color(0xFF55d7ed),
+                        side: const BorderSide(
+                            color: Color(0xFF55d7ed), width: 1),
+                      ),
+                      child: Text('Use "${preset.name}" as starting point'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: widget.onOpenLibrary,
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.15)),
+                      foregroundColor: Colors.white54,
+                    ),
+                    child: const Text('All configs'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetSnippet {
+  const _PresetSnippet({
+    required this.id,
+    required this.name,
+    required this.emoji,
+    required this.tagline,
+    required this.scoreLabel,
+    required this.scoreColor,
+    required this.params,
+    required this.skillOrder,
+    required this.bestFor,
+    required this.why,
+  });
+  final String id;
+  final String name;
+  final String emoji;
+  final String tagline;
+  final String scoreLabel;
+  final Color scoreColor;
+  final Map<String, String> params;
+  final List<String> skillOrder;
+  final String bestFor;
+  final String why;
+}
+
+// ── Community hint chip ───────────────────────────────────────────────────────
+// Shown inline next to config fields to surface what community presets use.
+
+class _CommunityHint extends StatelessWidget {
+  const _CommunityHint({required this.fieldName, required this.hints});
+
+  final String fieldName;
+  // e.g. {'Champion': '1024', 'Industrial': '2048', 'Home': '512'}
+  final Map<String, String> hints;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Community: ',
+              style: TextStyle(fontSize: 10, color: Colors.white30)),
+          Expanded(
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: hints.entries
+                  .map((e) => Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF55d7ed).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                              color: const Color(0xFF55d7ed)
+                                  .withValues(alpha: 0.25)),
+                        ),
+                        child: Text(
+                          '${e.key}: ${e.value}',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              color: Color(0xFF55d7ed),
+                              fontFamily: 'monospace'),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
