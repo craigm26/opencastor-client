@@ -12,6 +12,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'config_library_view.dart';
 
 import '../../data/models/command.dart' show CommandScope;
 import '../../data/models/harness_config.dart';
@@ -556,6 +557,18 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
           style: const TextStyle(fontFamily: 'Space Grotesk'),
         ),
         actions: [
+          // Config Library — browse community presets
+          IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            tooltip: 'Config Library',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ConfigLibraryView(robotId: widget.rrn),
+              ),
+            ),
+          ),
           // Flow / list view toggle
           IconButton(
             icon: Icon(
