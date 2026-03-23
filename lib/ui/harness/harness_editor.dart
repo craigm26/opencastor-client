@@ -48,16 +48,110 @@ class HarnessEditorScreen extends ConsumerStatefulWidget {
 
 class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   late HarnessConfig _config;
+  // The deployed baseline — used to compute diffs and enable restore
+  late HarnessConfig _deployedConfig;
   bool _saving = false;
   bool _deploying = false;
   bool _showFlow = false;
+  // Experiment Mode: changes are sandboxed; no auto-deploy prompt suppressed
+  bool _experimentMode = false;
   FlowGraph _flowGraph = FlowGraph.empty();
 
   @override
   void initState() {
     super.initState();
     _config = widget.initialConfig;
+    _deployedConfig = widget.initialConfig;
     _syncGraph();
+  }
+
+  /// True when current config differs from the deployed baseline.
+  bool get _hasUndeployedChanges =>
+      _config.layers.length != _deployedConfig.layers.length ||
+      _config.layers.asMap().entries.any((e) {
+        final dep = _deployedConfig.layers.length > e.key
+            ? _deployedConfig.layers[e.key]
+            : null;
+        if (dep == null) return true;
+        return e.value.id != dep.id ||
+            e.value.enabled != dep.enabled ||
+            e.value.config.toString() != dep.config.toString();
+      });
+
+  /// Compute a human-readable diff summary for the diff bar.
+  List<String> get _changeSummary {
+    final changes = <String>[];
+    final curr = {for (final l in _config.layers) l.id: l};
+    final dep = {for (final l in _deployedConfig.layers) l.id: l};
+
+    // Added layers
+    for (final id in curr.keys) {
+      if (!dep.containsKey(id)) changes.add('+ ${curr[id]!.label}');
+    }
+    // Removed layers
+    for (final id in dep.keys) {
+      if (!curr.containsKey(id)) changes.add('− ${dep[id]!.label}');
+    }
+    // Modified layers (config or enabled changed)
+    for (final id in curr.keys) {
+      if (!dep.containsKey(id)) continue;
+      final c = curr[id]!;
+      final d = dep[id]!;
+      if (c.enabled != d.enabled) {
+        changes.add('${c.enabled ? '✓' : '✗'} ${c.label}');
+      } else if (c.config.toString() != d.config.toString()) {
+        changes.add('~ ${c.label}');
+      }
+    }
+    return changes;
+  }
+
+  /// Apply a single config dimension from a research finding.
+  void _applyFinding(String configDim, dynamic value) {
+    // Find layers whose config map contains this dimension key
+    final updated = _config.layers.map((layer) {
+      if (layer.config.containsKey(configDim)) {
+        final newConfig = Map<String, dynamic>.from(layer.config)
+          ..[configDim] = value;
+        return layer.copyWith(config: newConfig);
+      }
+      return layer;
+    }).toList();
+
+    setState(() {
+      _config = _config.copyWithLayers(updated);
+      _syncGraph();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Applied: $configDim = $value'),
+        backgroundColor: const Color(0xFF1a2527),
+        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'Undo',
+          textColor: const Color(0xFFffba38),
+          onPressed: () => setState(() {
+            _config = _deployedConfig;
+            _syncGraph();
+          }),
+        ),
+      ),
+    );
+  }
+
+  /// Restore to the last deployed config.
+  void _restoreToDeployed() {
+    setState(() {
+      _config = _deployedConfig;
+      _syncGraph();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Restored to deployed config'),
+        backgroundColor: Color(0xFF1a2527),
+      ),
+    );
   }
 
   /// Rebuild the flow graph from the current config layers.
@@ -495,6 +589,8 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       );
 
       if (mounted) {
+        // Update deployed baseline so diff bar resets
+        setState(() => _deployedConfig = _config);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Harness deployed to ${widget.robotName}'),
@@ -552,11 +648,54 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Edit Harness — ${widget.robotName}',
-          style: const TextStyle(fontFamily: 'Space Grotesk'),
+        backgroundColor: _experimentMode
+            ? const Color(0xFF1a1400)
+            : null,
+        title: Row(
+          children: [
+            Text(
+              'Edit Harness — ${widget.robotName}',
+              style: const TextStyle(fontFamily: 'Space Grotesk'),
+            ),
+            if (_experimentMode) ...[
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFffba38).withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                      color: const Color(0xFFffba38).withValues(alpha: 0.5)),
+                ),
+                child: const Text(
+                  '⚗ EXPERIMENT',
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFFffba38),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8),
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
+          // Experiment Mode toggle
+          Tooltip(
+            message: _experimentMode
+                ? 'Exit experiment mode'
+                : 'Experiment mode — try changes freely, restore anytime',
+            child: IconButton(
+              icon: Icon(
+                Icons.science_outlined,
+                color: _experimentMode
+                    ? const Color(0xFFffba38)
+                    : null,
+              ),
+              onPressed: () =>
+                  setState(() => _experimentMode = !_experimentMode),
+            ),
+          ),
           // Config Library — browse community presets
           IconButton(
             icon: const Icon(Icons.library_books_outlined),
@@ -614,15 +753,93 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
         tooltip: 'Add block',
         child: const Icon(Icons.add),
       ),
-      body: _showFlow
-          ? FlowCanvas(
-              layers: _config.layers,
-              graph: _flowGraph,
-              editable: true,
-              onGraphChanged: (g) => setState(() => _flowGraph = g),
-              onNodeTap: _openEditSheet,
-            )
-          : ListView(
+      body: Column(
+          children: [
+            // ── Experiment mode banner ───────────────────────────────
+            if (_experimentMode)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: const Color(0xFF1a1400),
+                child: Row(
+                  children: [
+                    const Text('⚗',
+                        style: TextStyle(fontSize: 15)),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Experiment mode — changes are not deployed. '
+                        'Try anything freely.',
+                        style: TextStyle(
+                            color: Color(0xFFffba38),
+                            fontSize: 12,
+                            height: 1.4),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _restoreToDeployed,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFffba38),
+                        textStyle: const TextStyle(fontSize: 11),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text('Restore deployed'),
+                    ),
+                  ],
+                ),
+              ),
+
+            // ── Diff bar (changes vs deployed) ───────────────────────
+            if (_hasUndeployedChanges && !_experimentMode)
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                color: const Color(0xFF0e1a10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_outlined,
+                        size: 14, color: Color(0xFF4ade80)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _changeSummary.take(3).join('  ·  ') +
+                            (_changeSummary.length > 3
+                                ? '  · +${_changeSummary.length - 3} more'
+                                : ''),
+                        style: const TextStyle(
+                            color: Color(0xFF4ade80),
+                            fontSize: 11,
+                            fontFamily: 'monospace'),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _restoreToDeployed,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white38,
+                        textStyle: const TextStyle(fontSize: 11),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child: const Text('Restore'),
+                    ),
+                  ],
+                ),
+              ),
+
+            // ── Main editor body ─────────────────────────────────────
+            Expanded(
+              child: _showFlow
+                  ? FlowCanvas(
+                      layers: _config.layers,
+                      graph: _flowGraph,
+                      editable: true,
+                      onGraphChanged: (g) =>
+                          setState(() => _flowGraph = g),
+                      onNodeTap: _openEditSheet,
+                    )
+                  : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
                 // ── Community inspiration panel ──────────────────────
@@ -666,6 +883,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                       builder: (_) => ConfigLibraryView(robotId: widget.rrn),
                     ),
                   ),
+                  onApplyDimension: _applyFinding,
                 ),
                 // ── Harness pipeline layers ─────────────────────────
                 HarnessViewer(
@@ -677,6 +895,9 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 ),
               ],
             ),
+            ),  // Expanded
+          ],    // Column children
+        ),      // Column (body)
     );
   }
 }
@@ -1345,14 +1566,19 @@ class _ModelEditorState extends State<_ModelEditor> {
           onChanged: (v) =>
               widget.onUpdate('confidence_threshold', v),
         ),
-        const _CommunityHint(
-          fieldName: 'model',
-          hints: {
+        _CommunityHint(
+          fieldName: 'fast_model',
+          hints: const {
             'Champion': 'gemini-2.5-flash',
             'Local Only': 'gemma3:1b (ollama)',
             'Industrial': 'gemini-2.5-flash',
             'Home': 'gemma3:1b (local)',
             'Quality First': 'claude-sonnet-4-6',
+          },
+          onApplyValue: (dim, val) {
+            // Strip annotation like " (ollama)" before applying
+            final clean = val.contains(' ') ? val.split(' ').first : val;
+            onUpdate('fast_model', clean);
           },
         ),
         const Text(
@@ -1425,14 +1651,16 @@ class _DriftEditor extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 4),
-        const _CommunityHint(
+        _CommunityHint(
           fieldName: 'drift_detection',
-          hints: {
+          hints: const {
             'Champion': 'true',
             'Local Only': 'true',
             'Industrial': 'true',
             'Home': 'true',
           },
+          onApplyValue: (dim, val) =>
+              onUpdate('drift_detection', val == 'true'),
         ),
         const Text(
           '💡 All community presets enable drift detection — '
@@ -2278,10 +2506,13 @@ class _CommunityInspirationPanel extends StatefulWidget {
   const _CommunityInspirationPanel({
     required this.onApplyPreset,
     required this.onOpenLibrary,
+    this.onApplyDimension,
   });
 
   final void Function(String presetId, String presetName) onApplyPreset;
   final VoidCallback onOpenLibrary;
+  /// Called when the user taps "Try →" on a param chip inside the panel.
+  final void Function(String configDim, dynamic value)? onApplyDimension;
 
   @override
   State<_CommunityInspirationPanel> createState() =>
@@ -2584,25 +2815,54 @@ class _CommunityInspirationPanelState
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: preset.params.entries
-                          .map((e) => Padding(
-                                padding:
-                                    const EdgeInsets.only(bottom: 3),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                        child: Text(e.key,
-                                            style: const TextStyle(
-                                                fontSize: 10,
-                                                color: Colors.white38,
-                                                fontFamily: 'monospace'))),
-                                    Text(e.value,
-                                        style: TextStyle(
-                                            fontSize: 10,
-                                            color: preset.scoreColor,
-                                            fontFamily: 'monospace',
-                                            fontWeight:
-                                                FontWeight.w600)),
-                                  ],
+                          .map((e) => GestureDetector(
+                                onTap: widget.onApplyDimension != null
+                                    ? () {
+                                        // Parse value: booleans, numbers, strings
+                                        dynamic parsed = e.value;
+                                        if (e.value == 'true') {
+                                          parsed = true;
+                                        } else if (e.value == 'false') {
+                                          parsed = false;
+                                        } else {
+                                          final n = num.tryParse(e.value);
+                                          if (n != null) parsed = n;
+                                        }
+                                        widget.onApplyDimension!(
+                                            e.key, parsed);
+                                      }
+                                    : null,
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.only(bottom: 3),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                          child: Text(e.key,
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.white38,
+                                                  fontFamily:
+                                                      'monospace'))),
+                                      Text(e.value,
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: preset.scoreColor,
+                                              fontFamily: 'monospace',
+                                              fontWeight:
+                                                  FontWeight.w600)),
+                                      if (widget.onApplyDimension !=
+                                          null) ...[
+                                        const SizedBox(width: 4),
+                                        const Text(
+                                          '↑',
+                                          style: TextStyle(
+                                              fontSize: 9,
+                                              color: Color(0xFFffba38)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ))
                           .toList(),
@@ -2699,47 +2959,88 @@ class _PresetSnippet {
 // Shown inline next to config fields to surface what community presets use.
 
 class _CommunityHint extends StatelessWidget {
-  const _CommunityHint({required this.fieldName, required this.hints});
+  const _CommunityHint({
+    required this.fieldName,
+    required this.hints,
+    this.onApplyValue,
+  });
 
   final String fieldName;
   // e.g. {'Champion': '1024', 'Industrial': '2048', 'Home': '512'}
   final Map<String, String> hints;
+  // Optional callback: when provided, each chip gets a "Try →" tap target.
+  // Called with the raw string value from the hint.
+  final void Function(String configDim, String value)? onApplyValue;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Community: ',
-              style: TextStyle(fontSize: 10, color: Colors.white30)),
-          Expanded(
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              children: hints.entries
-                  .map((e) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF55d7ed).withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(99),
-                          border: Border.all(
-                              color: const Color(0xFF55d7ed)
-                                  .withValues(alpha: 0.25)),
-                        ),
-                        child: Text(
-                          '${e.key}: ${e.value}',
-                          style: const TextStyle(
-                              fontSize: 10,
-                              color: Color(0xFF55d7ed),
-                              fontFamily: 'monospace'),
-                        ),
-                      ))
-                  .toList(),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Community: ',
+                  style: TextStyle(fontSize: 10, color: Colors.white30)),
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: hints.entries
+                      .map((e) => GestureDetector(
+                            onTap: onApplyValue != null
+                                ? () => onApplyValue!(fieldName, e.value)
+                                : null,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF55d7ed)
+                                    .withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(
+                                    color: const Color(0xFF55d7ed)
+                                        .withValues(alpha: 0.25)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${e.key}: ${e.value}',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        color: Color(0xFF55d7ed),
+                                        fontFamily: 'monospace'),
+                                  ),
+                                  if (onApplyValue != null) ...[
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Try →',
+                                      style: TextStyle(
+                                          fontSize: 9,
+                                          color: Color(0xFFffba38),
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+            ],
           ),
+          if (onApplyValue != null)
+            const Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Text(
+                'Tap a chip to try that value in your current config.',
+                style: TextStyle(fontSize: 9, color: Colors.white24),
+              ),
+            ),
         ],
       ),
     );
