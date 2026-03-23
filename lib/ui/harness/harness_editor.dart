@@ -1578,7 +1578,7 @@ class _ModelEditorState extends State<_ModelEditor> {
           onApplyValue: (dim, val) {
             // Strip annotation like " (ollama)" before applying
             final clean = val.contains(' ') ? val.split(' ').first : val;
-            onUpdate('fast_model', clean);
+            widget.onUpdate('fast_model', clean);
           },
         ),
         const Text(
