@@ -321,8 +321,223 @@ class HarnessDesignPanels extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: const SecurityPanel(),
         ),
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: const VisualPlannerPanel(),
+        ),
         const SizedBox(height: 16),
       ],
     );
   }
+}
+
+// ─── Visual Planner Panel ─────────────────────────────────────────────────────
+
+class VisualPlannerPanel extends StatefulWidget {
+  const VisualPlannerPanel({super.key});
+
+  @override
+  State<VisualPlannerPanel> createState() => _VisualPlannerPanelState();
+}
+
+class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
+  String _model = 'none';
+  String _goalSource = 'oak_d';
+  int _planningHorizon = 16;
+  int _cemSamples = 512;
+  String _device = 'hailo';
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return ExpansionTile(
+      leading: Icon(Icons.remove_red_eye_outlined, color: cs.primary),
+      title: const Text('Visual Planner'),
+      subtitle: Text(
+        _model == 'none'
+            ? 'Disabled — LLM handles motor planning'
+            : 'LeWM JEPA — pixel-based motor planning',
+        style: const TextStyle(fontSize: 12),
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Model selection
+              const Text('Model backend',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'none', label: Text('None (LLM)')),
+                  ButtonSegment(value: 'lewm', label: Text('LeWM')),
+                  ButtonSegment(value: 'dinowm', label: Text('DINO-WM')),
+                ],
+                selected: {_model},
+                onSelectionChanged: (s) => setState(() => _model = s.first),
+              ),
+              const SizedBox(height: 12),
+
+              // LeWM info card
+              if (_model == 'lewm') ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF55d7ed).withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: const Color(0xFF55d7ed).withValues(alpha: 0.2)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '⚗ LeWorldModel (LeWM)',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF55d7ed),
+                            fontSize: 13),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        '15M params · raw pixels · ~1s on Pi5+Hailo8L\n'
+                        'JEPA architecture — no text LLM needed for motor tasks.\n'
+                        'Routes grip / navigate / place / reach commands through\n'
+                        'pixel-based planning instead of the model router.',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.white70, height: 1.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline,
+                              size: 13, color: Color(0xFF4ade80)),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'Fully offline · no API key · OAK-D native',
+                            style: TextStyle(
+                                fontSize: 11, color: Color(0xFF4ade80)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Goal source
+                const Text('Goal source',
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                DropdownButtonFormField<String>(
+                  value: _goalSource,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                      isDense: true, border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'oak_d', child: Text('OAK-D (live frame)')),
+                    DropdownMenuItem(
+                        value: 'last_frame', child: Text('Last captured frame')),
+                    DropdownMenuItem(
+                        value: 'static_image',
+                        child: Text('Static image (set manually)')),
+                  ],
+                  onChanged: (v) => setState(() => _goalSource = v!),
+                ),
+                const SizedBox(height: 12),
+
+                // Planning horizon
+                Text('Planning horizon: $_planningHorizon steps',
+                    style: const TextStyle(fontSize: 12)),
+                Slider(
+                  value: _planningHorizon.toDouble(),
+                  min: 4,
+                  max: 64,
+                  divisions: 15,
+                  label: '$_planningHorizon',
+                  onChanged: (v) =>
+                      setState(() => _planningHorizon = v.round()),
+                ),
+                const _VisualHint(
+                  'Research: horizon=16 balances planning quality vs latency on Pi-class hardware.'),
+
+                // CEM samples
+                Text('CEM samples: $_cemSamples',
+                    style: const TextStyle(fontSize: 12)),
+                Slider(
+                  value: _cemSamples.toDouble(),
+                  min: 64,
+                  max: 1024,
+                  divisions: 15,
+                  label: '$_cemSamples',
+                  onChanged: (v) =>
+                      setState(() => _cemSamples = v.round()),
+                ),
+                const _VisualHint(
+                  'More samples = better action quality, higher latency. '
+                  '512 is the autoresearch default.'),
+
+                // Device
+                const Text('Inference device',
+                    style: TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                DropdownButtonFormField<String>(
+                  value: _device,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                      isDense: true, border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'hailo',
+                        child: Text('Hailo8L (Pi5+Hailo, recommended)')),
+                    DropdownMenuItem(
+                        value: 'cpu', child: Text('CPU (~8–15s on Pi)')),
+                    DropdownMenuItem(
+                        value: 'cuda', child: Text('CUDA (server/Jetson)')),
+                  ],
+                  onChanged: (v) => setState(() => _device = v!),
+                ),
+              ],
+
+              if (_model == 'dinowm')
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: const Text(
+                    'DINO-WM: heavier baseline (~47s planning). '
+                    'Use for comparison against LeWM. '
+                    'Not recommended for real-time use on Pi-class hardware.',
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.white54, height: 1.5),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VisualHint extends StatelessWidget {
+  const _VisualHint(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Text(
+          '💡 $text',
+          style: const TextStyle(
+              fontSize: 11, color: Colors.white38, height: 1.5),
+        ),
+      );
 }
