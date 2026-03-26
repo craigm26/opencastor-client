@@ -33,6 +33,9 @@ import 'ui/harness/harness_viewer.dart';
 import 'ui/robot_capabilities/ai_screen.dart';
 import 'ui/robot_capabilities/contribute_screen.dart';
 import 'ui/robot_capabilities/conformance_screen.dart';
+import 'ui/robot_detail/attestation_card.dart' show AttestationCard;
+import 'ui/robot_detail/compliance_report_screen.dart';
+import 'ui/robot_detail/orchestrator_screen.dart';
 import 'ui/robot_capabilities/hardware_screen.dart';
 import 'ui/robot_capabilities/identity_screen.dart';
 import 'ui/robot_capabilities/providers_screen.dart';
@@ -243,6 +246,16 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/robot/:rrn/capabilities/contribute',
             builder: (_, state) =>
                 CapContributeScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance-report',
+            builder: (_, state) =>
+                ComplianceReportScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/orchestrators',
+            builder: (_, state) =>
+                OrchestratorScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/harness',

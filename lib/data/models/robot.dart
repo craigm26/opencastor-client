@@ -112,6 +112,20 @@ class Robot {
   /// Idle compute contribution stats (from telemetry.contribute).
   final ContributeStats contribute;
 
+  // ── RCAN v2.1 fields ──────────────────────────────────────────────────────
+
+  /// SHA-256 of the signed firmware manifest (envelope field 13). null if not attested.
+  final String? firmwareHash;
+
+  /// URL to /.well-known/rcan-sbom.json (envelope field 14). null if not published.
+  final String? attestationRef;
+
+  /// Whether the robot has an AUTHORITY_ACCESS (41) handler registered.
+  final bool authorityHandlerEnabled;
+
+  /// Configured audit retention in days (EU AI Act Art. 12). null if not configured.
+  final int? auditRetentionDays;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -138,6 +152,11 @@ class Robot {
     this.registryTier = 'community',
     this.opencastorVersion,
     this.contribute = const ContributeStats(),
+    // v2.1 fields
+    this.firmwareHash,
+    this.attestationRef,
+    this.authorityHandlerEnabled = false,
+    this.auditRetentionDays,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -184,6 +203,11 @@ class Robot {
         final raw = m['telemetry']?['contribute'] as Map<String, dynamic>?;
         return raw != null ? ContributeStats.fromMap(raw) : const ContributeStats();
       }(),
+      // ── RCAN v2.1 fields — safe defaults preserve v1.x behaviour ──────────
+      firmwareHash: m['firmware_hash'] as String?,
+      attestationRef: m['attestation_ref'] as String?,
+      authorityHandlerEnabled: m['authority_handler_enabled'] as bool? ?? false,
+      auditRetentionDays: m['audit_retention_days'] as int?,
     );
   }
 
@@ -211,6 +235,35 @@ class Robot {
     final major = int.tryParse(parts[0]) ?? 0;
     final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
     return major > 1 || (major == 1 && minor >= 6);
+  }
+
+  /// True if the robot supports RCAN v2.1 or later.
+  bool get isRcanV21 {
+    if (rcanVersion == null) return false;
+    final parts = rcanVersion!.split('.');
+    if (parts.isEmpty) return false;
+    final major = int.tryParse(parts[0]) ?? 0;
+    final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return major >= 2 && minor >= 1;
+  }
+
+  /// True if firmware has been signed and attested (RCAN v2.1 §11).
+  bool get isFirmwareAttested =>
+      firmwareHash != null && firmwareHash!.startsWith('sha256:');
+
+  /// True if SBOM is published (RCAN v2.1 §12).
+  bool get isSbomPublished => attestationRef != null && attestationRef!.isNotEmpty;
+
+  /// RCAN conformance level (L1–L5).
+  int get conformanceLevel {
+    if (!isRcanV21) {
+      if (!isRcanV16) return isRcanV15 ? 2 : 1;
+      return supportsQos2 ? 3 : 2;
+    }
+    if (!isFirmwareAttested || !isSbomPublished) return 3;
+    if (!authorityHandlerEnabled) return 4;
+    if ((auditRetentionDays ?? 0) < 3650) return 4;
+    return 5;
   }
 
   /// True if LoA enforcement is active (loa_enforcement=true).
