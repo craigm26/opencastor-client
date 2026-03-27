@@ -213,6 +213,14 @@ class Robot {
 
   bool get isOnline => status.online;
 
+  /// Hardware snapshot from last telemetry push (may be null if not yet received).
+  Map<String, dynamic>? get systemInfo =>
+      telemetry['system'] as Map<String, dynamic>?;
+
+  /// Active model runtime info from last telemetry push.
+  Map<String, dynamic>? get modelRuntime =>
+      telemetry['model_runtime'] as Map<String, dynamic>?;
+
   bool get isRevoked => revocationStatus == RevocationStatus.revoked;
 
   bool get isSuspended => revocationStatus == RevocationStatus.suspended;
