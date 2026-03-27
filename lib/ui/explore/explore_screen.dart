@@ -18,7 +18,6 @@ class ExploreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(exploreFilterProvider);
     final configs = ref.watch(exploreConfigsProvider(filter));
-    final cs = Theme.of(context).colorScheme;
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
 
     return DefaultTabController(
@@ -294,6 +293,10 @@ class _ConfigCard extends ConsumerWidget {
                     const SizedBox(width: 6),
                   ],
                   _TypeBadge(type: config.type),
+                  if (config.pqEnabled) ...[
+                    const SizedBox(width: 6),
+                    _PqBadge(),
+                  ],
                   const Spacer(),
                   GestureDetector(
                     onTap: () => toggleStar(config.id, ref),
@@ -346,12 +349,7 @@ class _ConfigCard extends ConsumerWidget {
               // Footer: RCAN version + stats
               Row(
                 children: [
-                  Text(
-                    'RCAN ${config.rcanVersion}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.primary,
-                        ),
-                  ),
+                  _RcanVersionBadge(version: config.rcanVersion),
                   const Spacer(),
                   Icon(Icons.download_outlined,
                       size: 13, color: cs.outlineVariant),
@@ -417,7 +415,6 @@ class ExploreDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final configAsync = ref.watch(hubConfigDetailProvider(configId));
-    final cs = Theme.of(context).colorScheme;
     final starred = ref.watch(starredConfigsProvider).contains(configId);
 
     return Scaffold(
@@ -481,8 +478,7 @@ class _ConfigDetail extends StatelessWidget {
             children: [
               _TypeBadge(type: config.type),
               const SizedBox(width: 8),
-              Text('RCAN ${config.rcanVersion}',
-                  style: tt.labelSmall?.copyWith(color: cs.primary)),
+              _RcanVersionBadge(version: config.rcanVersion),
               const Spacer(),
               Icon(Icons.download_outlined, size: 14, color: cs.outlineVariant),
               const SizedBox(width: 2),
@@ -864,9 +860,9 @@ class _InstallCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.primaryContainer.withOpacity(0.3),
+        color: cs.primaryContainer.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.primary.withOpacity(0.3)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -928,9 +924,9 @@ class _TypeBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         _typeDisplayLabel(type),
@@ -1109,7 +1105,7 @@ class _HarnessPreview extends StatelessWidget {
     final harnessConfig = _buildHarnessConfig();
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(12),
         color: cs.surfaceContainerLowest,
       ),
@@ -1131,8 +1127,20 @@ class _SkillInfoCard extends StatelessWidget {
   const _SkillInfoCard({required this.config});
   final HubConfig config;
 
-  static String _scope(String title) {
-    final t = title.toLowerCase();
+  /// Infer scope_level from config.scopeLevel (explicit) or title heuristics.
+  /// RCAN v2.2 scopes: chat | status | control | system | fleet
+  static String _scope(HubConfig config) {
+    // Use declared scope_level if available (RCAN v2.2 hub configs supply this)
+    if (config.scopeLevel.isNotEmpty) return config.scopeLevel;
+    final t = config.title.toLowerCase();
+    if (t.contains('estop') || t.contains('firmware') || t.contains('upgrade') ||
+        t.contains('shutdown') || t.contains('reboot') || t.contains('system')) {
+      return 'system';
+    }
+    if (t.contains('fleet') || t.contains('swarm') || t.contains('peer') ||
+        t.contains('coordinate') || t.contains('delegate') || t.contains('multi')) {
+      return 'fleet';
+    }
     if (t.contains('navigate') || t.contains('arm') || t.contains('manipulat')) {
       return 'control';
     }
@@ -1145,11 +1153,15 @@ class _SkillInfoCard extends StatelessWidget {
   static Color _scopeColor(String scope) {
     switch (scope) {
       case 'control':
-        return const Color(0xFFef4444);
+        return const Color(0xFFef4444); // red
       case 'status':
-        return const Color(0xFF0ea5e9);
+        return const Color(0xFF0ea5e9); // sky blue
+      case 'system':
+        return const Color(0xFFf97316); // orange — high-privilege
+      case 'fleet':
+        return const Color(0xFF8b5cf6); // violet — multi-robot
       default:
-        return const Color(0xFF7c3aed);
+        return const Color(0xFF7c3aed); // purple (chat)
     }
   }
 
@@ -1159,6 +1171,10 @@ class _SkillInfoCard extends StatelessWidget {
         return Icons.gamepad_outlined;
       case 'status':
         return Icons.monitor_heart_outlined;
+      case 'system':
+        return Icons.admin_panel_settings_outlined;
+      case 'fleet':
+        return Icons.hub_outlined;
       default:
         return Icons.chat_bubble_outline;
     }
@@ -1202,10 +1218,19 @@ class _SkillInfoCard extends StatelessWidget {
         'Returns summarised results to the agent',
       ];
     }
-    if (t.contains('peer') || t.contains('coordinate')) {
+    if (t.contains('estop') || t.contains('firmware') || t.contains('shutdown')) {
       return [
-        'Discovers other robots on the RCAN mesh',
-        'Delegates sub-tasks to peer agents',
+        'Operates at RCAN system scope — admin privileges required',
+        'Can trigger ESTOP, firmware updates, or system shutdown',
+        'Always honored even under M2M_TRUSTED token restrictions',
+      ];
+    }
+    if (t.contains('fleet') || t.contains('swarm') || t.contains('delegate') ||
+        t.contains('peer') || t.contains('coordinate')) {
+      return [
+        'Discovers and coordinates with peer robots on the RCAN mesh',
+        'Delegates sub-tasks using M2M_TRUSTED tokens with explicit fleet_rrns',
+        'Respects multi-owner consent and 24h max TTL limits',
       ];
     }
     if (t.contains('code') || t.contains('review')) {
@@ -1224,7 +1249,7 @@ class _SkillInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final scope = _scope(config.title);
+    final scope = _scope(config);
     final scopeColor = _scopeColor(scope);
     final cmd = _slashCommand(config.title);
 
@@ -1233,7 +1258,7 @@ class _SkillInfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1246,12 +1271,12 @@ class _SkillInfoCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: scopeColor.withOpacity(0.12),
+                  color: scopeColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: scopeColor.withOpacity(0.35)),
+                  border: Border.all(color: scopeColor.withValues(alpha: 0.35)),
                 ),
                 child: Text(
-                  'RCAN scope: $scope',
+                  'scope_level: $scope',
                   style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -1331,6 +1356,8 @@ class _PresetSummaryCard extends StatelessWidget {
         ('Hardware', config.hardware, const Color(0xFF22c55e)),
       if (config.rcanVersion.isNotEmpty)
         ('RCAN', config.rcanVersion, const Color(0xFFa855f7)),
+      if (config.pqEnabled)
+        ('Signing', config.signingAlg.isNotEmpty ? config.signingAlg : 'ML-DSA-65', const Color(0xFF059669)),
     ];
 
     return Container(
@@ -1338,7 +1365,7 @@ class _PresetSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,9 +1383,9 @@ class _PresetSummaryCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color.withOpacity(0.35)),
+                  border: Border.all(color: color.withValues(alpha: 0.35)),
                 ),
                 child: RichText(
                   text: TextSpan(
@@ -1383,6 +1410,76 @@ class _PresetSummaryCard extends StatelessWidget {
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── RCAN version badge ────────────────────────────────────────────────────────
+
+/// Colour-coded RCAN version pill. v2.2 is highlighted as the current spec.
+class _RcanVersionBadge extends StatelessWidget {
+  const _RcanVersionBadge({required this.version});
+  final String version;
+
+  static const _v22Color = Color(0xFF059669); // emerald — current spec
+  static const _v21Color = Color(0xFF0ea5e9); // sky — previous
+  static const _legacyColor = Color(0xFF6b7280); // grey — old
+
+  Color get _color {
+    final v = version.trim();
+    if (v == '2.2' || v == '2.2.0') return _v22Color;
+    if (v == '2.1' || v == '2.1.0') return _v21Color;
+    return _legacyColor;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        'RCAN $version',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: _color,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// ── PQ signing badge ──────────────────────────────────────────────────────────
+
+/// Small ML-DSA-65 badge shown on post-quantum signed configs.
+class _PqBadge extends StatelessWidget {
+  const _PqBadge();
+
+  static const _pqColor = Color(0xFF7c3aed);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: _pqColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: _pqColor.withValues(alpha: 0.4)),
+      ),
+      child: const Text(
+        'PQ',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: _pqColor,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }

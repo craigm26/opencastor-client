@@ -37,8 +37,7 @@ class HubComment {
     if (v == null) return DateTime.now();
     if (v is String) return DateTime.tryParse(v) ?? DateTime.now();
     if (v is Map && v['_seconds'] != null) {
-      return DateTime.fromMillisecondsSinceEpoch(
-          (v['_seconds'] as int) * 1000);
+      return DateTime.fromMillisecondsSinceEpoch((v['_seconds'] as int) * 1000);
     }
     return DateTime.now();
   }
@@ -49,7 +48,8 @@ final commentsProvider =
   final fn = FirebaseFunctions.instance.httpsCallable('getComments');
   final result = await fn.call<dynamic>({'config_id': configId});
   final raw = result.data;
-  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final map =
+      raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
   final list = (map['comments'] as List?) ?? [];
   return list
       .whereType<Map>()
@@ -64,8 +64,8 @@ Future<void> addComment(String configId, String text) async {
 
 Future<void> deleteComment(String configId, String commentId) async {
   final fn = FirebaseFunctions.instance.httpsCallable('deleteComment');
-  await fn
-      .call<Map<String, dynamic>>({'config_id': configId, 'comment_id': commentId});
+  await fn.call<Map<String, dynamic>>(
+      {'config_id': configId, 'comment_id': commentId});
 }
 
 // ── Fork ─────────────────────────────────────────────────────────────────────
@@ -93,7 +93,8 @@ final myStarsProvider = FutureProvider<List<HubConfig>>((ref) async {
   final fn = FirebaseFunctions.instance.httpsCallable('getMyStars');
   final result = await fn.call<dynamic>({});
   final raw = result.data;
-  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final map =
+      raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
   final list = (map['configs'] as List?) ?? [];
   return list
       .whereType<Map>()
@@ -107,7 +108,8 @@ final myConfigsProvider = FutureProvider<List<HubConfig>>((ref) async {
   final fn = FirebaseFunctions.instance.httpsCallable('getMyConfigs');
   final result = await fn.call<dynamic>({});
   final raw = result.data;
-  final map = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+  final map =
+      raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
   final list = (map['configs'] as List?) ?? [];
   return list
       .whereType<Map>()

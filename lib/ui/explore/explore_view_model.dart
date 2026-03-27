@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/hub_config.dart';
@@ -25,13 +24,12 @@ final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFil
     try {
       final result = await callable.call<dynamic>(params);
       final raw = result.data;
-      final data = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+      final data =
+          raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final results = (data['results'] as List?) ?? [];
-      final configs = results
-          .whereType<Map>()
-          .map((m) => HubConfig.fromMap(_deepCast(m)))
-          .toList();
-      // Official configs always sorted first
+      final configs =
+          results.whereType<Map>().map((m) => HubConfig.fromMap(_deepCast(m))).toList();
+      // Official configs always sorted first, then by stars
       configs.sort((a, b) {
         if (a.isOfficial && !b.isOfficial) return -1;
         if (!a.isOfficial && b.isOfficial) return 1;
@@ -39,7 +37,6 @@ final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFil
       });
       return configs;
     } catch (e) {
-      // Return empty on error — user sees empty state with retry
       throw Exception('Could not load hub configs: $e');
     }
   },
@@ -53,7 +50,7 @@ final hubConfigDetailProvider = FutureProvider.family<HubConfig, String>(
     final callable = functions.httpsCallable('getConfig');
     final result = await callable.call<dynamic>({'id': configId});
     final raw = result.data;
-    final map = raw is Map ? _deepCast(raw as Map) : <String, dynamic>{};
+    final map = raw is Map ? _deepCast(raw) : <String, dynamic>{};
     return HubConfig.fromMap(map);
   },
 );
@@ -68,7 +65,8 @@ Future<bool> toggleStar(String configId, WidgetRef ref) async {
     final callable = functions.httpsCallable('starConfig');
     final result = await callable.call<dynamic>({'id': configId});
     final raw = result.data;
-    final rmap = raw is Map ? Map<String, dynamic>.from(raw as Map) : <String, dynamic>{};
+    final rmap =
+        raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
     final starred = rmap['starred'] as bool? ?? false;
 
     ref.read(starredConfigsProvider.notifier).update((s) {
