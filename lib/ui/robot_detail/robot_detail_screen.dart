@@ -1037,9 +1037,6 @@ class _TelemetryPanel extends StatelessWidget {
             ],
           ),
 
-          // ── Hardware + model stats chips ──────────────────────────
-          _HardwareSection(t: t),
-          _ModelRuntimeSection(t: t),
         ],
       ),
     );
