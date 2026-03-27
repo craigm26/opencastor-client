@@ -1,3 +1,35 @@
 /*
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Cross-Origin-Embedder-Policy: unsafe-none
+
+# Flutter service worker must NEVER be cached by CDN/browser.
+# If Cloudflare caches an old SW, users stay on stale code indefinitely.
+# The SW itself manages app-shell caching via its own RESOURCES manifest.
+/flutter_service_worker.js
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
+
+# index.html must be fresh on every visit so the SW version query param
+# (?v=XXXXXXXX) is always current. Stale index.html → stale SW registration.
+/index.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
+
+# Firebase messaging SW — also must not be CDN-cached.
+/firebase-messaging-sw.js
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
+
+# Versioned Flutter build artifacts — safe to cache long-term
+# (Flutter hashes filenames on every build, so stale caches are impossible).
+/flutter_bootstrap.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/main.dart.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/canvaskit/*
+  Cache-Control: public, max-age=31536000, immutable
