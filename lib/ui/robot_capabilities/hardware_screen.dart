@@ -179,7 +179,6 @@ class _LiveStatsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final rows = <CapabilityRow>[];
 
     // RAM
@@ -188,9 +187,9 @@ class _LiveStatsSection extends StatelessWidget {
     if (ramAvail != null && ramTotal != null) {
       final pct = ramAvail / ramTotal;
       final status = pct < 0.15
-          ? CapStatus.fail
+          ? CapStatus.missing
           : pct < 0.30
-              ? CapStatus.warn
+              ? CapStatus.warning
               : CapStatus.ok;
       rows.add(CapabilityRow(
         label: '${ramAvail.toStringAsFixed(1)} / ${ramTotal.toStringAsFixed(0)} GB RAM',
@@ -214,9 +213,9 @@ class _LiveStatsSection extends StatelessWidget {
     final temp = sys['cpu_temp_c'] as num?;
     if (temp != null) {
       final status = temp >= 80
-          ? CapStatus.fail
+          ? CapStatus.missing
           : temp >= 65
-              ? CapStatus.warn
+              ? CapStatus.warning
               : CapStatus.ok;
       rows.add(CapabilityRow(
         label: '${temp.toStringAsFixed(0)}°C CPU',
@@ -274,7 +273,7 @@ class _LiveStatsSection extends StatelessWidget {
 
       rows.add(CapabilityRow(
         label: '$model$sizeLabel',
-        status: fitStatus == 'oom' ? CapStatus.fail : CapStatus.ok,
+        status: fitStatus == 'oom' ? CapStatus.missing : CapStatus.ok,
         description: '${provider.isNotEmpty ? "$provider" : ""}$ctxLabel$kvLabel'
             '${fitLabel.isNotEmpty ? " · $fitLabel" : ""}'
             '${tps != null ? " · ${tps.toStringAsFixed(0)} tok/s" : ""}',
