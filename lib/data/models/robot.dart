@@ -163,19 +163,24 @@ class Robot {
     final m = doc.data() as Map<String, dynamic>;
     return Robot(
       rrn: m['rrn'] as String? ?? doc.id,
-      name: m['name'] as String? ?? 'Unknown',
+      name: (m['name'] ?? m['robot_name']) as String? ?? 'Unknown',
       owner: m['owner'] as String? ?? '',
       firebaseUid: m['firebase_uid'] as String? ?? '',
-      ruri: m['ruri'] as String? ?? '',
+      ruri: (m['ruri'] as String?) ?? ((m['telemetry'] as Map<String, dynamic>?)?['ruri'] as String?) ?? '',
       capabilities: ((m['capabilities'] as List<dynamic>?) ?? [])
           .map((c) => _parseCapability(c as String))
           .whereType<RobotCapability>()
           .toList(),
-      version: m['version'] as String? ?? 'unknown',
+      version: (m['version'] ?? m['opencastor_version'] ?? (m['telemetry'] as Map<String, dynamic>?)?['version']) as String? ?? 'unknown',
       bridgeVersion: m['bridge_version'] as String? ?? 'unknown',
-      registeredAt: m['registered_at'] != null
-          ? DateTime.parse(m['registered_at'] as String)
-          : DateTime.now(),
+      registeredAt: () {
+        final raw = m['registered_at'];
+        if (raw == null) return DateTime.now();
+        if (raw is String) return DateTime.tryParse(raw) ?? DateTime.now();
+        // Firestore Timestamp — toDate() returns DateTime
+        try { return (raw as dynamic).toDate() as DateTime; } catch (_) {}
+        return DateTime.now();
+      }(),
       status: m['status'] != null
           ? RobotStatus.fromMap(m['status'] as Map<String, dynamic>)
           : RobotStatus(online: false, lastSeen: DateTime.now()),
