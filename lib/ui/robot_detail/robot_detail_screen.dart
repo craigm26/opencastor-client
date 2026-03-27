@@ -40,6 +40,8 @@ import 'robot_detail_view_model.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
 import '../fleet_leaderboard/personal_research_card.dart';
+import 'attestation_card.dart';
+import 'compliance_report_screen.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -833,6 +835,21 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
           // ── Personal Research mini-card ───────────────────────────────────
           PersonalResearchMiniCard(rrn: widget.rrn),
+
+          // ── RCAN v2.2 Attestation (closes #766) ──────────────────────────
+          AttestationCard(robot: robot),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.fact_check_outlined, size: 16),
+              label: const Text('View Full Compliance Report'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(36),
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+              onPressed: () => context.push('/robot/\${robot.rrn}/compliance-report'),
+            ),
+          ),
 
           // ── Chat input with slash command palette ─────────────────────────
           if (robot.hasCapability(RobotCapability.chat) &&
