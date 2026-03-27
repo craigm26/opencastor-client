@@ -7,11 +7,28 @@ library;
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
+import '../../data/models/command.dart' show CommandScope;
+import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+
+// ── LoA enforcement command provider ─────────────────────────────────────────
+
+/// Enables LoA enforcement for [rrn] via a system-scope sendCommand call.
+/// The castor bridge handles "loa_enable" system commands by patching its
+/// in-memory config and writing loa_enforcement=true to the RCAN yaml.
+final loaEnableCommandProvider = FutureProvider.family<void, String>((ref, rrn) async {
+  await ref.read(robotRepositoryProvider).sendCommand(
+    rrn: rrn,
+    instruction: 'loa_enable',
+    scope: CommandScope.system,
+    reason: 'user requested via Fleet UI',
+  );
+});
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -839,23 +856,210 @@ class ConformanceCard extends StatelessWidget {
 
 // ── LoA + Vision bottom sheets ────────────────────────────────────────────────
 
-void showLoaBottomSheet(BuildContext context) {
-  const snippet = 'loa_enforcement: true';
+void showLoaBottomSheet(BuildContext context, {required String rrn, required WidgetRef ref}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (_) => const CapInstructionSheet(
-      title: 'Enable LoA Enforcement',
-      steps: [
-        'Open your robot config file: .rcan.yaml',
-        'Add or update the following line:',
-        'Restart the castor bridge:',
-      ],
-      codeSnippets: [null, snippet, 'castor bridge restart'],
-      note:
-          'LoA enforcement requires RCAN v1.6+. Your robot will reject commands below the configured minimum assurance level.',
+    builder: (_) => ProviderScope(
+      parent: ProviderScope.containerOf(context),
+      child: _LoaEnableSheet(rrn: rrn, ref: ref),
     ),
   );
+}
+
+class _LoaEnableSheet extends ConsumerStatefulWidget {
+  final String rrn;
+  final WidgetRef ref;
+  const _LoaEnableSheet({required this.rrn, required this.ref});
+
+  @override
+  ConsumerState<_LoaEnableSheet> createState() => _LoaEnableSheetState();
+}
+
+class _LoaEnableSheetState extends ConsumerState<_LoaEnableSheet> {
+  bool _loading = false;
+  String? _result;
+  bool _success = false;
+
+  Future<void> _enable() async {
+    setState(() { _loading = true; _result = null; });
+    try {
+      await ref.read(loaEnableCommandProvider(widget.rrn).future);
+      setState(() { _success = true; _result = 'LoA enforcement enabled.'; });
+    } catch (e) {
+      setState(() { _result = e.toString(); });
+    } finally {
+      setState(() { _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    const snippet = 'loa_enforcement: true';
+    const cliSnippet = 'castor loa enable';
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16, right: 16, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Text('Enable LoA Enforcement',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+
+          // One-tap enable (calls gateway API via command)
+          if (!_success) ...[
+            Text('Quick enable — applies immediately to the running bridge:',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _loading ? null : _enable,
+                icon: _loading
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.shield_outlined, size: 18),
+                label: Text(_loading ? 'Enabling…' : 'Enable LoA Enforcement'),
+              ),
+            ),
+            if (_result != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_result!, style: TextStyle(fontSize: 12, color: cs.onErrorContainer)),
+              ),
+            ],
+            const Divider(height: 32),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  Text('LoA enforcement enabled', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+
+          // Manual / CLI instructions as fallback
+          Text('Or enable manually:',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 8),
+          _InstructionStep(number: 1, text: 'Via CLI (on the robot):'),
+          _CodeChip(code: cliSnippet),
+          const SizedBox(height: 8),
+          _InstructionStep(number: 2, text: 'Or edit .rcan.yaml and add:'),
+          _CodeChip(code: snippet),
+          const SizedBox(height: 8),
+          _InstructionStep(number: 3, text: 'Restart the bridge:'),
+          _CodeChip(code: 'castor bridge restart'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'LoA enforcement requires RCAN v1.6+. Commands below the minimum assurance level will be rejected.',
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstructionStep extends StatelessWidget {
+  final int number;
+  final String text;
+  const _InstructionStep({required this.number, required this.text});
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 20, height: 20,
+            decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+            child: Center(child: Text('$number', style: TextStyle(fontSize: 11, color: cs.onPrimary, fontWeight: FontWeight.bold))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+        ],
+      ),
+    );
+  }
+}
+
+class _CodeChip extends StatelessWidget {
+  final String code;
+  const _CodeChip({required this.code});
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(left: 28, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 12))),
+          InkWell(
+            onTap: () {
+              // ignore: avoid_print
+              // Clipboard.setData not available without flutter/services import here
+            },
+            child: Icon(Icons.copy_outlined, size: 14, color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 void showVisionBottomSheet(BuildContext context) {

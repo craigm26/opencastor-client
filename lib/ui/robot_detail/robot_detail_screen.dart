@@ -446,7 +446,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 12, bottom: 16),
                 decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -880,12 +880,12 @@ class _RevocationBanner extends StatelessWidget {
         ? 'REVOKED — All commands blocked'
         : 'SUSPENDED — Commands temporarily blocked';
     return Material(
-      color: bg.withOpacity(0.12),
+      color: bg.withValues(alpha: 0.12),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: bg.withOpacity(0.4)))),
+            border: Border(bottom: BorderSide(color: bg.withValues(alpha: 0.4)))),
         child: Row(
           children: [
             Icon(icon, size: 16, color: bg),
@@ -914,14 +914,14 @@ class _OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (robot.isOnline || !robot.offlineCapable) return const SizedBox.shrink();
     return Material(
-      color: AppTheme.warning.withOpacity(0.08),
+      color: AppTheme.warning.withValues(alpha: 0.08),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
             border: Border(
                 bottom: BorderSide(
-                    color: AppTheme.warning.withOpacity(0.3)))),
+                    color: AppTheme.warning.withValues(alpha: 0.3)))),
         child: Row(
           children: [
             Icon(Icons.wifi_off_outlined,
@@ -1072,6 +1072,11 @@ class _ShortcutRow extends StatelessWidget {
           onTap: () => context.push('/robot/${robot.rrn}/control'),
         ),
       _Shortcut(
+        icon: Icons.developer_board_outlined,
+        label: 'Components',
+        onTap: () => context.push('/robot/${robot.rrn}/capabilities/components'),
+      ),
+      _Shortcut(
         icon: Icons.verified_outlined,
         label: 'Attest',
         onTap: () => context.push('/robot/${robot.rrn}/attestation'),
@@ -1092,7 +1097,7 @@ class _ShortcutRow extends StatelessWidget {
       height: 64,
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(bottom: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+        border: Border(bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -1158,9 +1163,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1271,7 +1276,7 @@ class _VersionBadge extends ConsumerWidget {
                     color: cs.tertiaryContainer,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                        color: cs.tertiary.withOpacity(0.4), width: 1),
+                        color: cs.tertiary.withValues(alpha: 0.4), width: 1),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -1562,7 +1567,7 @@ class _HwChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest.withOpacity(0.6),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outlineVariant.withOpacity(0.4)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

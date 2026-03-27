@@ -31,7 +31,7 @@ class _PatternPanelState extends State<PatternPanel> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: _pattern,
+          initialValue: _pattern,
           decoration: InputDecoration(
             labelText: 'Pattern',
             border: OutlineInputBorder(
@@ -125,7 +125,7 @@ class _MemoryPanelState extends State<MemoryPanel> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          value: _backend,
+          initialValue: _backend,
           decoration: InputDecoration(
             labelText: 'Backend',
             border: OutlineInputBorder(
@@ -160,7 +160,7 @@ class _MemoryPanelState extends State<MemoryPanel> {
         ],
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: _overflow,
+          initialValue: _overflow,
           decoration: InputDecoration(
             labelText: 'Overflow strategy',
             border: OutlineInputBorder(
@@ -383,142 +383,146 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
 
               // LeWM info card
               if (_model == 'lewm') ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF55d7ed).withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: const Color(0xFF55d7ed).withValues(alpha: 0.2)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '⚗ LeWorldModel (LeWM)',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF55d7ed),
-                            fontSize: 13),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        '15M params · raw pixels · ~1s on Pi5+Hailo8L\n'
-                        'JEPA architecture — no text LLM needed for motor tasks.\n'
-                        'Routes grip / navigate / place / reach commands through\n'
-                        'pixel-based planning instead of the model router.',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.white70, height: 1.5),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline,
-                              size: 13, color: Color(0xFF4ade80)),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Fully offline · no API key · OAK-D native',
+                Builder(builder: (context) {
+                  final cs = Theme.of(context).colorScheme;
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(children: [
+                          Icon(Icons.science_outlined, size: 15, color: cs.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'LeWorldModel (LeWM)',
                             style: TextStyle(
-                                fontSize: 11, color: Color(0xFF4ade80)),
+                                fontWeight: FontWeight.w700,
+                                color: cs.onPrimaryContainer,
+                                fontSize: 13),
                           ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                        ]),
+                        const SizedBox(height: 8),
+                        _InfoRow(icon: Icons.memory_outlined,
+                            text: '15M params · raw pixels · ~1s on Pi5+Hailo8L'),
+                        _InfoRow(icon: Icons.hub_outlined,
+                            text: 'JEPA architecture — no LLM needed for motor tasks'),
+                        _InfoRow(icon: Icons.route_outlined,
+                            text: 'Routes grip / navigate / place / reach commands\nthrough pixel-based planning, bypassing the model router'),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: cs.secondaryContainer,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi_off_outlined, size: 13, color: cs.onSecondaryContainer),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Fully offline · no API key · OAK-D native',
+                                style: TextStyle(fontSize: 11, color: cs.onSecondaryContainer, fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
                 const SizedBox(height: 12),
 
                 // Goal source
                 const Text('Goal source',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 DropdownButtonFormField<String>(
-                  value: _goalSource,
+                  initialValue: _goalSource,
                   isDense: true,
                   decoration: const InputDecoration(
                       isDense: true, border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(
-                        value: 'oak_d', child: Text('OAK-D (live frame)')),
-                    DropdownMenuItem(
-                        value: 'last_frame', child: Text('Last captured frame')),
-                    DropdownMenuItem(
-                        value: 'static_image',
-                        child: Text('Static image (set manually)')),
+                    DropdownMenuItem(value: 'oak_d',       child: Text('OAK-D (live frame)')),
+                    DropdownMenuItem(value: 'last_frame',  child: Text('Last captured frame')),
+                    DropdownMenuItem(value: 'static_image',child: Text('Static image (set manually)')),
                   ],
                   onChanged: (v) => setState(() => _goalSource = v!),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
-                // Planning horizon
-                Text('Planning horizon: $_planningHorizon steps',
-                    style: const TextStyle(fontSize: 12)),
-                Slider(
+                // Planning horizon slider
+                _SliderField(
+                  label: 'Planning horizon',
                   value: _planningHorizon.toDouble(),
-                  min: 4,
-                  max: 64,
-                  divisions: 15,
-                  label: '$_planningHorizon',
-                  onChanged: (v) =>
-                      setState(() => _planningHorizon = v.round()),
+                  unit: 'steps',
+                  min: 4, max: 64, divisions: 15,
+                  recommended: 16,
+                  increaseMeaning: 'longer plans, captures multi-step tasks better',
+                  decreaseMeaning: 'faster inference, more reactive/myopic behaviour',
+                  impact: 'Latency scales ~linearly with horizon on Hailo8L. '
+                      'Horizon > 32 pushes past the ~1s real-time budget.',
+                  onChanged: (v) => setState(() => _planningHorizon = v.round()),
                 ),
-                const _VisualHint(
-                  'Research: horizon=16 balances planning quality vs latency on Pi-class hardware.'),
 
-                // CEM samples
-                Text('CEM samples: $_cemSamples',
-                    style: const TextStyle(fontSize: 12)),
-                Slider(
+                // CEM samples slider
+                _SliderField(
+                  label: 'CEM samples',
                   value: _cemSamples.toDouble(),
-                  min: 64,
-                  max: 1024,
-                  divisions: 15,
-                  label: '$_cemSamples',
-                  onChanged: (v) =>
-                      setState(() => _cemSamples = v.round()),
+                  unit: 'trajectories',
+                  min: 64, max: 1024, divisions: 15,
+                  recommended: 512,
+                  increaseMeaning: 'better trajectory quality, smoother motion',
+                  decreaseMeaning: 'lower latency, acceptable for simple tasks',
+                  impact: 'Cross-Entropy Method samples the action space. '
+                      '64→128 cuts latency ~4×; quality drop is noticeable '
+                      'on precision tasks (grasp, place).',
+                  onChanged: (v) => setState(() => _cemSamples = v.round()),
                 ),
-                const _VisualHint(
-                  'More samples = better action quality, higher latency. '
-                  '512 is the autoresearch default.'),
 
                 // Device
                 const Text('Inference device',
-                    style: TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 DropdownButtonFormField<String>(
-                  value: _device,
+                  initialValue: _device,
                   isDense: true,
                   decoration: const InputDecoration(
                       isDense: true, border: OutlineInputBorder()),
                   items: const [
-                    DropdownMenuItem(
-                        value: 'hailo',
-                        child: Text('Hailo8L (Pi5+Hailo, recommended)')),
-                    DropdownMenuItem(
-                        value: 'cpu', child: Text('CPU (~8–15s on Pi)')),
-                    DropdownMenuItem(
-                        value: 'cuda', child: Text('CUDA (server/Jetson)')),
+                    DropdownMenuItem(value: 'hailo', child: Text('Hailo8L (Pi5+Hailo, recommended)')),
+                    DropdownMenuItem(value: 'cpu',   child: Text('CPU (~8–15s on Pi)')),
+                    DropdownMenuItem(value: 'cuda',  child: Text('CUDA (server/Jetson)')),
                   ],
                   onChanged: (v) => setState(() => _device = v!),
                 ),
               ],
 
               if (_model == 'dinowm')
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: const Text(
-                    'DINO-WM: heavier baseline (~47s planning). '
-                    'Use for comparison against LeWM. '
-                    'Not recommended for real-time use on Pi-class hardware.',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.white54, height: 1.5),
-                  ),
-                ),
+                Builder(builder: (context) {
+                  final cs = Theme.of(context).colorScheme;
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: cs.outlineVariant),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _InfoRow(icon: Icons.warning_amber_outlined,
+                            text: 'DINO-WM: heavier baseline (~47s planning on Pi)'),
+                        _InfoRow(icon: Icons.compare_outlined,
+                            text: 'Best used for offline comparison against LeWM'),
+                        _InfoRow(icon: Icons.speed_outlined,
+                            text: 'Not recommended for real-time control on Pi-class hardware'),
+                      ],
+                    ),
+                  );
+                }),
             ],
           ),
         ),
@@ -527,17 +531,175 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
   }
 }
 
-class _VisualHint extends StatelessWidget {
-  const _VisualHint(this.text);
+// ── Harness panel helper widgets ──────────────────────────────────────────────
+
+/// A bulleted info row using a theme-aware icon + text.
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
   final String text;
+  const _InfoRow({required this.icon, required this.text});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text(
-          '💡 $text',
-          style: const TextStyle(
-              fontSize: 11, color: Colors.white38, height: 1.5),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 13, color: cs.onPrimaryContainer),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(
+                    fontSize: 12, color: cs.onPrimaryContainer, height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A labelled slider with ↑/↓ impact description and a recommended marker.
+class _SliderField extends StatelessWidget {
+  final String label;
+  final double value;
+  final String unit;
+  final double min;
+  final double max;
+  final int divisions;
+  final double recommended;
+  final String increaseMeaning;
+  final String decreaseMeaning;
+  final String impact;
+  final ValueChanged<double> onChanged;
+
+  const _SliderField({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.recommended,
+    required this.increaseMeaning,
+    required this.decreaseMeaning,
+    required this.impact,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isAtRecommended = value == recommended;
+    final displayVal = value == value.truncate()
+        ? value.toInt().toString()
+        : value.toStringAsFixed(1);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Label + current value + recommended badge
+          Row(
+            children: [
+              Text('$label: $displayVal $unit',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              if (isAtRecommended)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text('recommended',
+                      style: TextStyle(fontSize: 10, color: cs.onPrimaryContainer,
+                          fontWeight: FontWeight.w500)),
+                ),
+            ],
+          ),
+          // ↑ / ↓ impact row
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 2),
+            child: Row(
+              children: [
+                _ImpactChip(arrow: '↑', meaning: increaseMeaning, color: cs.tertiary),
+                const SizedBox(width: 8),
+                _ImpactChip(arrow: '↓', meaning: decreaseMeaning, color: cs.secondary),
+              ],
+            ),
+          ),
+          // Slider
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            label: '$displayVal $unit',
+            onChanged: onChanged,
+          ),
+          // Min / max labels
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('${min.toInt()} $unit',
+                    style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+                Text('${max.toInt()} $unit',
+                    style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          // Detail note
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 12, color: cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(impact,
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant, height: 1.4)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactChip extends StatelessWidget {
+  final String arrow;
+  final String meaning;
+  final Color color;
+  const _ImpactChip({required this.arrow, required this.meaning, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(arrow,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(meaning,
+                style: TextStyle(fontSize: 11, color: color, height: 1.3)),
+          ),
+        ],
+      ),
+    );
+  }
 }

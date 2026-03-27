@@ -31,6 +31,7 @@ import 'ui/physical_control/physical_control_screen.dart';
 import 'ui/harness/harness_editor.dart';
 import 'ui/harness/harness_viewer.dart';
 import 'ui/robot_capabilities/ai_screen.dart';
+import 'ui/robot_capabilities/components_screen.dart';
 import 'ui/robot_capabilities/contribute_screen.dart';
 import 'ui/robot_capabilities/conformance_screen.dart';
 import 'ui/robot_detail/compliance_report_screen.dart';
@@ -245,6 +246,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/robot/:rrn/capabilities/contribute',
             builder: (_, state) =>
                 CapContributeScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/components',
+            builder: (_, state) =>
+                ComponentsScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/compliance-report',

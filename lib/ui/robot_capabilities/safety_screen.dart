@@ -33,12 +33,12 @@ class SafetyScreen extends ConsumerWidget {
   }
 }
 
-class _SafetyView extends StatelessWidget {
+class _SafetyView extends ConsumerWidget {
   final Robot robot;
   const _SafetyView({required this.robot});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: Text('Safety — ${robot.name}')),
       body: ListView(
@@ -78,7 +78,7 @@ class _SafetyView extends StatelessWidget {
                     robot.loaEnforcement ? null : 'Enable →',
                 onAction: robot.loaEnforcement
                     ? null
-                    : (ctx) => showLoaBottomSheet(ctx),
+                    : (ctx) => showLoaBottomSheet(ctx, rrn: robot.rrn, ref: ref),
               ),
             ],
           ),
