@@ -780,6 +780,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
           // ── Telemetry + condensed badge row ───────────────────────────────
           _TelemetryPanel(robot: robot),
+          _ShortcutRow(robot: robot),
           const Divider(height: 1),
 
           // ── Chat history with ChatBubbles + date separators ───────────────
@@ -832,23 +833,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               }),
             ),
 
-          // ── Personal Research mini-card ───────────────────────────────────
-          PersonalResearchMiniCard(rrn: widget.rrn),
 
-          // ── RCAN v2.2 Attestation (closes #766) ──────────────────────────
-          AttestationCard(robot: robot),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.fact_check_outlined, size: 16),
-              label: const Text('View Full Compliance Report'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(36),
-                textStyle: const TextStyle(fontSize: 13),
-              ),
-              onPressed: () => context.push('/robot/\${robot.rrn}/compliance-report'),
-            ),
-          ),
 
           // ── Chat input with slash command palette ─────────────────────────
           if (robot.hasCapability(RobotCapability.chat) &&
@@ -1025,69 +1010,138 @@ class _TelemetryPanel extends StatelessWidget {
 
     return Container(
       color: cs.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header card: avatar + name + status ────────────────────
+          // ── Compact status row: avatar + status + version ─────────
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Hero-wrapped robot avatar
               Hero(
                 tag: 'robot-avatar-${robot.rrn}',
                 child: CircleAvatar(
-                  radius: 20,
+                  radius: 16,
                   backgroundColor: cs.primaryContainer,
-                  child: Icon(
-                    Icons.precision_manufacturing_outlined,
-                    size: 18,
-                    color: cs.onPrimaryContainer,
-                  ),
+                  child: Icon(Icons.precision_manufacturing_outlined,
+                      size: 14, color: cs.onPrimaryContainer),
                 ),
               ),
-              const SizedBox(width: 10),
-              // All pills/chips in a Wrap — flows to next line on small screens
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    // 1. Online/Offline status badge
-                    _StatusBadge(isOnline: robot.isOnline),
-                    // 2. OpenCastor version badge (+ update arrow if outdated)
-                    _VersionBadge(
-                        version: robot.opencastorVersion ?? robot.version,
-                        rrn: robot.rrn),
-                    // 3. Capabilities chip
-                    ActionChip(
-                      label: const Text('Capabilities'),
-                      avatar: const Icon(Icons.tune_outlined, size: 14),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () =>
-                          context.push('/robot/${robot.rrn}/capabilities'),
-                    ),
-                    // 3b. Harness chip
-                    ActionChip(
-                      label: const Text('Harness'),
-                      avatar: const Icon(Icons.account_tree_outlined,
-                          size: 14),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () =>
-                          context.push('/robot/${robot.rrn}/harness'),
-                    ),
-                    // 4. Public profile chip (if available)
-                    _RobotProfileChip(rrn: robot.rrn),
-                  ],
-                ),
-              ),
+              const SizedBox(width: 8),
+              _StatusBadge(isOnline: robot.isOnline),
+              const SizedBox(width: 6),
+              _VersionBadge(
+                  version: robot.opencastorVersion ?? robot.version,
+                  rrn: robot.rrn),
+              const Spacer(),
+              _RobotProfileChip(rrn: robot.rrn),
             ],
           ),
 
-          // ── Hardware + model runtime section ─────────────────────
+          // ── Hardware + model stats chips ──────────────────────────
           _HardwareSection(t: t),
           _ModelRuntimeSection(t: t),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Shortcut pill row ─────────────────────────────────────────────────────────
+
+class _ShortcutRow extends StatelessWidget {
+  final Robot robot;
+  const _ShortcutRow({required this.robot});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    // Build list of shortcuts dynamically based on robot capabilities
+    final shortcuts = <_Shortcut>[
+      _Shortcut(
+        icon: Icons.tune_outlined,
+        label: 'Capabilities',
+        onTap: () => context.push('/robot/${robot.rrn}/capabilities'),
+      ),
+      _Shortcut(
+        icon: Icons.account_tree_outlined,
+        label: 'Harness',
+        onTap: () => context.push('/robot/${robot.rrn}/harness'),
+      ),
+      if (robot.hasCapability(RobotCapability.control))
+        _Shortcut(
+          icon: Icons.gamepad_outlined,
+          label: 'Control',
+          onTap: () => context.push('/robot/${robot.rrn}/control'),
+        ),
+      _Shortcut(
+        icon: Icons.verified_outlined,
+        label: 'Attest',
+        onTap: () => context.push('/robot/${robot.rrn}/attestation'),
+      ),
+      _Shortcut(
+        icon: Icons.science_outlined,
+        label: 'Research',
+        onTap: () => context.push('/robot/${robot.rrn}/research'),
+      ),
+      _Shortcut(
+        icon: Icons.fact_check_outlined,
+        label: 'Compliance',
+        onTap: () => context.push('/robot/${robot.rrn}/compliance-report'),
+      ),
+    ];
+
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(bottom: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+      ),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: shortcuts.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 4),
+        itemBuilder: (_, i) => _ShortcutPill(s: shortcuts[i]),
+      ),
+    );
+  }
+}
+
+class _Shortcut {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _Shortcut({required this.icon, required this.label, required this.onTap});
+}
+
+class _ShortcutPill extends StatelessWidget {
+  final _Shortcut s;
+  const _ShortcutPill({required this.s});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: s.onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+            ),
+            child: Icon(s.icon, size: 18, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            s.label,
+            style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+          ),
         ],
       ),
     );
