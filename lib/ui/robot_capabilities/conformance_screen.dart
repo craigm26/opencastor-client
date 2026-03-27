@@ -84,7 +84,7 @@ class _ScoreBreakdown extends StatelessWidget {
         earned: robot.loaEnforcement,
       ),
       _BreakdownItem(
-        label: 'RCAN v1.6 (federation)',
+        label: 'RCAN v2.2 (ML-DSA-65)',
         points: 10,
         earned: robot.isRcanV16,
       ),

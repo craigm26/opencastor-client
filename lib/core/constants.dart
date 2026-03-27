@@ -5,9 +5,9 @@ class AppConstants {
   AppConstants._();
 
   static const String appVersion = '1.0';
-  static const String rcanVersion = '1.6';
-  static const String versionLabel = 'v1.0 · RCAN v1.6';
-  static const String opencastorReleaseVersion = '2026.3.17.1';
+  static const String rcanVersion = '2.2';
+  static const String versionLabel = 'v1.3 · RCAN v2.2';
+  static const String opencastorReleaseVersion = '2026.3.27.1';
 
   // Documentation URLs
   static const String docsRoot = 'https://opencastor.com/docs/';
