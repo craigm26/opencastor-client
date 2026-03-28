@@ -99,15 +99,31 @@ class _SoftwareView extends ConsumerWidget {
           status: CapStatus.ok,
           description: 'Robot runtime version',
         ),
-      CapabilityRow(
-        label: skills.isEmpty
-            ? 'No skills active'
-            : '${skills.length} skill(s) active',
-        status: skills.isEmpty ? CapStatus.info : CapStatus.ok,
-        description: skills.isEmpty
-            ? 'No skills enabled in RCAN config'
-            : skills.map((s) => s.cmd).join(', '),
-      ),
+      () {
+        final cliCmds = (skillsAsync.value ?? [])
+            .where((s) => s.group == 'CLI')
+            .toList();
+        if (skills.isNotEmpty) {
+          return CapabilityRow(
+            label: '${skills.length} skill(s) active',
+            status: CapStatus.ok,
+            description: skills.map((s) => s.cmd).join(', '),
+          );
+        } else if (cliCmds.isNotEmpty) {
+          final preview = cliCmds.take(5).map((s) => s.cmd).join(', ');
+          return CapabilityRow(
+            label: '${cliCmds.length} built-in commands',
+            status: CapStatus.ok,
+            description: cliCmds.length > 5 ? '$preview, …' : preview,
+          );
+        } else {
+          return CapabilityRow(
+            label: 'No skills active',
+            status: CapStatus.info,
+            description: 'No skills enabled in RCAN config',
+          );
+        }
+      }(),
     ];
 
     return Scaffold(

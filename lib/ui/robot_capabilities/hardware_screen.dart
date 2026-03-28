@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../harness/hardware_provider.dart';
+import '../../data/services/ws_telemetry_service.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import 'capabilities_widgets.dart';
 import 'provenance_card.dart';
@@ -26,26 +27,34 @@ class HardwareScreen extends ConsumerWidget {
       ),
       error: (_, __) => Scaffold(
         appBar: AppBar(title: const Text('Hardware')),
-        body: _buildBody(context, null, robotAsync),
+        body: _buildBody(context, ref, null, robotAsync),
       ),
       data: (hw) => Scaffold(
         appBar: AppBar(title: _hardwareTitle(hw.isNotEmpty ? hw : _syntheticHw(
           (robotAsync.valueOrNull?.telemetry['system'] as Map<String, dynamic>?),
           robotAsync.valueOrNull,
         ))),
-        body: _buildBody(context, hw, robotAsync),
+        body: _buildBody(context, ref, hw, robotAsync),
       ),
     );
   }
 
   Widget _buildBody(
     BuildContext context,
+    WidgetRef ref,
     Map<String, dynamic>? hw,
     AsyncValue robotAsync,
   ) {
-    // Live telemetry from /api/status → system + model_runtime
+    // Merge Firestore telemetry with live WebSocket telemetry.
+    // WS data is fresher (~200 ms) and takes priority for system/model_runtime.
     final robot = robotAsync.valueOrNull;
-    final t = (robot?.telemetry ?? {}) as Map<String, dynamic>;
+    final baseTelemetry = (robot?.telemetry ?? {}) as Map<String, dynamic>;
+    final wsData = robot != null
+        ? ref.watch(wsTelemetryProvider(robot.rrn)).valueOrNull
+        : null;
+    final t = wsData != null
+        ? {...baseTelemetry, ...wsData}
+        : baseTelemetry;
     final sys = t['system'] as Map<String, dynamic>?;
     final mr = t['model_runtime'] as Map<String, dynamic>?;
 
