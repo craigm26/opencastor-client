@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import '../../data/models/hub_config.dart';
+
+// GCS public configs bucket — served via CDN, zero Firestore reads.
+const _kGcsBase = 'https://storage.googleapis.com/opencastor-configs/configs';
 
 // ── Filter state ─────────────────────────────────────────────────────────────
 
@@ -13,19 +19,50 @@ final exploreSearchProvider = StateProvider<String>((_) => '');
 
 final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFilter>(
   (ref, filter) async {
-    final functions = FirebaseFunctions.instance;
-    final callable = functions.httpsCallable('searchConfigs');
+    // Primary: GCS public bucket (zero Firestore reads, CDN-cached, free at any scale)
+    try {
+      final indexRes = await http
+          .get(Uri.parse('$_kGcsBase/index.json'))
+          .timeout(const Duration(seconds: 5));
+      if (indexRes.statusCode == 200) {
+        final index = jsonDecode(indexRes.body) as Map<String, dynamic>;
+        final ids = (index['ids'] as List?)?.cast<String>() ?? [];
 
-    final params = <String, dynamic>{'limit': 50};
-    if (filter != ExploreFilter.all) {
-      params['type'] = filter.name;
+        final futures = ids.map((id) async {
+          try {
+            final r = await http
+                .get(Uri.parse('$_kGcsBase/$id.json'))
+                .timeout(const Duration(seconds: 4));
+            if (r.statusCode == 200) {
+              return HubConfig.fromMap(_deepCast(jsonDecode(r.body) as Map));
+            }
+          } catch (_) {}
+          return null;
+        });
+
+        final all = (await Future.wait(futures)).whereType<HubConfig>().toList();
+        final configs = filter == ExploreFilter.all
+            ? all
+            : all.where((c) => c.type == filter.name).toList();
+        configs.sort((a, b) {
+          if (a.isOfficial && !b.isOfficial) return -1;
+          if (!a.isOfficial && b.isOfficial) return 1;
+          return b.stars.compareTo(a.stars);
+        });
+        if (configs.isNotEmpty) return configs;
+      }
+    } catch (_) {
+      // GCS unreachable — fall through to CF
     }
 
+    // Fallback: Firebase CF searchConfigs (reads from GCS-backed cache in CF)
     try {
+      final callable = FirebaseFunctions.instance.httpsCallable('searchConfigs');
+      final params = <String, dynamic>{'limit': 50};
+      if (filter != ExploreFilter.all) params['type'] = filter.name;
       final result = await callable.call<dynamic>(params);
       final raw = result.data;
-      final data =
-          raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+      final data = raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
       final results = (data['results'] as List?) ?? [];
       final configs =
           results.whereType<Map>().map((m) => HubConfig.fromMap(_deepCast(m))).toList();
