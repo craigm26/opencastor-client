@@ -8,6 +8,9 @@
 /// Deploy to robot → sendCommand(scope: system, instruction: RELOAD_CONFIG).
 library;
 
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,11 +37,16 @@ class HarnessEditorScreen extends ConsumerStatefulWidget {
   final String robotName;
   final HarnessConfig initialConfig;
 
+  /// Restored flow graph from Firestore user_harness_config.
+  /// When provided, overrides the auto-generated layout on first open.
+  final FlowGraph? initialGraph;
+
   const HarnessEditorScreen({
     super.key,
     required this.rrn,
     required this.robotName,
     required this.initialConfig,
+    this.initialGraph,
   });
 
   @override
@@ -56,12 +64,16 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   // Experiment Mode: changes are sandboxed; no auto-deploy prompt suppressed
   bool _experimentMode = false;
   FlowGraph _flowGraph = FlowGraph.empty();
+  Timer? _draftTimer; // debounce auto-save
 
   @override
   void initState() {
     super.initState();
     _config = widget.initialConfig;
     _deployedConfig = widget.initialConfig;
+    if (widget.initialGraph != null) {
+      _flowGraph = widget.initialGraph!;
+    }
     _syncGraph();
   }
 
@@ -199,6 +211,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       );
       _syncGraph();
     });
+    _scheduleDraftSave();
   }
 
   void _updateLayerConfig(HarnessLayer layer, Map<String, dynamic> newConfig) {
@@ -211,6 +224,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       );
       _syncGraph();
     });
+    _scheduleDraftSave();
   }
 
   void _addLayer(HarnessLayer layer) {
@@ -269,6 +283,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       _config = _config.withLayerRemoved(layer.id);
       _syncGraph();
     });
+    _scheduleDraftSave();
   }
 
   void _reorderSkills(int oldIndex, int newIndex) {
@@ -292,6 +307,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       _config = _config.copyWithLayers(newLayers);
       _syncGraph();
     });
+    _scheduleDraftSave();
   }
 
   // ── Insert-on-edge ───────────────────────────────────────────────────────
@@ -524,6 +540,57 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
         false;
   }
 
+  // ── Persistence helpers ──────────────────────────────────────────────────
+
+  /// Returns the full harness state as a Firestore-ready map.
+  /// Includes both layers and the flow graph (edges + node positions).
+  Map<String, dynamic> _toFirestoreMap() {
+    return {
+      'layers': _config.layers.map((l) => l.toJson()).toList(),
+      'flow_graph': _flowGraph.toJson(),
+      'rcan_version': '2.2',
+      'rrn': widget.rrn,
+      'saved_at': FieldValue.serverTimestamp(),
+    };
+  }
+
+  /// Write harness to robots/{rrn}.user_harness_config in Firestore.
+  /// This is the "deployed" copy — read back on next page load.
+  Future<void> _persistToFirestore() async {
+    final db = FirebaseFirestore.instance;
+    await db.collection('robots').doc(widget.rrn).set(
+      {'user_harness_config': _toFirestoreMap()},
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Auto-save draft on edit — debounced 2s.
+  /// Draft is restored if user navigates away and back without deploying.
+  void _scheduleDraftSave() {
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(seconds: 2), () async {
+      if (!mounted) return;
+      try {
+        await FirebaseFirestore.instance
+            .collection('robots')
+            .doc(widget.rrn)
+            .set(
+          {
+            'harness_draft': {
+              ..._toFirestoreMap(),
+              // override saved_at with a plain ISO string (FieldValue
+              // cannot be nested inside a non-top-level map on some SDKs)
+            }..remove('saved_at'),
+            'harness_draft_at': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+      } catch (_) {
+        // Draft save is best-effort — never block the user
+      }
+    });
+  }
+
   // ── Save as template ──────────────────────────────────────────────────────
 
   Future<void> _saveAsTemplate() async {
@@ -616,36 +683,52 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     }
 
     setState(() => _deploying = true);
+    var hubError = '';
     try {
-      // Step 1: Upload config (deploy path keeps uploadConfig for robot_rrn tracking)
-      final callable =
-          FirebaseFunctions.instance.httpsCallable('uploadConfig');
-      await callable.call<dynamic>({
-        'type': 'harness',
-        'title': '${widget.robotName} Harness',
-        'tags': [widget.rrn.toLowerCase(), 'harness', 'deployed'],
-        'content': _configToYamlString(),
-        'filename':
-            '${widget.rrn.toLowerCase().replaceAll('-', '_')}.harness.yaml',
-        'robot_rrn': widget.rrn,
-        'public': false,
-      });
+      // ── Step 1: Persist to Firestore (always, regardless of CF) ──────────
+      // This is the primary persistence mechanism — read back on next page
+      // load. CF steps are best-effort (community hub + robot command).
+      await _persistToFirestore();
+      _draftTimer?.cancel(); // draft superseded by deploy
 
-      // Step 2: Send RELOAD_CONFIG command
-      final repo = ref.read(robotRepositoryProvider);
-      await repo.sendCommand(
-        rrn: widget.rrn,
-        instruction: 'RELOAD_CONFIG',
-        scope: CommandScope.system,
-        reason: 'Harness config update from OpenCastor app',
-      );
+      // ── Step 2: Upload to community hub (best-effort) ────────────────────
+      try {
+        final callable =
+            FirebaseFunctions.instance.httpsCallable('uploadConfig');
+        await callable.call<dynamic>({
+          'type': 'harness',
+          'title': '${widget.robotName} Harness',
+          'tags': [widget.rrn.toLowerCase(), 'harness', 'deployed'],
+          'content': _configToYamlString(),
+          'filename':
+              '${widget.rrn.toLowerCase().replaceAll('-', '_')}.harness.yaml',
+          'robot_rrn': widget.rrn,
+          'public': false,
+        });
+      } catch (cfErr) {
+        // Hub upload failed — not fatal, Firestore copy is already saved
+        hubError = ' (hub sync skipped)';
+      }
+
+      // ── Step 3: Send RELOAD_CONFIG command to robot ───────────────────────
+      // Written to Firestore commands subcollection — bridge executes locally.
+      try {
+        final repo = ref.read(robotRepositoryProvider);
+        await repo.sendCommand(
+          rrn: widget.rrn,
+          instruction: 'RELOAD_CONFIG',
+          scope: CommandScope.system,
+          reason: 'Harness config update from OpenCastor app',
+        );
+      } catch (_) {
+        // Robot may be offline — config is already persisted in Firestore
+      }
 
       if (mounted) {
-        // Update deployed baseline so diff bar resets
         setState(() => _deployedConfig = _config);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Harness deployed to ${widget.robotName}'),
+            content: Text('Harness saved\$hubError'),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 4),
           ),
@@ -655,7 +738,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Deploy failed: $e'),
+            content: Text('Save failed: \$e'),
             behavior: SnackBarBehavior.floating,
           ),
         );

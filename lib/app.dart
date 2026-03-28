@@ -28,6 +28,7 @@ import 'ui/fleet/fleet_view_model.dart' show authStateProvider;
 import 'ui/robot_detail/robot_detail_view_model.dart';
 import 'ui/login/ecosystem_section.dart';
 import 'ui/physical_control/physical_control_screen.dart';
+import 'ui/harness/flow_graph.dart';
 import 'ui/harness/harness_editor.dart';
 import 'ui/harness/harness_viewer.dart';
 import 'ui/robot_capabilities/ai_screen.dart';
@@ -291,6 +292,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
                 robotName: extra?.robotName ?? rrn,
                 initialConfig: extra?.config ??
                     HarnessConfig.defaults(robotRrn: rrn),
+                initialGraph: extra?.savedGraph,
               );
             },
           ),
@@ -394,7 +396,12 @@ class OpenCastorApp extends ConsumerWidget {
 class _HarnessEditorArgs {
   final String robotName;
   final HarnessConfig config;
-  const _HarnessEditorArgs({required this.robotName, required this.config});
+  final FlowGraph? savedGraph;
+  const _HarnessEditorArgs({
+    required this.robotName,
+    required this.config,
+    this.savedGraph,
+  });
 }
 
 /// Standalone harness viewer page — wraps HarnessViewer + Edit Harness button.
@@ -409,6 +416,12 @@ class _HarnessViewerPage extends ConsumerWidget {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     final config = robotAsync.whenData((robot) {
       if (robot == null) return HarnessConfig.defaults(robotRrn: rrn);
+
+      // Priority: user_harness_config (app-saved) > telemetry.harness_config
+      // (bridge-reported) > defaults
+      final userSaved = robot.userHarnessConfig;
+      if (userSaved != null) return userSaved;
+
       final harnessData = robot.telemetry['harness_config'];
       if (harnessData is Map<String, dynamic>) {
         return HarnessConfig.fromApiJson(rrn, harnessData);
@@ -425,26 +438,42 @@ class _HarnessViewerPage extends ConsumerWidget {
         appBar: AppBar(title: const Text('Harness')),
         body: Center(child: Text('Error loading harness: $e')),
       ),
-      data: (harnessConfig) => Scaffold(
-        appBar: AppBar(
-          title: const Text('Harness'),
-          actions: [
-            FilledButton.icon(
-              icon: const Icon(Icons.edit_outlined, size: 16),
-              label: const Text('Edit Harness'),
-              onPressed: () => context.push(
-                '/robot/$rrn/harness/edit',
-                extra: _HarnessEditorArgs(
-                  robotName: rrn,
-                  config: harnessConfig,
+      data: (harnessConfig) {
+        // Restore saved flow graph from user_harness_config if available
+        FlowGraph? savedGraph;
+        final robot = robotAsync.valueOrNull;
+        if (robot != null) {
+          final savedMap = robot.userHarnessRaw;
+          if (savedMap != null && savedMap['flow_graph'] is Map<String, dynamic>) {
+            try {
+              savedGraph = FlowGraph.fromJson(
+                  savedMap['flow_graph'] as Map<String, dynamic>);
+            } catch (_) {}
+          }
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Harness'),
+            actions: [
+              FilledButton.icon(
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit Harness'),
+                onPressed: () => context.push(
+                  '/robot/$rrn/harness/edit',
+                  extra: _HarnessEditorArgs(
+                    robotName: rrn,
+                    config: harnessConfig,
+                    savedGraph: savedGraph,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-          ],
-        ),
-        body: HarnessViewer(config: harnessConfig),
-      ),
+              const SizedBox(width: 12),
+            ],
+          ),
+          body: HarnessViewer(config: harnessConfig),
+        );
+      },
     );
   }
 }

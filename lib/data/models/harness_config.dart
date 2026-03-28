@@ -331,6 +331,22 @@ class HarnessConfig {
   /// Parses the flat JSON returned by `GET /api/harness` (keys: skills,
   /// hooks, context, model_tiers, trajectory, max_iterations).
   factory HarnessConfig.fromApiJson(String rrn, Map<String, dynamic> json) {
+    // Fast path: Firestore user_harness_config / harness_draft format —
+    // contains a 'layers' list of full HarnessLayer JSON objects.
+    if (json['layers'] is List) {
+      final layers = (json['layers'] as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .map(HarnessLayer.fromMap)
+          .toList();
+      if (layers.isNotEmpty) {
+        return HarnessConfig(
+          robotRrn: rrn,
+          name: (json['title'] as String?) ?? 'Robot Harness',
+          layers: layers,
+        );
+      }
+    }
+
     final skillsList = (json['skills'] as List<dynamic>?) ?? [];
     final hooks = Map<String, dynamic>.from(
         (json['hooks'] as Map?)?.cast<String, dynamic>() ?? {});

@@ -40,6 +40,13 @@ service cloud.firestore {
       allow update, delete: if isRobotOwner();
 
       // -------------------------------------------------------------------
+      // Owner can update user_harness_config + harness_draft on robot doc
+      // -------------------------------------------------------------------
+      // Note: Robot doc writes go through the robots/{rrn} match above,
+      // which allows owner writes via merge. No extra rule needed here —
+      // the owner can merge-write any field on their own robot doc.
+
+      // -------------------------------------------------------------------
       // /robots/{rrn}/commands/{cmdId}
       // -------------------------------------------------------------------
       match /commands/{cmdId} {

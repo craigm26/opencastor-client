@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'harness_config.dart';
 
 enum RobotCapability { chat, nav, control, vision, status, discover }
 
@@ -146,6 +147,13 @@ class Robot {
   /// Hardware model identifier.
   final String? hardwareModel;
 
+  /// App-saved harness config (user_harness_config in Firestore).
+  /// Takes priority over telemetry.harness_config from the bridge.
+  final HarnessConfig? userHarnessConfig;
+
+  /// Raw user_harness_config map — preserves flow_graph for the editor.
+  final Map<String, dynamic>? userHarnessRaw;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -184,6 +192,8 @@ class Robot {
     this.pqKid,
     this.manufacturer,
     this.hardwareModel,
+    this.userHarnessConfig,
+    this.userHarnessRaw,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -247,6 +257,24 @@ class Robot {
       pqKid:   m['pq_kid'] as String?,
       manufacturer:  m['manufacturer'] as String?,
       hardwareModel: m['model'] as String?,
+      userHarnessConfig: (() {
+        final saved = m['user_harness_config'];
+        if (saved is Map<String, dynamic>) {
+          try {
+            return HarnessConfig.fromApiJson(
+              m['rrn'] as String? ?? '',
+              saved,
+            );
+          } catch (_) {
+            return null;
+          }
+        }
+        return null;
+      })(),
+      userHarnessRaw: m['user_harness_config'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(
+              m['user_harness_config'] as Map<String, dynamic>)
+          : null,
     );
   }
 
