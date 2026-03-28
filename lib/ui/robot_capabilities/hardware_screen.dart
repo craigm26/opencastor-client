@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../harness/hardware_provider.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import 'capabilities_widgets.dart';
+import 'provenance_card.dart';
 
 class HardwareScreen extends ConsumerWidget {
   final String rrn;
@@ -75,6 +76,12 @@ class HardwareScreen extends ConsumerWidget {
           ),
 
         const SizedBox(height: 32),
+
+        // ── RRF Provenance Chain (RCAN v2.2 §21) ──────────────────────────
+        if (robot != null)
+          ProvenanceCard(robot: robot),
+
+        const SizedBox(height: 16),
       ],
     );
   }

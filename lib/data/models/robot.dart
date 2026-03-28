@@ -126,6 +126,26 @@ class Robot {
   /// Configured audit retention in days (EU AI Act Art. 12). null if not configured.
   final int? auditRetentionDays;
 
+  // ── RCAN v2.2 fields — RRF provenance chain (§21) ─────────────────────────
+
+  /// RRF-assigned component numbers linked to this robot.
+  final List<String> rrfRcns;
+
+  /// RRF-assigned model numbers used by this robot.
+  final List<String> rrfRmns;
+
+  /// RRF-assigned harness number for this robot's AI harness.
+  final String? rrfRhn;
+
+  /// ML-DSA-65 key ID (8-char hex).
+  final String? pqKid;
+
+  /// Hardware manufacturer.
+  final String? manufacturer;
+
+  /// Hardware model identifier.
+  final String? hardwareModel;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -157,6 +177,13 @@ class Robot {
     this.attestationRef,
     this.authorityHandlerEnabled = false,
     this.auditRetentionDays,
+    // v2.2 fields
+    this.rrfRcns = const [],
+    this.rrfRmns = const [],
+    this.rrfRhn,
+    this.pqKid,
+    this.manufacturer,
+    this.hardwareModel,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -213,6 +240,13 @@ class Robot {
       attestationRef: m['attestation_ref'] as String?,
       authorityHandlerEnabled: m['authority_handler_enabled'] as bool? ?? false,
       auditRetentionDays: m['audit_retention_days'] as int?,
+      // v2.2 provenance fields
+      rrfRcns: ((m['rrf_rcns'] as List<dynamic>?) ?? []).cast<String>(),
+      rrfRmns: ((m['rrf_rmns'] as List<dynamic>?) ?? []).cast<String>(),
+      rrfRhn:  m['rrf_rhn'] as String?,
+      pqKid:   m['pq_kid'] as String?,
+      manufacturer:  m['manufacturer'] as String?,
+      hardwareModel: m['model'] as String?,
     );
   }
 
