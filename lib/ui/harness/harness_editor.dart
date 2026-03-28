@@ -294,6 +294,38 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     });
   }
 
+  // ── Insert-on-edge ───────────────────────────────────────────────────────
+
+  /// Called when user taps ⊕ on a flow-canvas edge.
+  /// Opens the skill browser; on selection the new layer is inserted between
+  /// the edge's fromId and toId nodes (edge is split).
+  void _insertOnEdge(FlowEdge edge) {
+    _showSkillBrowser(onAdded: (newLayer) {
+      // Find the new node's position in the graph
+      final newPos = _flowGraph.posMap[newLayer.id];
+      if (newPos == null) return;
+
+      // Split the original edge: fromId→newLayer + newLayer→toId
+      setState(() {
+        _flowGraph.edges.removeWhere(
+          (e) => e.fromId == edge.fromId && e.toId == edge.toId,
+        );
+        _flowGraph.edges.add(FlowEdge(
+          id: '${edge.fromId}-${newLayer.id}',
+          fromId: edge.fromId,
+          toId: newLayer.id,
+          label: edge.label,
+        ));
+        _flowGraph.edges.add(FlowEdge(
+          id: '${newLayer.id}-${edge.toId}',
+          fromId: newLayer.id,
+          toId: edge.toId,
+          label: '',
+        ));
+      });
+    });
+  }
+
   // ── Show Add Block sheet ──────────────────────────────────────────────────
 
   void _showAddBlockSheet() {
@@ -319,7 +351,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     );
   }
 
-  void _showSkillBrowser() {
+  void _showSkillBrowser({void Function(HarnessLayer)? onAdded}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -334,6 +366,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
           onAdd: (layer) {
             Navigator.pop(ctx);
             _addLayer(layer);
+            onAdded?.call(layer);
           },
         ),
       ),
@@ -343,6 +376,10 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
   // ── Open layer edit bottom sheet ──────────────────────────────────────────
 
   void _openEditSheet(HarnessLayer layer) {
+    // Compute position among reorderable (skill) layers for the order badge.
+    final skillLayers = _config.skillLayers.toList();
+    final layerIndex = skillLayers.indexWhere((l) => l.id == layer.id);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -361,6 +398,8 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
             key: ValueKey(layer.id),
             rrn: widget.rrn,
             layer: layer,
+            layerIndex: layerIndex >= 0 ? layerIndex : null,
+            totalLayers: skillLayers.length,
             onToggle: (l) {
               _toggleLayerEnabled(l);
               Navigator.pop(ctx);
@@ -373,6 +412,19 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                     Navigator.pop(ctx);
                   }
                 : null,
+            onMoveUp: (layer.canReorder && layerIndex > 0)
+                ? () {
+                    _reorderSkills(layerIndex, layerIndex - 1);
+                    Navigator.pop(ctx);
+                  }
+                : null,
+            onMoveDown:
+                (layer.canReorder && layerIndex < skillLayers.length - 1)
+                    ? () {
+                        _reorderSkills(layerIndex, layerIndex + 2);
+                        Navigator.pop(ctx);
+                      }
+                    : null,
           ),
         ),
       ),
@@ -838,6 +890,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                       onGraphChanged: (g) =>
                           setState(() => _flowGraph = g),
                       onNodeTap: _openEditSheet,
+                      onInsertOnEdge: _insertOnEdge,
                     )
                   : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -911,6 +964,10 @@ class _LayerEditPanel extends StatefulWidget {
   final void Function(HarnessLayer, Map<String, dynamic>) onConfigChanged;
   final VoidCallback onClose;
   final VoidCallback? onRemove;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+  final int? layerIndex;
+  final int totalLayers;
 
   const _LayerEditPanel({
     super.key,
@@ -920,6 +977,10 @@ class _LayerEditPanel extends StatefulWidget {
     required this.onConfigChanged,
     required this.onClose,
     this.onRemove,
+    this.onMoveUp,
+    this.onMoveDown,
+    this.layerIndex,
+    this.totalLayers = 0,
   });
 
   @override
@@ -964,10 +1025,28 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  widget.layer.label,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.layer.label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    if (widget.layer.canReorder && widget.layerIndex != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          'Block ${widget.layerIndex! + 1} of ${widget.totalLayers}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurfaceVariant,
+                            fontFamily: 'Space Grotesk',
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               if (widget.layer.canDisable)
@@ -1000,6 +1079,21 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
+              // ↑/↓ move buttons (reorderable layers only)
+              if (widget.layer.canReorder) ...[
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward_rounded, size: 16),
+                  tooltip: 'Move block up',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: widget.onMoveUp,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                  tooltip: 'Move block down',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: widget.onMoveDown,
+                ),
+              ],
               // Delete button for removable layers
               if (widget.onRemove != null)
                 IconButton(

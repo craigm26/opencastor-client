@@ -665,42 +665,25 @@ class _SkillGroupCard extends StatelessWidget {
                           : const NeverScrollableScrollPhysics(),
                       onReorder: onReorder ?? (_, __) {},
                       children: [
-                        for (final skill in layers)
-                          ListTile(
-                            key: ValueKey(skill.id),
-                            dense: true,
-                            leading: ReorderableDragStartListener(
-                              index: layers.indexOf(skill),
-                              child: const Icon(Icons.drag_handle, size: 18),
-                            ),
-                            title: Text(skill.label,
-                                style: const TextStyle(fontSize: 13)),
-                            subtitle: Text(skill.description,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: cs.onSurfaceVariant)),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Switch(
-                                  value: skill.enabled,
-                                  onChanged: onToggleSkill != null
-                                      ? (_) => onToggleSkill!(skill)
-                                      : null,
-                                  materialTapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                if (onEditLayer != null)
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined,
-                                        size: 14),
-                                    visualDensity: VisualDensity.compact,
-                                    onPressed: () => onEditLayer!(skill),
-                                  ),
-                              ],
-                            ),
-                            contentPadding:
-                                const EdgeInsets.only(left: 4, right: 0),
+                        for (int si = 0; si < layers.length; si++)
+                          _SkillListTile(
+                            key: ValueKey(layers[si].id),
+                            skill: layers[si],
+                            index: si,
+                            total: layers.length,
+                            onToggle: onToggleSkill != null
+                                ? () => onToggleSkill!(layers[si])
+                                : null,
+                            onEdit: onEditLayer != null
+                                ? () => onEditLayer!(layers[si])
+                                : null,
+                            onMoveUp: (onReorder != null && si > 0)
+                                ? () => onReorder!(si, si - 1)
+                                : null,
+                            onMoveDown:
+                                (onReorder != null && si < layers.length - 1)
+                                    ? () => onReorder!(si, si + 2)
+                                    : null,
                           ),
                       ],
                     ),
@@ -718,6 +701,171 @@ class _SkillGroupCard extends StatelessWidget {
     );
   }
 }
+
+// ── _SkillListTile ────────────────────────────────────────────────────────────
+
+/// A reorderable skill row with:
+/// - Order badge (1-based index chip)
+/// - Drag handle (long-press to drag)
+/// - ↑/↓ quick-move buttons (one step at a time)
+/// - Enable switch + edit button
+class _SkillListTile extends StatelessWidget {
+  final HarnessLayer skill;
+  final int index;
+  final int total;
+  final VoidCallback? onToggle;
+  final VoidCallback? onEdit;
+  final VoidCallback? onMoveUp;
+  final VoidCallback? onMoveDown;
+
+  const _SkillListTile({
+    super.key,
+    required this.skill,
+    required this.index,
+    required this.total,
+    this.onToggle,
+    this.onEdit,
+    this.onMoveUp,
+    this.onMoveDown,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final canReorder = skill.canReorder;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          // ── Order badge ────────────────────────────────────────────
+          SizedBox(
+            width: 32,
+            child: Center(
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: canReorder
+                      ? cs.primary.withValues(alpha: 0.15)
+                      : cs.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Space Grotesk',
+                      color: canReorder ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // ── Drag handle ────────────────────────────────────────────
+          if (canReorder)
+            ReorderableDragStartListener(
+              index: index,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                child: Icon(Icons.drag_handle,
+                    size: 18, color: cs.onSurfaceVariant),
+              ),
+            )
+          else
+            const SizedBox(width: 26),
+
+          // ── Label + description ────────────────────────────────────
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(skill.label,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500)),
+                  Text(skill.description,
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+          ),
+
+          // ── ↑/↓ quick-move ────────────────────────────────────────
+          if (canReorder) ...[
+            _ArrowBtn(
+              icon: Icons.keyboard_arrow_up_rounded,
+              enabled: onMoveUp != null,
+              onTap: onMoveUp,
+            ),
+            _ArrowBtn(
+              icon: Icons.keyboard_arrow_down_rounded,
+              enabled: onMoveDown != null,
+              onTap: onMoveDown,
+            ),
+          ] else ...[
+            const SizedBox(width: 48),
+          ],
+
+          // ── Enable switch ──────────────────────────────────────────
+          Switch(
+            value: skill.enabled,
+            onChanged: onToggle != null ? (_) => onToggle!() : null,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+
+          // ── Edit button ────────────────────────────────────────────
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 14),
+              visualDensity: VisualDensity.compact,
+              onPressed: onEdit,
+            ),
+
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArrowBtn extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback? onTap;
+
+  const _ArrowBtn({required this.icon, required this.enabled, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 24,
+      height: 40,
+      child: IconButton(
+        icon: Icon(icon, size: 16),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        color: enabled ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.3),
+        onPressed: enabled ? onTap : null,
+      ),
+    );
+  }
+}
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

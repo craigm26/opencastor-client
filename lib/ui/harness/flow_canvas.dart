@@ -41,6 +41,9 @@ class FlowCanvas extends StatefulWidget {
   /// Called when a node is tapped in editable mode (to open the edit panel).
   final void Function(HarnessLayer layer)? onNodeTap;
 
+  /// Fired when user taps the ⊕ insert button on an edge midpoint.
+  final void Function(FlowEdge edge)? onInsertOnEdge;
+
   const FlowCanvas({
     super.key,
     required this.layers,
@@ -48,6 +51,7 @@ class FlowCanvas extends StatefulWidget {
     this.editable = false,
     this.onGraphChanged,
     this.onNodeTap,
+    this.onInsertOnEdge,
   });
 
   @override
@@ -388,42 +392,80 @@ class _FlowCanvasState extends State<FlowCanvas> {
     );
   }
 
-  /// Build an invisible tap target at the midpoint of an edge to edit its label.
+  /// Build midpoint controls on an edge:
+  /// - Label chip (tap to edit connector type)
+  /// - ⊕ insert button (tap to insert a new block inline)
   Widget _buildEdgeTapTarget(FlowEdge edge) {
     final from = _graph.posMap[edge.fromId];
     final to = _graph.posMap[edge.toId];
     if (from == null || to == null) return const SizedBox.shrink();
 
-    final midX = ((from.x + _kNodeW / 2) + (to.x + _kNodeW / 2)) / 2 - 20;
-    final midY = ((from.y + _kNodeH) + to.y) / 2 - 10;
+    final midX = ((from.x + _kNodeW / 2) + (to.x + _kNodeW / 2)) / 2;
+    final midY = ((from.y + _kNodeH) + to.y) / 2;
+
+    final edgeColor = edge.isLoop ? _kLoopColor : _kEdgeColor;
+    final hasInsert = widget.editable && widget.onInsertOnEdge != null;
 
     return Positioned(
-      left: midX,
-      top: midY,
-      child: GestureDetector(
-        onTap: () => _editEdgeLabel(edge),
-        child: Container(
-          width: 40,
-          height: 20,
-          decoration: BoxDecoration(
-            color: const Color(0x22FFFFFF),
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: edge.isLoop ? _kLoopColor.withValues(alpha: 0.5) : _kEdgeColor.withValues(alpha: 0.5),
-              width: 1,
-            ),
-          ),
-          child: Center(
-            child: Text(
-              edge.label.isEmpty ? '…' : edge.label,
-              style: TextStyle(
-                color: edge.isLoop ? _kLoopColor : _kEdgeColor,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
+      left: midX - (hasInsert ? 36 : 20),
+      top: midY - 12,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Label chip — tap to set connector type
+          GestureDetector(
+            onTap: () => _editEdgeLabel(edge),
+            child: Container(
+              height: 22,
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(
+                color: const Color(0x33000000),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: edgeColor.withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  edge.label.isEmpty ? '…' : edge.label,
+                  style: TextStyle(
+                    color: edgeColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+
+          // ⊕ Insert button — only in editable mode
+          if (hasInsert) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => widget.onInsertOnEdge!(edge),
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1F6FEB).withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF1F6FEB).withValues(alpha: 0.7),
+                    width: 1.2,
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.add_rounded,
+                    size: 13,
+                    color: Color(0xFF58A6FF),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
