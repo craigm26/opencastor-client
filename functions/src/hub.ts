@@ -109,6 +109,54 @@ function extractYamlMeta(content: string): { rcan_version: string; provider: str
 
 // ── Cloud Functions ───────────────────────────────────────────────────────────
 
+// ── GCS configs cache ────────────────────────────────────────────────────────
+// Configs are synced to gs://opencastor-configs/configs/ by the bridge.
+// CF reads from GCS with a 5-min in-memory cache to avoid 200 Firestore reads
+// per searchConfigs call.
+
+const GCS_CONFIGS_BUCKET = "opencastor-configs";
+const GCS_CONFIGS_PREFIX = "configs/";
+let _configsCache: Record<string, unknown>[] | null = null;
+let _configsCacheAt = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function _loadConfigsFromGcs(): Promise<Record<string, unknown>[]> {
+  const now = Date.now();
+  if (_configsCache && now - _configsCacheAt < CACHE_TTL_MS) {
+    return _configsCache;
+  }
+  try {
+    const { Storage } = await import("@google-cloud/storage");
+    const storage = new Storage();
+    const [indexFile] = await storage
+      .bucket(GCS_CONFIGS_BUCKET)
+      .file(`${GCS_CONFIGS_PREFIX}index.json`)
+      .download();
+    const index = JSON.parse(indexFile.toString()) as { ids: string[] };
+    const ids = index.ids || [];
+
+    const configs = await Promise.all(
+      ids.map(async (id) => {
+        try {
+          const [file] = await storage
+            .bucket(GCS_CONFIGS_BUCKET)
+            .file(`${GCS_CONFIGS_PREFIX}${id}.json`)
+            .download();
+          return JSON.parse(file.toString()) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+    );
+    _configsCache = configs.filter(Boolean) as Record<string, unknown>[];
+    _configsCacheAt = now;
+    return _configsCache;
+  } catch (e) {
+    // GCS unavailable — fall back to Firestore
+    return [];
+  }
+}
+
 /**
  * uploadConfig — upload a config/skill/harness to the community hub.
  * Requires Firebase Auth. Content is scrubbed of secrets before storage.
@@ -202,15 +250,18 @@ export const searchConfigs = functions.onCall(
     const rcan_version = params.rcan_version as string | undefined;
     const limit = Math.min(Number(params.limit) || 20, 50);
 
-    // Use a simple public==true query to avoid composite index requirements.
-    // Filtering and sorting happen in memory — collection stays small (<500 docs).
-    let query: admin.firestore.Query = db()
-      .collection("configs")
-      .where("public", "==", true)
-      .limit(200); // over-fetch, filter in memory
-
-    const snaps = await query.get();
-    let docs = snaps.docs.map((doc) => doc.data());
+    // Primary: read from GCS-backed in-memory cache (0 Firestore reads, 5-min TTL).
+    // Fallback: Firestore query (used when GCS is unavailable or cache is empty).
+    let docs = await _loadConfigsFromGcs();
+    if (docs.length === 0) {
+      // Fallback to Firestore
+      let query: admin.firestore.Query = db()
+        .collection("configs")
+        .where("public", "==", true)
+        .limit(200);
+      const snaps = await query.get();
+      docs = snaps.docs.map((doc) => doc.data());
+    }
 
     // Apply filters in memory
     if (type) docs = docs.filter((d) => d.type === type);
@@ -222,9 +273,9 @@ export const searchConfigs = functions.onCall(
     docs.sort((a, b) => {
       if (a.official && !b.official) return -1;
       if (!a.official && b.official) return 1;
-      const starDiff = (b.stars || 0) - (a.stars || 0);
+      const starDiff = (Number(b.stars) || 0) - (Number(a.stars) || 0);
       if (starDiff !== 0) return starDiff;
-      return (b.installs || 0) - (a.installs || 0);
+      return (Number(b.installs) || 0) - (Number(a.installs) || 0);
     });
 
     const results = docs.slice(0, limit).map((d) => {

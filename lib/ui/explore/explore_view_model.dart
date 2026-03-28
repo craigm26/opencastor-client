@@ -29,7 +29,6 @@ final exploreConfigsProvider = FutureProvider.family<List<HubConfig>, ExploreFil
       final results = (data['results'] as List?) ?? [];
       final configs =
           results.whereType<Map>().map((m) => HubConfig.fromMap(_deepCast(m))).toList();
-      // Official configs always sorted first, then by stars
       configs.sort((a, b) {
         if (a.isOfficial && !b.isOfficial) return -1;
         if (!a.isOfficial && b.isOfficial) return 1;
