@@ -3,7 +3,6 @@
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -63,20 +62,34 @@ class _ContributeSettingsViewState
   Future<void> _toggleEnabled(bool v) async {
     setState(() => _saving = true);
     try {
-      final fn = FirebaseFunctions.instance.httpsCallable('sendRobotCommand');
-      await fn.call<Map<String, dynamic>>({
-        'rrn': widget.robot.rrn,
-        'command': v ? '/contribute start' : '/contribute stop',
-      });
-      await FirebaseFirestore.instance
+      final db = FirebaseFirestore.instance;
+      final rrn = widget.robot.rrn;
+
+      // Write command to Firestore commands subcollection.
+      // The bridge polls this and executes /contribute start|stop locally.
+      // (sendRobotCommand CF is not used — local robots need direct Firestore writes.)
+      await db
           .collection('robots')
-          .doc(widget.robot.rrn)
+          .doc(rrn)
+          .collection('commands')
+          .add({
+        'instruction': v ? '/contribute start' : '/contribute stop',
+        'scope': 'system',
+        'source': 'app',
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      // Also update contribute toggle state directly so UI is always consistent.
+      await db
+          .collection('robots')
+          .doc(rrn)
           .set({'contribute': {'enabled': v}}, SetOptions(merge: true));
+
       if (mounted) setState(() => _enabled = v);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: \$e')),
         );
       }
     } finally {
@@ -111,30 +124,25 @@ class _ContributeSettingsViewState
       _applyError = null;
     });
     try {
-      final fn = FirebaseFunctions.instance.httpsCallable('robotApiPost');
-      final result = await fn.call<Map<String, dynamic>>({
-        'rrn': widget.robot.rrn,
-        'path': '/api/harness/apply-champion',
-        'body': {},
+      // Write apply-champion command to Firestore — bridge executes locally.
+      await FirebaseFirestore.instance
+          .collection('robots')
+          .doc(widget.robot.rrn)
+          .collection('commands')
+          .add({
+        'instruction': '/harness apply-champion',
+        'scope': 'system',
+        'source': 'app',
+        'created_at': FieldValue.serverTimestamp(),
       });
-      final data = result.data as Map<String, dynamic>? ?? {};
-      if (data['applied'] == true) {
-        if (mounted) {
-          setState(() => _pendingChampion = null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  'Champion applied: ${data['candidate_id']} '
-                  '(score ${(data['score'] as num?)?.toStringAsFixed(4) ?? '?'})'),
-              backgroundColor: const Color(0xFF4caf50),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          setState(() => _applyError =
-              data['reason']?.toString() ?? 'Apply failed');
-        }
+      if (mounted) {
+        setState(() => _pendingChampion = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Apply-champion command sent — robot will update on next cycle'),
+            backgroundColor: Color(0xFF4caf50),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

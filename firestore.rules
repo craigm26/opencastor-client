@@ -48,8 +48,12 @@ service cloud.firestore {
           get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
             == request.auth.uid;
 
-        // Direct command writes blocked — must go through Cloud Functions relay
-        allow write: if false;
+        // Owner can write commands directly (bridge polls this subcollection).
+        // CF relay is preferred but not required — local robots need direct writes.
+        allow create: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow update, delete: if false; // immutable once created
       }
 
       // -------------------------------------------------------------------
