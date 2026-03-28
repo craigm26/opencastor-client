@@ -4,6 +4,39 @@ All notable changes to opencastor-client are documented here.
 
 ---
 
+## [1.4.0] - 2026-03-28
+
+### Added
+- WebSocket real-time telemetry (`ws_telemetry_service.dart`) — merges live WS data over Firestore
+- Hardware screen: synthesizes hw profile from `telemetry.system` when CF relay unavailable
+- Software screen: displays built-in commands list from bridge skills push
+- LoA enforce button (`_LoaEnableSheet`) — sends `loa_enable` command via Firestore
+- Components screen (`/robot/:rrn/capabilities/components`) — Firestore stream, grouped by type
+- Research screen (`/robot/:rrn/research`) — OHB-1 benchmark, community submit
+- Provenance card in hardware screen — full RRF chain (RCN/RMN/RHN)
+- Harness editor block ordering UX — numbered badge, drag handle, ↑/↓ buttons
+- Harness auto-save draft (2s debounce) + persistence to `robots/{rrn}.user_harness_config`
+- Flow graph serialized in harness saves; restored on editor open
+- Contribute toggle: direct Firestore write to `robots/{rrn}/commands` (replaces CF relay)
+- GCS direct read for Explore configs (public bucket, zero Firestore reads)
+- BigQuery telemetry streaming support (bridge-side, confirmed live)
+
+### Changed
+- Robot detail: chat-first layout; hardware stats moved to Capabilities → Hardware
+- RCAN v2.2 explore configs: PQ badges, v2.2 scope levels
+- `_RcanVersionBadge`: v2.2 → emerald, v2.1 → sky, others → grey
+- `validateAndSaveHarness` CF rcan_version corrected to `"2.2"`
+- `Robot` model: added v2.2 fields (rrfRcns, rrfRmns, rrfRhn, pqKid, manufacturer, hardwareModel)
+- `withOpacity()` → `withValues(alpha:)` throughout
+- Harness design panels: slider UX overhaul
+
+### Fixed
+- Stale service worker causing blank fleet cards + `Failed to fetch`
+- `CapStatus.fail` → `missing`, `CapStatus.warn` → `warning`
+- `Robot.fromDoc` — handle Firestore Timestamp for `registered_at`
+- Firestore security rule for `robots/{rrn}/components/{componentId}`
+
+
 ## [1.2.0] - 2026-03-21
 ### Added
 - Fleet Leaderboard: Kinetic Command design system (Stitch AI) — AeroNexus Technical theme, tonal cards, Space Grotesk typography, badge tier chips (Diamond/Gold/Silver/Bronze), search/filter bar
