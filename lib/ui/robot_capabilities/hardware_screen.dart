@@ -29,7 +29,10 @@ class HardwareScreen extends ConsumerWidget {
         body: _buildBody(context, null, robotAsync),
       ),
       data: (hw) => Scaffold(
-        appBar: AppBar(title: _hardwareTitle(hw)),
+        appBar: AppBar(title: _hardwareTitle(hw.isNotEmpty ? hw : _syntheticHw(
+          (robotAsync.valueOrNull?.telemetry['system'] as Map<String, dynamic>?),
+          robotAsync.valueOrNull,
+        ))),
         body: _buildBody(context, hw, robotAsync),
       ),
     );
@@ -46,6 +49,10 @@ class HardwareScreen extends ConsumerWidget {
     final sys = t['system'] as Map<String, dynamic>?;
     final mr = t['model_runtime'] as Map<String, dynamic>?;
 
+    // If Cloud Function couldn't reach the robot (local network), synthesize
+    // the hw map from Firestore telemetry.system — same data, already available.
+    final effectiveHw = (hw == null || hw.isEmpty) ? _syntheticHw(sys, robot) : hw;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -56,11 +63,11 @@ class HardwareScreen extends ConsumerWidget {
         ],
 
         // ── Detected hardware profile ─────────────────────────────────────
-        if (hw != null && hw.isNotEmpty)
+        if (effectiveHw.isNotEmpty)
           CapSection(
             title: 'Detected Hardware',
             icon: Icons.memory_outlined,
-            rows: _buildRows(hw),
+            rows: _buildRows(effectiveHw),
           )
         else
           CapSection(
@@ -84,6 +91,58 @@ class HardwareScreen extends ConsumerWidget {
         const SizedBox(height: 16),
       ],
     );
+  }
+
+  /// Build a hw-profile map from Firestore telemetry.system when the
+  /// Cloud Function relay cannot reach the robot (local-network robot).
+  static Map<String, dynamic> _syntheticHw(
+    Map<String, dynamic>? sys,
+    dynamic robot, // Robot? — avoid importing the model here
+  ) {
+    if (sys == null || sys.isEmpty) return const {};
+
+    final cpuModel  = sys['cpu_model']       as String? ?? '';
+    final cpuCount  = (sys['cpu_count'] as num?)?.toInt() ?? 0;
+    final platform  = sys['platform']        as String? ?? 'unknown';
+    final ramTotal  = (sys['ram_total_gb']   as num?)?.toDouble() ?? 0.0;
+    final ramAvail  = (sys['ram_available_gb'] as num?)?.toDouble() ?? 0.0;
+    final diskFree  = (sys['disk_free_gb']   as num?)?.toDouble() ?? 0.0;
+    final npuDetect = sys['npu_detected']    as bool? ?? false;
+    final npuTops   = (sys['npu_tops']       as num?)?.toDouble();
+
+    // Derive arch from platform string ("linux-aarch64" → "aarch64")
+    final arch = platform.contains('-')
+        ? platform.split('-').last
+        : platform;
+
+    // Derive hardware tier: Pi5 + Hailo → "pi5-hailo", Pi5 alone → "pi5",
+    // fallback → "unknown"
+    String tier = 'unknown';
+    if (cpuModel.toLowerCase().contains('raspberry pi 5')) {
+      tier = npuDetect ? 'pi5-hailo' : 'pi5-8gb';
+    } else if (cpuModel.toLowerCase().contains('raspberry pi 4')) {
+      tier = 'pi4';
+    }
+
+    final accelerators = <String>[
+      if (npuDetect)
+        'hailo-8${npuTops != null ? " · ${npuTops.toStringAsFixed(0)} TOPS" : ""}',
+      if (sys['gpu_detected'] == true) 'GPU detected',
+    ];
+
+    return {
+      'cpu_model':        cpuModel,
+      'cpu_cores':        cpuCount,
+      'arch':             arch,
+      'platform':         platform,
+      'ram_gb':           ramTotal,
+      'ram_available_gb': ramAvail,
+      'storage_free_gb':  diskFree,
+      'hardware_tier':    tier,
+      'accelerators':     accelerators,
+      'ollama_models':    <String>[],
+      '_source':          'firestore_telemetry', // internal marker
+    };
   }
 
   Widget _hardwareTitle(Map<String, dynamic> hw) {
