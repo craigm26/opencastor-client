@@ -73,6 +73,16 @@ service cloud.firestore {
       }
 
       // -------------------------------------------------------------------
+      // /robots/{rrn}/components/{componentId}  — RCN hardware registry
+      // -------------------------------------------------------------------
+      match /components/{componentId} {
+        allow read: if isSignedIn() &&
+          get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
+            == request.auth.uid;
+        allow write: if false; // Admin SDK (castor rrf / bridge) only
+      }
+
+      // -------------------------------------------------------------------
       // /robots/{rrn}/alerts/{alertId}
       // -------------------------------------------------------------------
       match /alerts/{alertId} {
