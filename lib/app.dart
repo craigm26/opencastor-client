@@ -39,6 +39,7 @@ import 'ui/robot_detail/orchestrator_screen.dart';
 import 'ui/robot_capabilities/hardware_screen.dart';
 import 'ui/robot_capabilities/identity_screen.dart';
 import 'ui/robot_capabilities/providers_screen.dart';
+import 'ui/robot_capabilities/research_screen.dart';
 import 'ui/robot_capabilities/robot_capabilities_screen.dart';
 import 'ui/robot_capabilities/safety_screen.dart';
 import 'ui/robot_capabilities/software_screen.dart';
@@ -256,6 +257,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/robot/:rrn/compliance-report',
             builder: (_, state) =>
                 ComplianceReportScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/research',
+            builder: (_, state) =>
+                ResearchScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             // #766: direct deep-link to compliance report (alias)
