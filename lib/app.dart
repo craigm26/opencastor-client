@@ -34,6 +34,7 @@ import 'ui/harness/harness_viewer.dart';
 import 'ui/robot_capabilities/ai_screen.dart';
 import 'ui/robot_capabilities/components_screen.dart';
 import 'ui/robot_capabilities/contribute_screen.dart';
+import 'ui/robot_capabilities/mcp_screen.dart';
 import 'ui/robot_capabilities/conformance_screen.dart';
 import 'ui/robot_detail/compliance_report_screen.dart';
 import 'ui/robot_detail/orchestrator_screen.dart';
@@ -243,6 +244,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/robot/:rrn/capabilities/providers',
             builder: (_, state) =>
                 ProvidersScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/capabilities/mcp',
+            builder: (_, state) =>
+                McpScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/capabilities/contribute',
