@@ -56,10 +56,13 @@ class PersonalResearchService {
     if (rrn.isEmpty) return false;
     try {
       await _db.collection('robots').doc(rrn).collection('commands').add({
-        'cmd': 'research_submit',
+        'instruction': 'research_submit',
         'scope': 'system',
         'params': {'run_id': runId, 'community': true},
+        'status': 'pending',
+        'source': 'app',
         'ts': FieldValue.serverTimestamp(),
+        'issued_at': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {
@@ -72,10 +75,13 @@ class PersonalResearchService {
     if (rrn.isEmpty) return false;
     try {
       await _db.collection('robots').doc(rrn).collection('commands').add({
-        'cmd': 'research_run',
+        'instruction': 'research_run',
         'scope': 'system',
         'params': {'personal': true},
+        'status': 'pending',
+        'source': 'app',
         'ts': FieldValue.serverTimestamp(),
+        'issued_at': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {

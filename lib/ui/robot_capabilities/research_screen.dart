@@ -9,15 +9,22 @@ import '../../data/models/personal_research.dart';
 import '../../data/services/personal_research_service.dart';
 import '../fleet_leaderboard/personal_research_card.dart';
 
-class ResearchScreen extends ConsumerWidget {
+class ResearchScreen extends ConsumerStatefulWidget {
   final String rrn;
   const ResearchScreen({super.key, required this.rrn});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ResearchScreen> createState() => _ResearchScreenState();
+}
+
+class _ResearchScreenState extends ConsumerState<ResearchScreen> {
+  bool _running = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final summaryAsync = ref.watch(personalResearchRrnProvider(rrn));
+    final summaryAsync = ref.watch(personalResearchRrnProvider(widget.rrn));
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -76,9 +83,10 @@ class ResearchScreen extends ConsumerWidget {
               ),
             ),
             data: (summary) => _ResearchBody(
-              rrn: rrn,
+              rrn: widget.rrn,
               summary: summary,
-              onRun: () => _triggerRun(context, ref),
+              running: _running,
+              onRun: () => _triggerRun(context),
               onSubmit: summary?.bestRun != null
                   ? () => _submitRun(context, ref, summary!)
                   : null,
@@ -89,18 +97,27 @@ class ResearchScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _triggerRun(BuildContext context, WidgetRef ref) async {
-    PersonalResearchService().triggerRun(rrn);
-    if (context.mounted) {
+  Future<void> _triggerRun(BuildContext context) async {
+    if (_running) return;
+    setState(() => _running = true);
+    try {
+      final ok = await PersonalResearchService().triggerRun(widget.rrn);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Research run queued — results in ~60s'),
+        SnackBar(
+          content: Text(ok
+              ? 'Research run queued — bridge will process shortly'
+              : 'Could not queue run — check robot connection'),
           behavior: SnackBarBehavior.floating,
         ),
       );
+      if (ok) {
+        await Future.delayed(const Duration(seconds: 8));
+        if (mounted) ref.invalidate(personalResearchRrnProvider(widget.rrn));
+      }
+    } finally {
+      if (mounted) setState(() => _running = false);
     }
-    await Future.delayed(const Duration(seconds: 5));
-    ref.invalidate(personalResearchRrnProvider(rrn));
   }
 
   Future<void> _submitRun(
@@ -135,7 +152,7 @@ class ResearchScreen extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
 
     final ok = await PersonalResearchService()
-        .submitToCommunity(rrn, run.runId);
+        .submitToCommunity(widget.rrn, run.runId);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -147,7 +164,7 @@ class ResearchScreen extends ConsumerWidget {
         ),
       );
     }
-    if (ok) ref.invalidate(personalResearchRrnProvider(rrn));
+    if (ok) ref.invalidate(personalResearchRrnProvider(widget.rrn));
   }
 }
 
@@ -158,10 +175,12 @@ class _ResearchBody extends StatelessWidget {
   final PersonalResearchSummary? summary;
   final VoidCallback onRun;
   final VoidCallback? onSubmit;
+  final bool running;
 
   const _ResearchBody({
     required this.rrn,
     required this.summary,
+    required this.running,
     required this.onRun,
     this.onSubmit,
   });
@@ -209,9 +228,14 @@ class _ResearchBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Run OHB-1 Benchmark'),
-              onPressed: onRun,
+              icon: running
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.play_arrow_rounded),
+              label: Text(running ? 'Queuing run…' : 'Run OHB-1 Benchmark'),
+              onPressed: running ? null : onRun,
             ),
           ),
 
