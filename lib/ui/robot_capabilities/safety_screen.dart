@@ -2,6 +2,7 @@
 /// Route: /robot/:rrn/capabilities/safety
 library;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -82,9 +83,70 @@ class _SafetyView extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _SafetyTelemetrySection(rrn: robot.rrn),
           const SizedBox(height: 32),
         ],
       ),
+    );
+  }
+}
+
+// ── Safety telemetry section (Firestore stream) ───────────────────────────────
+
+class _SafetyTelemetrySection extends StatelessWidget {
+  final String rrn;
+  const _SafetyTelemetrySection({required this.rrn});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('robots')
+          .doc(rrn)
+          .collection('telemetry')
+          .doc('safety')
+          .snapshots(),
+      builder: (context, snap) {
+        final safetyTelemetry =
+            snap.data?.data() as Map<String, dynamic>? ?? {};
+        final revocationLastCheckedS =
+            safetyTelemetry['revocation_last_checked_s'] as int? ?? 0;
+        final offlineMode =
+            safetyTelemetry['offline_mode'] as bool? ?? false;
+        final replayCacheSize =
+            safetyTelemetry['replay_cache_size'] as int? ?? 0;
+
+        return CapSection(
+          title: 'Runtime Safety Telemetry',
+          icon: Icons.monitor_heart_outlined,
+          rows: [
+            CapabilityRow(
+              label: 'Revocation Poll',
+              status: revocationLastCheckedS == 0
+                  ? CapStatus.info
+                  : revocationLastCheckedS < 60
+                      ? CapStatus.ok
+                      : CapStatus.warning,
+              description: revocationLastCheckedS == 0
+                  ? 'Not yet checked'
+                  : 'Last checked: ${revocationLastCheckedS}s ago',
+            ),
+            CapabilityRow(
+              label: 'Offline Mode',
+              status: offlineMode ? CapStatus.warning : CapStatus.ok,
+              description: offlineMode
+                  ? 'Using cached credentials'
+                  : 'Online — live credential validation',
+            ),
+            CapabilityRow(
+              label: 'Replay Cache',
+              status: CapStatus.info,
+              description: '$replayCacheSize nonces cached',
+            ),
+          ],
+        );
+      },
     );
   }
 }

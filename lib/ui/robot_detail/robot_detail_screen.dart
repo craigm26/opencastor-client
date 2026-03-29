@@ -1075,6 +1075,11 @@ class _ShortcutRow extends StatelessWidget {
         onTap: () => context.push('/robot/${robot.rrn}/capabilities/components'),
       ),
       _Shortcut(
+        icon: Icons.handshake_outlined,
+        label: 'Consent',
+        onTap: () => context.push('/robot/${robot.rrn}/capabilities/consent'),
+      ),
+      _Shortcut(
         icon: Icons.science_outlined,
         label: 'Research',
         onTap: () => context.push('/robot/${robot.rrn}/research'),

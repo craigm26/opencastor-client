@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
@@ -76,6 +77,47 @@ class _IdentityView extends StatelessWidget {
                     ? 'Robot Resource Name: ${robot.rrn}'
                     : 'Robot has no assigned RRN.',
               ),
+              CapabilityRow(
+                label: 'RURI',
+                status: robot.ruri.isNotEmpty ? CapStatus.ok : CapStatus.missing,
+                description: robot.ruri.isNotEmpty ? robot.ruri : 'No RURI assigned',
+                trailing: robot.ruri.isNotEmpty ? IconButton(
+                  icon: const Icon(Icons.copy, size: 16),
+                  onPressed: () => Clipboard.setData(ClipboardData(text: robot.ruri)),
+                  tooltip: 'Copy RURI',
+                ) : null,
+              ),
+              CapabilityRow(
+                label: 'Revocation',
+                status: robot.revocationStatus == RevocationStatus.active
+                    ? CapStatus.ok
+                    : robot.revocationStatus == RevocationStatus.suspended
+                        ? CapStatus.warning
+                        : CapStatus.missing,
+                description: robot.revocationStatus.name.toUpperCase(),
+              ),
+              if (robot.pqKid != null && robot.pqKid!.isNotEmpty)
+                CapabilityRow(
+                  label: 'PQ Key',
+                  status: CapStatus.ok,
+                  description: 'kid: ${robot.pqKid!.length > 8 ? robot.pqKid!.substring(robot.pqKid!.length - 8) : robot.pqKid!}',
+                ),
+              CapabilityRow(
+                label: 'Offline Mode',
+                status: robot.offlineCapable ? CapStatus.ok : CapStatus.info,
+                description: robot.offlineCapable ? 'Cached credentials available' : 'Requires network connectivity',
+              ),
+              if (robot.firmwareHash != null && robot.firmwareHash!.isNotEmpty)
+                CapabilityRow(
+                  label: 'Firmware Hash',
+                  status: CapStatus.ok,
+                  description: '${robot.firmwareHash!.substring(0, 16)}…',
+                  trailing: IconButton(
+                    icon: const Icon(Icons.copy, size: 16),
+                    onPressed: () => Clipboard.setData(ClipboardData(text: robot.firmwareHash!)),
+                    tooltip: 'Copy full hash',
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 32),
