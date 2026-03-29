@@ -13,6 +13,7 @@
 /// See also: [PendingConsentScreen] for the receiving side.
 library;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -161,7 +162,10 @@ final _consentFormProvider =
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 class ConsentScreen extends ConsumerWidget {
-  const ConsentScreen({super.key});
+  /// Optional RRN — when provided (from robot detail shortcut), shows a
+  /// tabbed view with Request Access + Training Consent tabs.
+  final String? rrn;
+  const ConsentScreen({super.key, this.rrn});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -171,6 +175,45 @@ class ConsentScreen extends ConsumerWidget {
       return _SuccessView(
         targetRrn: formState.targetRrn,
         onDone: () => context.pop(),
+      );
+    }
+
+    // When accessed via robot detail shortcut (rrn provided), show tabs.
+    if (rrn != null) {
+      return DefaultTabController(
+        length: 2,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Consent'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.info_outline),
+                tooltip: 'Consent Docs',
+                onPressed: () =>
+                    launchUrl(Uri.parse(AppConstants.docsConsent)),
+              ),
+              TextButton(
+                onPressed: () => context.push('/consent/pending'),
+                child: const Text('Pending'),
+              ),
+            ],
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Request Access'),
+                Tab(text: 'Training Data'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: _ConsentRequestForm(),
+              ),
+              _TrainingConsentTab(rrn: rrn!),
+            ],
+          ),
+        ),
       );
     }
 
@@ -195,6 +238,69 @@ class ConsentScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(20),
         child: _ConsentRequestForm(),
       ),
+    );
+  }
+}
+
+// ── Training Consent Tab ──────────────────────────────────────────────────────
+
+class _TrainingConsentTab extends StatelessWidget {
+  final String rrn;
+  const _TrainingConsentTab({required this.rrn});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('robots')
+          .doc(rrn)
+          .collection('consent')
+          .doc('training')
+          .collection('records')
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return Center(
+            child: Text(
+              'No training consent records',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final data = docs[i].data() as Map<String, dynamic>;
+            final consentId = data['consent_id'] as String? ?? docs[i].id;
+            final grantedAt = data['granted_at'];
+            String grantedLabel = 'Unknown date';
+            if (grantedAt != null) {
+              try {
+                final dt = (grantedAt as dynamic).toDate() as DateTime;
+                grantedLabel = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+              } catch (_) {}
+            }
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(consentId, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text('Granted: $grantedLabel', style: const TextStyle(fontSize: 11)),
+                trailing: IconButton(
+                  icon: Icon(Icons.delete_outline, color: cs.error),
+                  tooltip: 'Revoke consent',
+                  onPressed: () => docs[i].reference.delete(),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

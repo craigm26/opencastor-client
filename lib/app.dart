@@ -256,6 +256,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
                 CapContributeScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
+            path: '/robot/:rrn/capabilities/consent',
+            builder: (_, state) =>
+                ConsentScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
             path: '/robot/:rrn/capabilities/components',
             builder: (_, state) =>
                 ComponentsScreen(rrn: state.pathParameters['rrn']!),

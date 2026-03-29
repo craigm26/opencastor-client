@@ -50,6 +50,8 @@ class _ConformanceView extends StatelessWidget {
           ConformanceCard(robot: robot, score: score, p66Pass: p66Pass),
           const SizedBox(height: 16),
           _ScoreBreakdown(robot: robot, score: score, p66Pass: p66Pass),
+          const SizedBox(height: 16),
+          _L4L5Section(robot: robot),
           const SizedBox(height: 32),
         ],
       ),
@@ -154,6 +156,71 @@ class _BreakdownItem {
   final bool earned;
   const _BreakdownItem(
       {required this.label, required this.points, required this.earned});
+}
+
+// ── L4/L5 Supply Chain Section ────────────────────────────────────────────────
+
+class _L4L5Section extends StatelessWidget {
+  final Robot robot;
+  const _L4L5Section({required this.robot});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          'L4/L5 Supply Chain',
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        CapSection(
+          title: 'Supply Chain',
+          icon: Icons.account_tree_outlined,
+          rows: [
+            CapabilityRow(
+              label: 'Delegation Chains',
+              status: robot.supportsDelegation ? CapStatus.ok : CapStatus.missing,
+              description: robot.supportsDelegation
+                  ? 'RCAN §delegation supported'
+                  : 'delegation_chain not configured',
+            ),
+            CapabilityRow(
+              label: 'PQ Signing (ML-DSA-65)',
+              status: (robot.pqKid != null && robot.pqKid!.isNotEmpty)
+                  ? CapStatus.ok
+                  : CapStatus.missing,
+              description: (robot.pqKid != null && robot.pqKid!.isNotEmpty)
+                  ? 'kid: ${robot.pqKid}'
+                  : 'No PQ signing key',
+            ),
+            CapabilityRow(
+              label: 'Attestation Ref',
+              status: (robot.attestationRef != null && robot.attestationRef!.isNotEmpty)
+                  ? CapStatus.ok
+                  : CapStatus.info,
+              description: (robot.attestationRef != null && robot.attestationRef!.isNotEmpty)
+                  ? robot.attestationRef!
+                  : 'Not set',
+            ),
+            CapabilityRow(
+              label: 'RRF Provenance',
+              status: (robot.rrfRcns.isNotEmpty) ? CapStatus.ok : CapStatus.info,
+              description: robot.rrfRcns.isNotEmpty
+                  ? '${robot.rrfRcns.length} component(s) registered'
+                  : 'No RCN components in RRF',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 class _BreakdownRow extends StatelessWidget {

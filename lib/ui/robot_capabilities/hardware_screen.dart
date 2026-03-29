@@ -76,7 +76,7 @@ class HardwareScreen extends ConsumerWidget {
           CapSection(
             title: 'Detected Hardware',
             icon: Icons.memory_outlined,
-            rows: _buildRows(effectiveHw),
+            rows: _buildRows(effectiveHw, robot: robot),
           )
         else
           CapSection(
@@ -163,7 +163,7 @@ class HardwareScreen extends ConsumerWidget {
     return Text('Hardware — ${_tierLabel(tier)}');
   }
 
-  List<CapabilityRow> _buildRows(Map<String, dynamic> hw) {
+  List<CapabilityRow> _buildRows(Map<String, dynamic> hw, {dynamic robot}) {
     if (hw.isEmpty) {
       return [
         CapabilityRow(
@@ -234,6 +234,19 @@ class HardwareScreen extends ConsumerWidget {
           description: 'No Ollama models installed',
         ),
     ];
+
+    // Multimodal capability (from Robot model when available)
+    if (robot != null) {
+      final multimodalEnabled = (robot as dynamic).multimodalEnabled as bool? ?? true;
+      rows.add(CapabilityRow(
+        label: 'Multimodal',
+        status: multimodalEnabled ? CapStatus.ok : CapStatus.info,
+        description: multimodalEnabled
+            ? 'Image/video/audio payloads enabled (RCAN §5.4)'
+            : 'Disabled — add multimodal.enabled: true to config',
+      ));
+    }
+
     return rows;
   }
 

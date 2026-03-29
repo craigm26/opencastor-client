@@ -186,6 +186,8 @@ class MissionMessage {
   final DateTime timestamp;
   final MissionMessageStatus status;
   final bool isDeleted;
+  /// RCAN scope for this message (e.g. 'chat', 'control', 'safety'). Null if not set.
+  final String? scope;
 
   const MissionMessage({
     required this.id,
@@ -199,6 +201,7 @@ class MissionMessage {
     required this.timestamp,
     required this.status,
     this.isDeleted = false,
+    this.scope,
   });
 
   static DateTime _parseTs(dynamic v) {
@@ -244,6 +247,7 @@ class MissionMessage {
       timestamp: _parseTs(m['timestamp']),
       status: _statusFromStr(m['status'] as String?),
       isDeleted: m['deleted'] as bool? ?? false,
+      scope: m['scope'] as String?,
     );
   }
 

@@ -10,6 +10,32 @@ import '../../data/models/mission.dart';
 import '../widgets/thinking_indicator.dart';
 
 // ---------------------------------------------------------------------------
+// RCAN scope badge
+// ---------------------------------------------------------------------------
+
+Widget _scopeBadge(String? scope) {
+  if (scope == null || scope.isEmpty) return const SizedBox.shrink();
+  final colors = {
+    'discover': Colors.grey,
+    'status': Colors.blue,
+    'chat': Colors.green,
+    'control': Colors.orange,
+    'safety': Colors.red,
+    'system': Colors.purple,
+  };
+  final color = colors[scope.toLowerCase()] ?? Colors.grey;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(4),
+      border: Border.all(color: color.withValues(alpha: 0.4)),
+    ),
+    child: Text(scope, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Consistent color palette — shared by robots (by RRN) and humans (by uid)
 // ---------------------------------------------------------------------------
 
@@ -252,6 +278,9 @@ class _MissionScreenState extends State<MissionScreen> {
                         mission: mission, currentUid: myUid ?? '')
                     : const SizedBox.shrink(),
               ),
+
+              // Mission info card
+              _MissionInfoCard(mission: mission),
 
               // Messages
               Expanded(
@@ -804,10 +833,18 @@ class _RobotMessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${msg.fromName} · ${_timeLabel(msg.timestamp)}',
-                  style: TextStyle(
-                      fontSize: 10, color: cs.onSurfaceVariant),
+                Row(
+                  children: [
+                    Text(
+                      '${msg.fromName} · ${_timeLabel(msg.timestamp)}',
+                      style: TextStyle(
+                          fontSize: 10, color: cs.onSurfaceVariant),
+                    ),
+                    if (msg.scope != null) ...[
+                      const SizedBox(width: 6),
+                      _scopeBadge(msg.scope),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Container(
@@ -945,6 +982,40 @@ class _ErrorBanner extends StatelessWidget {
             constraints: const BoxConstraints(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mission info card
+// ---------------------------------------------------------------------------
+
+class _MissionInfoCard extends StatelessWidget {
+  final Mission mission;
+  const _MissionInfoCard({required this.mission});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('RCAN v2.2 Mission',
+                style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            Text('ID: ${mission.id}', style: theme.textTheme.bodySmall),
+          ],
+        ),
       ),
     );
   }

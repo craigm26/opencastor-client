@@ -218,6 +218,8 @@ class CapabilityRow {
   final String? actionLabel;
   final String? actionUrl;
   final void Function(BuildContext ctx)? onAction;
+  /// Optional trailing widget rendered after the action button (e.g. an IconButton).
+  final Widget? trailing;
 
   const CapabilityRow({
     required this.label,
@@ -226,6 +228,7 @@ class CapabilityRow {
     this.actionLabel,
     this.actionUrl,
     this.onAction,
+    this.trailing,
   });
 }
 
@@ -337,6 +340,10 @@ class CapabilityRowWidget extends StatelessWidget {
                 }
               },
             ),
+          ],
+          if (row.trailing != null) ...[
+            const SizedBox(width: 4),
+            row.trailing!,
           ],
         ],
       ),
