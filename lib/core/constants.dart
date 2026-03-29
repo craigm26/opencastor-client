@@ -4,10 +4,10 @@ library;
 class AppConstants {
   AppConstants._();
 
-  static const String appVersion = '1.4.1';
+  static const String appVersion = '1.4.3';
   static const String rcanVersion = '2.2.1';
-  static const String versionLabel = 'v1.4 · RCAN v2.2.1';
-  static const String opencastorReleaseVersion = '2026.3.28.0';
+  static const String versionLabel = 'v1.4.3 · RCAN v2.2.1';
+  static const String opencastorReleaseVersion = '2026.3.29.0';
 
   // Documentation URLs
   static const String docsRoot = 'https://opencastor.com/docs/';

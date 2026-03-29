@@ -299,8 +299,8 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
         color: const Color(0xFF131c1f),
         border: Border.all(
           color: config.isChampion
-              ? const Color(0xFF55d7ed).withOpacity(0.4)
-              : Colors.white.withOpacity(0.08),
+              ? const Color(0xFF55d7ed).withValues(alpha: 0.4)
+              : Colors.white.withValues(alpha: 0.08),
         ),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -426,7 +426,7 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
                 OutlinedButton(
                   onPressed: () {/* navigate to raw yaml viewer */},
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
                     foregroundColor: Colors.white70,
                     textStyle: const TextStyle(fontSize: 12),
                   ),
@@ -443,7 +443,7 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
   Widget _chip(String label, Color color, {bool tinted = false}) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
         decoration: BoxDecoration(
-          color: tinted ? color.withOpacity(0.12) : Colors.white.withOpacity(0.05),
+          color: tinted ? color.withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(99),
         ),
         child: Text(label,

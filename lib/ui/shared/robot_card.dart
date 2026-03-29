@@ -37,7 +37,7 @@ class SharedRobotCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        splashColor: cs.primary.withOpacity(0.08),
+        splashColor: cs.primary.withValues(alpha: 0.08),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

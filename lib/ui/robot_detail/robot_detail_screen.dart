@@ -953,7 +953,7 @@ class _UpdateBanner extends StatelessWidget {
     }
     const color = Color(0xFFE65100); // deep orange
     return Material(
-      color: color.withOpacity(0.10),
+      color: color.withValues(alpha: 0.10),
       child: InkWell(
         onTap: () => launchUrl(
           Uri.parse('https://github.com/craigm26/OpenCastor/releases/latest'),
@@ -964,7 +964,7 @@ class _UpdateBanner extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
               border: Border(
-                  bottom: BorderSide(color: color.withOpacity(0.35)))),
+                  bottom: BorderSide(color: color.withValues(alpha: 0.35)))),
           child: Row(
             children: [
               Icon(Icons.system_update_alt_outlined, size: 15, color: color),
@@ -1128,7 +1128,7 @@ class _ShortcutPill extends StatelessWidget {
             decoration: BoxDecoration(
               color: cs.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
             ),
             child: Icon(s.icon, size: 18, color: cs.onSurfaceVariant),
           ),
@@ -1170,7 +1170,7 @@ class _StatusBadge extends StatelessWidget {
               color: color,
               shape: BoxShape.circle,
               boxShadow: isOnline
-                  ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 4)]
+                  ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 4)]
                   : null,
             ),
           ),
@@ -1558,7 +1558,7 @@ class _HwChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.6),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
       ),

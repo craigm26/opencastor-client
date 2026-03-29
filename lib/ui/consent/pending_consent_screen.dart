@@ -154,8 +154,8 @@ class _PendingConsentCard extends ConsumerWidget {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: isServiceRequest
-              ? Colors.amber.withOpacity(0.4)
-              : AppTheme.warning.withOpacity(0.25),
+              ? Colors.amber.withValues(alpha: 0.4)
+              : AppTheme.warning.withValues(alpha: 0.25),
         ),
       ),
       child: Padding(
@@ -210,10 +210,10 @@ class _PendingConsentCard extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withOpacity(0.10),
+                  color: Colors.amber.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                      color: Colors.amber.withOpacity(0.3)),
+                      color: Colors.amber.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -305,7 +305,7 @@ class _PendingConsentCard extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppTheme.danger,
                     side: BorderSide(
-                        color: AppTheme.danger.withOpacity(0.5)),
+                        color: AppTheme.danger.withValues(alpha: 0.5)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -461,9 +461,9 @@ class _ScopeChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         scope,

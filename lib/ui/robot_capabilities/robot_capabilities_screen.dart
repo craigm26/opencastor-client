@@ -236,7 +236,7 @@ class _CapabilitiesIndex extends StatelessWidget {
       height: 1,
       indent: 56,
       endIndent: 16,
-      color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4),
+      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
     );
   }
 }
@@ -285,7 +285,7 @@ class _CapabilitiesIndexTile extends StatelessWidget {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, size: 18, color: color),

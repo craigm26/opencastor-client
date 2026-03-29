@@ -100,13 +100,13 @@ class _OrchestratorList extends StatelessWidget {
         const SizedBox(height: 8),
         Text('RCAN v2.1 §2.9 — M2M_TRUSTED Orchestrators',
             style: TextStyle(
-                fontSize: 12, color: cs.onSurface.withOpacity(0.6))),
+                fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6))),
         const SizedBox(height: 4),
         Text(
           'Orchestrators are cross-fleet systems authorized by all robot owners to command '
           'multiple robots simultaneously. Each orchestrator must have consent from every '
           "robot owner. Tokens are issued by RRF's root key and expire in 24 hours.",
-          style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.6)),
+          style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6)),
         ),
         const SizedBox(height: 16),
 
@@ -171,9 +171,9 @@ class _ConsentPendingCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                   ),
                   child: const Text('PENDING CONSENT',
                       style: TextStyle(
@@ -237,7 +237,7 @@ class _LabelValue extends StatelessWidget {
             child: Text(label,
                 style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.6),
+                    color: cs.onSurface.withValues(alpha: 0.6),
                     fontWeight: FontWeight.w500)),
           ),
           Expanded(
@@ -382,9 +382,9 @@ class _InfoBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,7 +393,7 @@ class _InfoBanner extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(message,
-                style: TextStyle(fontSize: 12, color: color.withOpacity(0.9))),
+                style: TextStyle(fontSize: 12, color: color.withValues(alpha: 0.9))),
           ),
         ],
       ),

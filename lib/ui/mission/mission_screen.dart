@@ -114,7 +114,7 @@ class _MissionScreenState extends State<MissionScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 12, bottom: 16),
                 decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -469,9 +469,9 @@ class _ParticipantChipFull extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _accentColor.withOpacity(0.12),
+        color: _accentColor.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _accentColor.withOpacity(0.3)),
+        border: Border.all(color: _accentColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -494,7 +494,7 @@ class _ParticipantChipFull extends StatelessWidget {
             Text('· $roleLabel',
                 style: TextStyle(
                     fontSize: 10,
-                    color: _accentColor.withOpacity(0.7))),
+                    color: _accentColor.withValues(alpha: 0.7))),
           ],
         ],
       ),
@@ -709,7 +709,7 @@ class _HumanMessageBubble extends StatelessWidget {
             height: 32,
             margin: const EdgeInsets.only(right: 8, top: 4),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               shape: BoxShape.circle,
               border: Border.all(color: color, width: 1.5),
             ),
@@ -793,7 +793,7 @@ class _RobotMessageBubble extends StatelessWidget {
             height: 32,
             margin: const EdgeInsets.only(right: 8, top: 4),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: accentColor.withValues(alpha: 0.15),
               shape: BoxShape.circle,
               border: Border.all(color: accentColor, width: 1.5),
             ),

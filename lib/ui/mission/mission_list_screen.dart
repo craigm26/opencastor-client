@@ -52,7 +52,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(top: 12, bottom: 16),
                 decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withOpacity(0.3),
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -198,7 +198,7 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.track_changes_outlined,
-              size: 64, color: cs.onSurfaceVariant.withOpacity(0.4)),
+              size: 64, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
           Text('No missions yet',
               style: Theme.of(context)
@@ -263,7 +263,7 @@ class _MissionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
             color: isDark
-                ? const Color(0xFF0ea5e9).withOpacity(0.15)
+                ? const Color(0xFF0ea5e9).withValues(alpha: 0.15)
                 : cs.outlineVariant,
           ),
         ),
@@ -421,7 +421,7 @@ class _MiniAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: _color.withOpacity(0.2),
+        color: _color.withValues(alpha: 0.2),
         shape: BoxShape.circle,
         border: Border.all(
             color: Theme.of(context).colorScheme.surface, width: 1.5),
@@ -463,7 +463,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(label,

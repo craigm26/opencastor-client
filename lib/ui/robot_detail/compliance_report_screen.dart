@@ -144,7 +144,7 @@ class _ComplianceReportView extends StatelessWidget {
         children: [
           // Overall status
           Card(
-            color: statusColor.withOpacity(0.08),
+            color: statusColor.withValues(alpha: 0.08),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -177,7 +177,7 @@ class _ComplianceReportView extends StatelessWidget {
                         'Conformance Level: L${report['conformance_level']}  •  Deadline: ${report['deadline']}',
                         style: TextStyle(
                             fontSize: 12,
-                            color: cs.onSurface.withOpacity(0.7)),
+                            color: cs.onSurface.withValues(alpha: 0.7)),
                       ),
                     ],
                   ),
@@ -208,7 +208,7 @@ class _ComplianceReportView extends StatelessWidget {
                   Text(m['provision'] as String,
                       style: TextStyle(
                           fontSize: 12,
-                          color: cs.onSurface.withOpacity(0.7))),
+                          color: cs.onSurface.withValues(alpha: 0.7))),
                 ],
               ),
             );
@@ -223,7 +223,7 @@ class _ComplianceReportView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cs.surfaceVariant.withOpacity(0.5),
+              color: cs.surfaceVariant.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: SelectableText(

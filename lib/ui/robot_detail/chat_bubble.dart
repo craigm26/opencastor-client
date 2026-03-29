@@ -36,7 +36,7 @@ class ChatBubble extends StatelessWidget {
         isUser ? cs.primary : cs.surfaceContainerHigh;
     final textColor = isUser ? cs.onPrimary : cs.onSurface;
     final timeColor =
-        isUser ? cs.onPrimary.withOpacity(0.6) : cs.onSurfaceVariant;
+        isUser ? cs.onPrimary.withValues(alpha: 0.6) : cs.onSurfaceVariant;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -77,7 +77,7 @@ class ChatBubble extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.terminal_rounded,
-                        size: 14, color: textColor.withOpacity(0.85)),
+                        size: 14, color: textColor.withValues(alpha: 0.85)),
                     const SizedBox(width: 6),
                     Text(
                       text,

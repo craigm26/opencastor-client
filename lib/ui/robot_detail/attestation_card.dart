@@ -131,7 +131,7 @@ class _AttestRow extends StatelessWidget {
                   Text(detail,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
                         decoration: onTap != null ? TextDecoration.underline : null,
                       )),
                 ],
@@ -170,14 +170,14 @@ class _ConformanceLevelBar extends StatelessWidget {
             Text('Conformance Level',
                 style: TextStyle(
                     fontSize: 12,
-                    color: cs.onSurface.withOpacity(0.7),
+                    color: cs.onSurface.withValues(alpha: 0.7),
                     fontWeight: FontWeight.w600)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: levelColor.withOpacity(0.15),
+                color: levelColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: levelColor.withOpacity(0.5)),
+                border: Border.all(color: levelColor.withValues(alpha: 0.5)),
               ),
               child: Text('L$level',
                   style: TextStyle(
@@ -199,7 +199,7 @@ class _ConformanceLevelBar extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             _nextLevelHint(level),
-            style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.5)),
+            style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5)),
           ),
         ],
       ],
@@ -230,13 +230,13 @@ class _RcanBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: isV21
-            ? Colors.green.withOpacity(0.1)
-            : Colors.orange.withOpacity(0.1),
+            ? Colors.green.withValues(alpha: 0.1)
+            : Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
             color: isV21
-                ? Colors.green.withOpacity(0.5)
-                : Colors.orange.withOpacity(0.5)),
+                ? Colors.green.withValues(alpha: 0.5)
+                : Colors.orange.withValues(alpha: 0.5)),
       ),
       child: Text(
         'RCAN $version',

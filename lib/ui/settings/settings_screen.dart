@@ -181,7 +181,7 @@ class SettingsScreen extends ConsumerWidget {
               label: const Text('Sign out'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppTheme.danger,
-                side: BorderSide(color: AppTheme.danger.withOpacity(0.5)),
+                side: BorderSide(color: AppTheme.danger.withValues(alpha: 0.5)),
                 minimumSize: const Size(0, 48),
               ),
             ),

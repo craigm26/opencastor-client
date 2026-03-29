@@ -214,7 +214,7 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8)),
                                 tileColor: isSelected
-                                    ? const Color(0xFF0ea5e9).withOpacity(0.08)
+                                    ? const Color(0xFF0ea5e9).withValues(alpha: 0.08)
                                     : null,
                               );
                             }).toList(),
@@ -383,7 +383,7 @@ class _InviteeRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surfaceVariant.withOpacity(0.5),
+        color: cs.surfaceVariant.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: cs.outlineVariant),
       ),
@@ -402,7 +402,7 @@ class _InviteeRow extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: _roleColor.withOpacity(0.15),
+              color: _roleColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: DropdownButtonHideUnderline(

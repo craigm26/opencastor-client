@@ -274,7 +274,7 @@ class CapSection extends StatelessWidget {
                     height: 1,
                     indent: 16,
                     endIndent: 16,
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
               ],
             ],
@@ -571,10 +571,10 @@ class CapInstructionSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.warning.withOpacity(0.1),
+                  color: AppTheme.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border:
-                      Border.all(color: AppTheme.warning.withOpacity(0.3)),
+                      Border.all(color: AppTheme.warning.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,7 +815,7 @@ class ConformanceCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: score / 100.0,
                       minHeight: 8,
-                      backgroundColor: progressColor.withOpacity(0.15),
+                      backgroundColor: progressColor.withValues(alpha: 0.15),
                       valueColor:
                           AlwaysStoppedAnimation<Color>(progressColor),
                     ),

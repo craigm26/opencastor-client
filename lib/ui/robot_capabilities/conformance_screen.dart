@@ -137,7 +137,7 @@ class _ScoreBreakdown extends StatelessWidget {
                     height: 1,
                     indent: 16,
                     endIndent: 16,
-                    color: cs.outlineVariant.withOpacity(0.4),
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
                   ),
               ],
             ],
