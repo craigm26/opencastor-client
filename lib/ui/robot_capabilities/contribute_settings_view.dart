@@ -1,5 +1,13 @@
-/// Contribute settings: enable/disable toggle, auto-apply champion toggle,
-/// and manual "Apply Champion Now" action.
+/// Contribute settings: two distinct modes clearly explained.
+///
+/// Mode 1 — Donate Idle Compute:
+///   When this robot is idle, it runs distributed harness research tasks
+///   for the OpenCastor community. Earns Castor Credits and fleet rank.
+///
+/// Mode 2 — Auto-Apply Champions:
+///   When the community verifies a new top-performing harness config,
+///   automatically install it on this robot. Keeps the local harness
+///   optimised without manual review.
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,11 +28,12 @@ class ContributeSettingsView extends ConsumerStatefulWidget {
 
 class _ContributeSettingsViewState
     extends ConsumerState<ContributeSettingsView> {
-  bool _enabled = false;
+  bool _donateEnabled = false;
   bool _autoApply = false;
   Map<String, dynamic>? _pendingChampion;
   bool _loading = true;
-  bool _saving = false;
+  bool _savingDonate = false;
+  bool _savingAutoApply = false;
   bool _applying = false;
   String? _applyError;
 
@@ -46,7 +55,7 @@ class _ContributeSettingsViewState
         final contribute = data['contribute'] as Map<String, dynamic>? ?? {};
         final pending = data['harness_pending'] as Map<String, dynamic>?;
         setState(() {
-          _enabled = contribute['enabled'] as bool? ?? false;
+          _donateEnabled = contribute['enabled'] as bool? ?? false;
           _autoApply = contribute['auto_apply_champion'] as bool? ?? false;
           _pendingChampion = pending;
           _loading = false;
@@ -59,46 +68,43 @@ class _ContributeSettingsViewState
     }
   }
 
-  Future<void> _toggleEnabled(bool v) async {
-    setState(() => _saving = true);
+  Future<void> _toggleDonate(bool v) async {
+    setState(() => _savingDonate = true);
     try {
       final db = FirebaseFirestore.instance;
       final rrn = widget.robot.rrn;
 
       // Write command to Firestore commands subcollection.
-      // The bridge polls this and executes /contribute start|stop locally.
-      // (sendRobotCommand CF is not used — local robots need direct Firestore writes.)
-      await db
-          .collection('robots')
-          .doc(rrn)
-          .collection('commands')
-          .add({
+      // Bridge polls this and executes /contribute start|stop locally.
+      await db.collection('robots').doc(rrn).collection('commands').add({
         'instruction': v ? '/contribute start' : '/contribute stop',
         'scope': 'system',
         'source': 'app',
+        'status': 'pending',
         'created_at': FieldValue.serverTimestamp(),
+        'issued_at': FieldValue.serverTimestamp(),
       });
 
-      // Also update contribute toggle state directly so UI is always consistent.
+      // Mirror state directly so UI is immediately consistent.
       await db
           .collection('robots')
           .doc(rrn)
           .set({'contribute': {'enabled': v}}, SetOptions(merge: true));
 
-      if (mounted) setState(() => _enabled = v);
+      if (mounted) setState(() => _donateEnabled = v);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: \$e')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _savingDonate = false);
     }
   }
 
   Future<void> _toggleAutoApply(bool v) async {
-    setState(() => _saving = true);
+    setState(() => _savingAutoApply = true);
     try {
       await FirebaseFirestore.instance
           .collection('robots')
@@ -110,11 +116,11 @@ class _ContributeSettingsViewState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving auto-apply setting: $e')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _savingAutoApply = false);
     }
   }
 
@@ -124,7 +130,6 @@ class _ContributeSettingsViewState
       _applyError = null;
     });
     try {
-      // Write apply-champion command to Firestore — bridge executes locally.
       await FirebaseFirestore.instance
           .collection('robots')
           .doc(widget.robot.rrn)
@@ -133,21 +138,21 @@ class _ContributeSettingsViewState
         'instruction': '/harness apply-champion',
         'scope': 'system',
         'source': 'app',
+        'status': 'pending',
         'created_at': FieldValue.serverTimestamp(),
+        'issued_at': FieldValue.serverTimestamp(),
       });
       if (mounted) {
         setState(() => _pendingChampion = null);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Apply-champion command sent — robot will update on next cycle'),
+            content: Text('Champion config queued — robot will update on next cycle'),
             backgroundColor: Color(0xFF4caf50),
           ),
         );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _applyError = 'Could not apply — try again');
-      }
+      if (mounted) setState(() => _applyError = 'Could not apply — try again');
     } finally {
       if (mounted) setState(() => _applying = false);
     }
@@ -157,178 +162,241 @@ class _ContributeSettingsViewState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    const cyan = Color(0xFF55d7ed);
-    const amber = Color(0xFFffba38);
 
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Section header ────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Contribution modes',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+
+        // ── Mode 1: Donate idle compute ───────────────────────────────────
+        _ModeCard(
+          icon: Icons.volunteer_activism_outlined,
+          title: 'Donate idle compute',
+          description: _donateEnabled
+              ? 'Running distributed tasks when idle — earning rank and Castor Credits'
+              : 'When off, this robot keeps all compute for local tasks only',
+          saving: _savingDonate,
+          enabled: _donateEnabled,
+          onChanged: _toggleDonate,
+          accentColor: cs.primary,
+        ),
+
+        const SizedBox(height: 10),
+
+        // ── Mode 2: Auto-apply champion configs ───────────────────────────
+        _ModeCard(
+          icon: Icons.auto_fix_high_outlined,
+          title: 'Auto-apply champion configs',
+          description: _autoApply
+              ? 'Best harness configs from the community install automatically'
+              : "New champion configs queue for your review before installing",
+          saving: _savingAutoApply,
+          enabled: _autoApply,
+          onChanged: _toggleAutoApply,
+          accentColor: const Color(0xFF55d7ed),
+        ),
+
+        // ── Pending champion banner ───────────────────────────────────────
+        if (_pendingChampion != null) ...[
+          const SizedBox(height: 10),
+          _PendingChampionBanner(
+            champion: _pendingChampion!,
+            applying: _applying,
+            applyError: _applyError,
+            onApply: _applyChampionNow,
+            onDismiss: () => setState(() => _pendingChampion = null),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Reusable mode card ────────────────────────────────────────────────────────
+
+class _ModeCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool saving;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+  final Color accentColor;
+
+  const _ModeCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.saving,
+    required this.enabled,
+    required this.onChanged,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+        padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Enable/disable toggle ────────────────────────────────────────
-            Row(
-              children: [
-                Icon(Icons.science_outlined, size: 20, color: cs.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Compute Contribution',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-                if (_saving)
-                  const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                else
-                  Switch.adaptive(
-                    value: _enabled,
-                    onChanged: _toggleEnabled,
-                  ),
-              ],
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(icon, size: 20, color: enabled ? accentColor : cs.onSurfaceVariant),
             ),
-            const SizedBox(height: 4),
-            Text(
-              _enabled
-                  ? 'Contributing when idle — earning rank and Castor Credits'
-                  : 'Enable to earn rank and Castor Credits from idle compute',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
-            ),
-
-            if (_enabled) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // ── Pending champion banner ────────────────────────────────────
-              if (_pendingChampion != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: amber.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: amber.withValues(alpha: 0.3), width: 1),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.emoji_events_outlined,
-                              size: 16, color: amber),
-                          const SizedBox(width: 6),
-                          Text(
-                            'New champion config available',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: amber,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Candidate: ${_pendingChampion!['_candidate_id'] ?? '?'}  '
-                        '·  Score: ${(_pendingChampion!['_score'] as num?)?.toStringAsFixed(4) ?? '?'}',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      if (_applyError != null) ...[
-                        const SizedBox(height: 6),
-                        Text(_applyError!,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: cs.error)),
-                      ],
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _applying
-                                ? const Center(
-                                    child: SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2)))
-                                : FilledButton.icon(
-                                    icon: const Icon(
-                                        Icons.check_circle_outline,
-                                        size: 16),
-                                    label: const Text('Apply to this robot'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor:
-                                          amber.withValues(alpha: 0.85),
-                                      foregroundColor: Colors.black87,
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    onPressed: _applyChampionNow,
-                                  ),
-                          ),
-                          const SizedBox(width: 8),
-                          OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              side: BorderSide(
-                                  color:
-                                      cs.outline.withValues(alpha: 0.5)),
-                            ),
-                            onPressed: () =>
-                                setState(() => _pendingChampion = null),
-                            child: const Text('Dismiss'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // ── Auto-apply toggle ──────────────────────────────────────────
-              Row(
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.update_outlined, size: 18, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Auto-apply champion configs',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          _autoApply
-                              ? 'New champion configs apply automatically'
-                              : 'You review and apply champion configs manually',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                      ],
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  Switch.adaptive(
-                    value: _autoApply,
-                    activeThumbColor: cyan,
-                    onChanged: _toggleAutoApply,
+                  const SizedBox(height: 3),
+                  Text(
+                    description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
-            ],
+            ),
+            const SizedBox(width: 8),
+            saving
+                ? const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2)),
+                  )
+                : Switch.adaptive(
+                    value: enabled,
+                    activeColor: accentColor,
+                    onChanged: onChanged,
+                  ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Pending champion banner ───────────────────────────────────────────────────
+
+class _PendingChampionBanner extends StatelessWidget {
+  final Map<String, dynamic> champion;
+  final bool applying;
+  final String? applyError;
+  final VoidCallback onApply;
+  final VoidCallback onDismiss;
+
+  const _PendingChampionBanner({
+    required this.champion,
+    required this.applying,
+    required this.applyError,
+    required this.onApply,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    const amber = Color(0xFFffba38);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: amber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: amber.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.emoji_events_outlined, size: 16, color: amber),
+              const SizedBox(width: 6),
+              Text(
+                'New champion config ready to install',
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: amber, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Candidate: ${champion['_candidate_id'] ?? '?'}  ·  '
+            'Score: ${(champion['_score'] as num?)?.toStringAsFixed(4) ?? '?'}',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          if (applyError != null) ...[
+            const SizedBox(height: 4),
+            Text(applyError!,
+                style:
+                    theme.textTheme.labelSmall?.copyWith(color: cs.error)),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: applying
+                    ? const Center(
+                        child: SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2)))
+                    : FilledButton.icon(
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Install on this robot'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: amber.withValues(alpha: 0.85),
+                          foregroundColor: Colors.black87,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: onApply,
+                      ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: cs.outline.withValues(alpha: 0.5)),
+                ),
+                onPressed: onDismiss,
+                child: const Text('Dismiss'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

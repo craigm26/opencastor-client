@@ -8,9 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../robot_detail/robot_detail_view_model.dart';
-import '../shared/pipeline_explainer.dart';
 import 'contribute_history_view.dart';
-import 'contribute_section.dart';
 import 'contribute_settings_view.dart';
 
 class CapContributeScreen extends ConsumerWidget {
@@ -33,16 +31,10 @@ class CapContributeScreen extends ConsumerWidget {
               body: const Center(child: Text('Robot not found')));
         }
         return Scaffold(
-          appBar:
-              AppBar(title: Text('Contribute — ${robot.name}')),
+          appBar: AppBar(title: Text('Contribute — ${robot.name}')),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Pipeline explainer — always visible, collapsed by default
-              const PipelineExplainer(mode: ContributeMode.community),
-              const SizedBox(height: 12),
-              ContributeSection(stats: robot.contribute),
-              const SizedBox(height: 12),
               ContributeSettingsView(robot: robot),
               const SizedBox(height: 12),
               ContributeHistoryView(rrn: robot.rrn),
