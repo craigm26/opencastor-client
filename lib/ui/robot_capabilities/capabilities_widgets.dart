@@ -4,6 +4,7 @@
 /// can reference them without circular imports.
 library;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,12 +23,18 @@ import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 /// The castor bridge handles "loa_enable" system commands by patching its
 /// in-memory config and writing loa_enforcement=true to the RCAN yaml.
 final loaEnableCommandProvider = FutureProvider.family<void, String>((ref, rrn) async {
-  await ref.read(robotRepositoryProvider).sendCommand(
-    rrn: rrn,
-    instruction: 'loa_enable',
-    scope: CommandScope.system,
-    reason: 'user requested via Fleet UI',
-  );
+  // Use Firestore commands subcollection — CF relay can't reach local-network robots.
+  await FirebaseFirestore.instance
+      .collection('robots')
+      .doc(rrn)
+      .collection('commands')
+      .add({
+    'instruction': 'loa_enable',
+    'scope': 'system',
+    'source': 'app',
+    'reason': 'user requested via Fleet UI',
+    'created_at': FieldValue.serverTimestamp(),
+  });
 });
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

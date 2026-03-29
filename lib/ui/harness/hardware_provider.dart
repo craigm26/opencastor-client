@@ -1,63 +1,71 @@
 /// hardware_provider.dart — Riverpod provider for robot hardware profile.
 ///
-/// Fetches GET /api/hardware via the Firebase Cloud Function relay.
-/// Falls back gracefully to an empty map (all models shown) if unavailable.
+/// Reads from Firestore robots/{rrn}.system (pushed by bridge every 30s).
+/// The Cloud Function relay cannot reach local-network robots, so we read
+/// the telemetry data that the bridge already pushes to Firestore instead.
 library;
 
-import 'dart:convert';
-
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Fetches the hardware profile for a robot by RRN.
+/// Fetches the hardware profile for a robot by RRN from Firestore telemetry.
 ///
-/// Uses the `robotApiGet` Cloud Function to proxy the request to the robot's
-/// `/api/hardware` endpoint. Falls back to an empty map on any error so the
-/// Model Garage still works without hardware info (shows all models).
+/// The bridge pushes system_info to robots/{rrn}.system every 30s.
+/// Falls back to an empty map (all models shown) if unavailable.
 ///
-/// Example result shape:
-/// ```json
-/// {
-///   "hostname": "robot",
-///   "arch": "aarch64",
-///   "hardware_tier": "pi5-8gb",
-///   "ram_gb": 8.0,
-///   "ram_available_gb": 4.2,
-///   "accelerators": [],
-///   "ollama_models": ["gemma3:1b"],
-///   ...
-/// }
-/// ```
+/// Map keys mirror the Cloud Function response shape for compatibility:
+/// - hardware_tier, ram_gb, ram_available_gb, accelerators, ollama_models,
+///   cpu_model, cpu_cores, arch, platform, storage_free_gb
 final hardwareProfileProvider =
     FutureProvider.family<Map<String, dynamic>, String>(
   (ref, rrn) async {
     try {
-      final fn = FirebaseFunctions.instance;
-      final callable = fn.httpsCallable(
-        'robotApiGet',
-        options: HttpsCallableOptions(timeout: const Duration(seconds: 10)),
-      );
-      final result = await callable.call(<String, dynamic>{
-        'rrn': rrn,
-        'path': '/api/hardware',
-      });
-      final data = result.data;
-      if (data is Map) {
-        // Cloud Function may return the body as a JSON string or as a map.
-        if (data['body'] is String) {
-          return Map<String, dynamic>.from(
-            jsonDecode(data['body'] as String) as Map,
-          );
-        }
-        if (data['body'] is Map) {
-          return Map<String, dynamic>.from(data['body'] as Map);
-        }
-        // Direct map response
-        return Map<String, dynamic>.from(data);
+      final doc = await FirebaseFirestore.instance
+          .collection('robots')
+          .doc(rrn)
+          .get();
+      final data = doc.data();
+      if (data == null) return const {};
+      final sys = data['system'] as Map<String, dynamic>?;
+      if (sys == null || sys.isEmpty) return const {};
+
+      // Map system_info keys → hardware profile shape expected by hardware_screen.
+      final npuRaw    = sys['npu_detected'];
+      final npuDetect = npuRaw is bool ? npuRaw : (npuRaw != null && npuRaw != false);
+      final npuModel  = sys['npu_model'] as String? ??
+          (npuRaw is String ? npuRaw : null);
+      final npuTops   = (sys['npu_tops'] as num?)?.toDouble();
+
+      final cpuModel = sys['cpu_model'] as String? ?? '';
+      String tier = 'unknown';
+      if (cpuModel.toLowerCase().contains('raspberry pi 5')) {
+        tier = npuDetect ? 'pi5-hailo' : 'pi5-8gb';
+      } else if (cpuModel.toLowerCase().contains('raspberry pi 4')) {
+        tier = 'pi4';
       }
+
+      final platform = sys['platform'] as String? ?? 'unknown';
+      final arch = platform.contains('-') ? platform.split('-').last : platform;
+
+      return {
+        'cpu_model':        cpuModel,
+        'cpu_cores':        (sys['cpu_count'] as num?)?.toInt() ?? 0,
+        'arch':             arch,
+        'platform':         platform,
+        'ram_gb':           (sys['ram_total_gb'] as num?)?.toDouble() ?? 0.0,
+        'ram_available_gb': (sys['ram_available_gb'] as num?)?.toDouble() ?? 0.0,
+        'storage_free_gb':  (sys['disk_free_gb'] as num?)?.toDouble() ?? 0.0,
+        'hardware_tier':    tier,
+        'accelerators': <String>[
+          if (npuDetect)
+            '${npuModel ?? "NPU"}${npuTops != null ? " · ${npuTops.toStringAsFixed(0)} TOPS" : ""}',
+          if (sys['gpu_detected'] == true) 'GPU detected',
+        ],
+        'ollama_models': <String>[],
+        '_source': 'firestore_system',
+      };
     } catch (_) {
-      // Fail silently — garage works without hardware data, shows all models.
+      return const {};
     }
-    return const <String, dynamic>{};
   },
 );

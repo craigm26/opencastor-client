@@ -39,7 +39,6 @@ import '../widgets/thinking_indicator.dart';
 import 'robot_detail_view_model.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
-import 'attestation_card.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -1074,11 +1073,6 @@ class _ShortcutRow extends StatelessWidget {
         icon: Icons.developer_board_outlined,
         label: 'Components',
         onTap: () => context.push('/robot/${robot.rrn}/capabilities/components'),
-      ),
-      _Shortcut(
-        icon: Icons.verified_outlined,
-        label: 'Attest',
-        onTap: () => context.push('/robot/${robot.rrn}/attestation'),
       ),
       _Shortcut(
         icon: Icons.science_outlined,

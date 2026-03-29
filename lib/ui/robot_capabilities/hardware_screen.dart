@@ -116,7 +116,11 @@ class HardwareScreen extends ConsumerWidget {
     final ramTotal  = (sys['ram_total_gb']   as num?)?.toDouble() ?? 0.0;
     final ramAvail  = (sys['ram_available_gb'] as num?)?.toDouble() ?? 0.0;
     final diskFree  = (sys['disk_free_gb']   as num?)?.toDouble() ?? 0.0;
-    final npuDetect = sys['npu_detected']    as bool? ?? false;
+    // npu_detected may be a bool (current bridge) or a string like "hailo-8" (legacy).
+    final npuRaw    = sys['npu_detected'];
+    final npuDetect = npuRaw is bool ? npuRaw : (npuRaw != null && npuRaw != false);
+    final npuModel  = sys['npu_model'] as String? ??
+        (npuRaw is String ? npuRaw : null);   // fallback to old string value
     final npuTops   = (sys['npu_tops']       as num?)?.toDouble();
 
     // Derive arch from platform string ("linux-aarch64" → "aarch64")
@@ -135,7 +139,7 @@ class HardwareScreen extends ConsumerWidget {
 
     final accelerators = <String>[
       if (npuDetect)
-        'hailo-8${npuTops != null ? " · ${npuTops.toStringAsFixed(0)} TOPS" : ""}',
+        '${npuModel ?? "NPU"}${npuTops != null ? " · ${npuTops.toStringAsFixed(0)} TOPS" : ""}',
       if (sys['gpu_detected'] == true) 'GPU detected',
     ];
 
