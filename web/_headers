@@ -36,3 +36,8 @@
 
 /canvaskit/*
   Cache-Control: public, max-age=31536000, immutable
+
+# SW reset page — must never be cached (either by CDN or SW)
+/sw-reset.html
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
