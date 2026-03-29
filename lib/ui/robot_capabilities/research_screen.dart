@@ -44,7 +44,7 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
-            onPressed: () => ref.invalidate(personalResearchRrnProvider(rrn)),
+            onPressed: () => ref.invalidate(personalResearchRrnProvider(widget.rrn)),
           ),
         ],
       ),
