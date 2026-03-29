@@ -20,13 +20,13 @@ class AppConstants {
       'https://github.com/craigm26/OpenCastor';
   static const String rcanSpecUrl = 'https://rcan.dev/spec/';
   static const String rcanDevUrl = 'https://rcan.dev/';
-  // Robot Registry Foundation — canonical URLs (robot-registry-foundation.pages.dev)
+  // Robot Registry Foundation — canonical URLs (robotregistryfoundation.org)
   static const String rrfUrl =
-      'https://robot-registry-foundation.pages.dev/';
+      'https://robotregistryfoundation.org/';
   static const String rrfRegisterUrl =
-      'https://robot-registry-foundation.pages.dev/';
+      'https://robotregistryfoundation.org/';
   static const String rrfOpencastorUrl =
-      'https://robot-registry-foundation.pages.dev/registry/';
+      'https://robotregistryfoundation.org/registry/';
   static const String rcanPyPypi = 'https://pypi.org/project/rcan/';
   static const String rcanPyGitHub =
       'https://github.com/continuonai/rcan-py';

@@ -13,7 +13,7 @@ class ProvenanceCard extends StatelessWidget {
   final Robot robot;
   const ProvenanceCard({super.key, required this.robot});
 
-  static const _rrfBase = 'https://robot-registry-foundation.pages.dev';
+  static const _rrfBase = 'https://robotregistryfoundation.org';
 
   @override
   Widget build(BuildContext context) {
