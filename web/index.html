@@ -82,7 +82,15 @@
     // When a new service worker is waiting (new app version deployed),
     // send SKIP_WAITING so it activates immediately without needing all
     // tabs closed. Then reload once to serve the new version.
+    // Force SW update check on every page load — ensures stale SWs get replaced quickly.
     if ('serviceWorker' in navigator) {
+      // If a SW is already controlling, immediately trigger an update check.
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATE' });
+      }
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(reg) { reg.update(); });
+      });
       navigator.serviceWorker.addEventListener('controllerchange', function() {
         window.location.reload();
       });
