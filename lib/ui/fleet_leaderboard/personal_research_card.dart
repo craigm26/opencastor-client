@@ -37,9 +37,10 @@ final personalResearchProvider =
 });
 
 /// Family variant scoped to a specific RRN (used by robot detail screen).
+/// Reads from Firestore stream (robots/{rrn}/telemetry/research) — no CF relay needed.
 final personalResearchRrnProvider =
-    FutureProvider.autoDispose.family<PersonalResearchSummary?, String>(
-  (ref, rrn) => PersonalResearchService().getSummary(rrn),
+    StreamProvider.autoDispose.family<PersonalResearchSummary?, String>(
+  (ref, rrn) => PersonalResearchService().summaryStream(rrn),
 );
 
 // ── Full card ─────────────────────────────────────────────────────────────────

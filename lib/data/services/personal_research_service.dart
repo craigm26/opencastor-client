@@ -1,51 +1,65 @@
-/// PersonalResearchService — proxies personal research API calls via robotApiGet.
+/// PersonalResearchService — reads research runs from Firestore subcollection
+/// and triggers runs via robots/{rrn}/commands (same pattern as contribute toggle).
 ///
-/// All requests are routed through the Firebase `robotApiGet` callable, which
-/// authenticates with the robot gateway server-side. Fails gracefully (null/false)
-/// on any error so UI always degrades offline cleanly.
+/// Cloud Functions relay cannot reach local-network robots, so we write commands
+/// directly to Firestore and read results from the subcollection.
 library;
 
-import 'dart:convert';
-
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/personal_research.dart';
 
 class PersonalResearchService {
-  static final _callable = FirebaseFunctions.instance.httpsCallable(
-    'robotApiGet',
-    options: HttpsCallableOptions(timeout: const Duration(seconds: 10)),
-  );
+  static final _db = FirebaseFirestore.instance;
 
-  /// Fetches the personal research summary for [rrn].
+  /// Fetches the personal research summary for [rrn] from Firestore.
   ///
-  /// Returns null on any network/auth/decode error.
+  /// Reads from robots/{rrn}/telemetry/research (pushed by bridge).
+  /// Returns null if no data is available yet.
   Future<PersonalResearchSummary?> getSummary(String rrn) async {
     if (rrn.isEmpty) return null;
     try {
-      final result = await _callable.call(<String, dynamic>{
-        'rrn': rrn,
-        'path': '/api/research/personal',
-      });
-      final body = _parseBody(result.data);
-      if (body == null) return null;
-      return PersonalResearchSummary.fromJson(body);
+      final doc = await _db
+          .collection('robots')
+          .doc(rrn)
+          .collection('telemetry')
+          .doc('research')
+          .get();
+      if (!doc.exists || doc.data() == null) return null;
+      return PersonalResearchSummary.fromJson(doc.data()!);
     } catch (_) {
       return null;
     }
   }
 
-  /// Submits [runId] to the community leaderboard for verification.
-  ///
-  /// Returns true on HTTP 200, false otherwise.
+  /// Stream version — live updates from Firestore.
+  Stream<PersonalResearchSummary?> summaryStream(String rrn) {
+    if (rrn.isEmpty) return const Stream.empty();
+    return _db
+        .collection('robots')
+        .doc(rrn)
+        .collection('telemetry')
+        .doc('research')
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists || snap.data() == null) return null;
+      try {
+        return PersonalResearchSummary.fromJson(snap.data()!);
+      } catch (_) {
+        return null;
+      }
+    });
+  }
+
+  /// Submits [runId] to the community leaderboard via Firestore command.
   Future<bool> submitToCommunity(String rrn, String runId) async {
     if (rrn.isEmpty) return false;
     try {
-      await _callable.call(<String, dynamic>{
-        'rrn': rrn,
-        'path': '/api/research/submit',
-        'method': 'POST',
-        'body': {'run_id': runId},
+      await _db.collection('robots').doc(rrn).collection('commands').add({
+        'cmd': 'research_submit',
+        'scope': 'system',
+        'params': {'run_id': runId, 'community': true},
+        'ts': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {
@@ -53,34 +67,19 @@ class PersonalResearchService {
     }
   }
 
-  /// Triggers a personal research run on the robot.
-  ///
-  /// Returns true on success, false otherwise.
+  /// Triggers a personal OHB-1 research run via Firestore command.
   Future<bool> triggerRun(String rrn) async {
     if (rrn.isEmpty) return false;
     try {
-      await _callable.call(<String, dynamic>{
-        'rrn': rrn,
-        'path': '/api/research/run',
-        'method': 'POST',
-        'body': {'personal': true},
+      await _db.collection('robots').doc(rrn).collection('commands').add({
+        'cmd': 'research_run',
+        'scope': 'system',
+        'params': {'personal': true},
+        'ts': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {
       return false;
     }
-  }
-
-  /// Parses the Cloud Function response body (handles string-encoded JSON,
-  /// direct Map, or null).
-  static Map<String, dynamic>? _parseBody(dynamic data) {
-    if (data is! Map) return null;
-    final raw = data['body'];
-    if (raw is String) {
-      final decoded = jsonDecode(raw);
-      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
-    }
-    if (raw is Map) return Map<String, dynamic>.from(raw);
-    return Map<String, dynamic>.from(data);
   }
 }
