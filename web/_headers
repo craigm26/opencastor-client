@@ -22,8 +22,11 @@
 
 # Versioned Flutter build artifacts — safe to cache long-term
 # (Flutter hashes filenames on every build, so stale caches are impossible).
+# flutter_bootstrap.js contains the serviceWorkerVersion hash — changes every build
+# but has NO version in the URL, so must NOT be cached long-term.
 /flutter_bootstrap.js
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: no-store, no-cache, must-revalidate
+  Pragma: no-cache
 
 /main.dart.js
   Cache-Control: public, max-age=31536000, immutable
