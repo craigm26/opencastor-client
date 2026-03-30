@@ -39,15 +39,11 @@ class RobotCommand {
       instruction: m['instruction'] as String? ?? '',
       scope: _parseScope(m['scope'] as String? ?? 'chat'),
       issuedByUid: m['issued_by_uid'] as String? ?? '',
-      issuedAt: m['issued_at'] != null
-          ? DateTime.parse(m['issued_at'] as String)
-          : DateTime.now(),
+      issuedAt: _parseDateTime(m['issued_at']) ?? DateTime.now(),
       status: _parseStatus(m['status'] as String? ?? 'pending'),
-      result: m['result'] as Map<String, dynamic>?,
+      result: m['result'] is Map ? Map<String, dynamic>.from(m['result'] as Map) : null,
       error: m['error'] as String?,
-      completedAt: m['completed_at'] != null
-          ? DateTime.parse(m['completed_at'] as String)
-          : null,
+      completedAt: _parseDateTime(m['completed_at']),
       // GAP-08: parse sender_type from audit field; default to human app sender
       senderType: m['sender_type'] as String? ?? 'human via OpenCastor app',
     );
@@ -69,5 +65,16 @@ class RobotCommand {
     return map[s] ??
         CommandStatus.values.firstWhere((e) => e.name == s,
             orElse: () => CommandStatus.pending);
+  }
+
+  /// Safely parse a date field that may be a String ISO-8601, a Firestore
+  /// Timestamp/DatetimeWithNanoseconds, or null.
+  static DateTime? _parseDateTime(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    // Firestore Timestamp / DatetimeWithNanoseconds — both expose .toDate()
+    try { return (raw as dynamic).toDate() as DateTime; } catch (_) {}
+    return null;
   }
 }
