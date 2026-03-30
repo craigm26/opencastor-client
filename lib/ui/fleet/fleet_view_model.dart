@@ -15,23 +15,17 @@ library;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_logger.dart';
-import '../../data/models/robot.dart';
-import '../../data/repositories/robot_repository.dart';
-import '../../data/services/firestore_robot_service.dart';
+import '../../data/repositories/robot_repository_provider.dart';
 
-export '../../data/models/robot.dart';
 export '../../data/repositories/robot_repository.dart';
+// Re-export so existing UI files that `show robotRepositoryProvider` from here
+// continue to resolve without changes.
+export '../../data/repositories/robot_repository_provider.dart'
+    show robotRepositoryProvider;
 
 // ---------------------------------------------------------------------------
-// Dependency injection
+// Auth
 // ---------------------------------------------------------------------------
-
-/// Provides the concrete [RobotRepository] implementation.
-/// Override in tests with ProviderScope overrides:
-///   overrides: [robotRepositoryProvider.overrideWithValue(MockRobotRepository())]
-final robotRepositoryProvider = Provider<RobotRepository>(
-  (_) => FirestoreRobotService(),
-);
 
 /// Auth state stream — single source of truth for sign-in status.
 final authStateProvider = StreamProvider<User?>(
