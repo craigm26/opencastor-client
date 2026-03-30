@@ -36,6 +36,7 @@ import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import '../widgets/thinking_indicator.dart';
 import 'robot_detail_view_model.dart';
+import '../../data/services/ws_telemetry_service.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
 import '../shared/error_view.dart';
@@ -999,14 +1000,16 @@ class _UpdateBanner extends StatelessWidget {
 
 // ── Telemetry panel — condensed 3-item header ─────────────────────────────────
 
-class _TelemetryPanel extends StatelessWidget {
+class _TelemetryPanel extends ConsumerWidget {
   final Robot robot;
   const _TelemetryPanel({required this.robot});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final t = robot.telemetry;
+    final wsAsync = ref.watch(wsTelemetryProvider(robot.rrn));
+    final liveData = wsAsync.valueOrNull;
+    final isLive = liveData != null;
 
     return Container(
       color: cs.surfaceContainerLow,
@@ -1032,6 +1035,18 @@ class _TelemetryPanel extends StatelessWidget {
               _VersionBadge(
                   version: robot.opencastorVersion ?? robot.version,
                   rrn: robot.rrn),
+              if (isLive) ...[
+                const SizedBox(width: 6),
+                // Live WebSocket indicator dot
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF22c55e), // green-500
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
               const Spacer(),
               _RobotProfileChip(rrn: robot.rrn),
             ],
