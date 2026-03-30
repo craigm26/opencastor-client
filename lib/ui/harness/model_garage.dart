@@ -27,6 +27,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/llm_fit.dart';
 import 'hardware_provider.dart';
+import '../shared/loading_view.dart';
 
 // ---------------------------------------------------------------------------
 // Result type
@@ -189,7 +190,7 @@ class _ModelGarageState extends ConsumerState<ModelGarage>
                 selected: _selected,
                 onSelected: (m) => setState(() => _selected = m),
               ),
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const LoadingView(),
               error: (_, __) => _ModelLists(
                 tab: _tab,
                 localModels: _localModels,

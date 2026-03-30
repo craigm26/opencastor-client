@@ -15,6 +15,7 @@ import '../../ui/core/theme/app_theme.dart';
 import 'flow_canvas.dart';
 import 'flow_graph.dart';
 import 'harness_design_panels.dart';
+import '../shared/loading_view.dart';
 
 // ── Layer colour palette ──────────────────────────────────────────────────────
 
@@ -305,7 +306,7 @@ class _HarnessViewerState extends State<HarnessViewer> {
   @override
   Widget build(BuildContext context) {
     if (widget.loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     // Flow view removed — list view only (#24)

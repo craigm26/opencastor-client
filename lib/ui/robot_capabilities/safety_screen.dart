@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
 
 class SafetyScreen extends ConsumerWidget {
@@ -17,16 +20,15 @@ class SafetyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     return robotAsync.when(
-      loading: () => const Scaffold(
-          body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(body: LoadingView()),
       error: (e, _) => Scaffold(
           appBar: AppBar(title: const Text('Safety')),
-          body: Center(child: Text('Error: $e'))),
+          body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
           return Scaffold(
               appBar: AppBar(title: const Text('Safety')),
-              body: const Center(child: Text('Robot not found')));
+              body: const EmptyView(title: 'Robot not found'));
         }
         return _SafetyView(robot: robot);
       },

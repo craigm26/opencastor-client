@@ -13,6 +13,9 @@ import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import '../../core/constants.dart';
 
@@ -126,11 +129,11 @@ class _PhysicalControlScreenState
     final robotAsync = ref.watch(robotDetailProvider(widget.rrn));
     return robotAsync.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+          const Scaffold(body: LoadingView()),
+      error: (e, _) => Scaffold(body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
-          return const Scaffold(body: Center(child: Text('Robot not found')));
+          return const Scaffold(body: EmptyView(title: 'Robot not found'));
         }
         return _buildUI(context, robot);
       },

@@ -9,6 +9,9 @@ import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import '../../core/constants.dart';
 
 class RobotStatusScreen extends ConsumerWidget {
@@ -20,12 +23,12 @@ class RobotStatusScreen extends ConsumerWidget {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     return robotAsync.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+          const Scaffold(body: LoadingView()),
+      error: (e, _) => Scaffold(body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
           return const Scaffold(
-              body: Center(child: Text('Robot not found')));
+              body: const EmptyView(title: 'Robot not found'));
         }
         return _StatusView(robot: robot);
       },

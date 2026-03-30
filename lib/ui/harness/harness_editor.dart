@@ -29,6 +29,8 @@ import 'flow_graph.dart';
 import 'harness_validator.dart';
 import 'harness_viewer.dart';
 import 'model_garage.dart';
+import '../shared/loading_view.dart';
+import '../shared/error_view.dart';
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -2490,27 +2492,8 @@ class _CommunitySkillTab extends ConsumerWidget {
         ref.watch(exploreConfigsProvider(ExploreFilter.skill));
 
     return asyncSkills.when(
-      loading: () =>
-          const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off_outlined, size: 36),
-              const SizedBox(height: 8),
-              Text('Could not load community skills',
-                  style:
-                      TextStyle(color: Theme.of(context).colorScheme.error)),
-              const SizedBox(height: 4),
-              Text('$e',
-                  style: const TextStyle(fontSize: 11),
-                  textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      ),
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(error: e.toString(), title: 'Could not load community skills'),
       data: (skills) {
         final filtered = skills.where((s) {
           if (search.isEmpty) return true;

@@ -29,6 +29,7 @@ import '../../data/repositories/consent_repository_provider.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import '../shared/loading_view.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ class _TrainingConsentTab extends StatelessWidget {
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const LoadingView();
         }
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {

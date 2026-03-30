@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../shared/google_sign_in_button.dart';
+import '../shared/loading_view.dart';
 
 class SetupScreen extends StatefulWidget {
   final String? robotName;
@@ -79,7 +80,7 @@ class _SetupScreenState extends State<SetupScreen> {
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView();
           }
 
           final user = snapshot.data;

@@ -8,6 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
 
 class IdentityScreen extends ConsumerWidget {
@@ -18,16 +21,15 @@ class IdentityScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     return robotAsync.when(
-      loading: () => const Scaffold(
-          body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(body: LoadingView()),
       error: (e, _) => Scaffold(
           appBar: AppBar(title: const Text('Identity & Registry')),
-          body: Center(child: Text('Error: $e'))),
+          body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
           return Scaffold(
               appBar: AppBar(title: const Text('Identity & Registry')),
-              body: const Center(child: Text('Robot not found')));
+              body: const EmptyView(title: 'Robot not found'));
         }
         return _IdentityView(robot: robot);
       },
