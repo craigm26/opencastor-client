@@ -12,6 +12,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/constants.dart';
@@ -63,6 +64,8 @@ import 'routes.dart';
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
 // ---------------------------------------------------------------------------
+
+final _pkgInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
 
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
@@ -738,12 +741,17 @@ class _LoginState extends State<_LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    AppConstants.versionLabel,
-                    style: TextStyle(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                        fontSize: 11),
-                  ),
+                  Consumer(builder: (context, ref, _) {
+                    final pkgAsync = ref.watch(_pkgInfoProvider);
+                    final label = pkgAsync.maybeWhen(
+                      data: (info) => 'v\${info.version} · RCAN v\${AppConstants.rcanVersion}',
+                      orElse: () => AppConstants.versionLabel,
+                    );
+                    return Text(label,
+                        style: TextStyle(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                            fontSize: 11));
+                  }),
                 ],
               ),
             ),
