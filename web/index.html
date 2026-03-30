@@ -86,20 +86,19 @@
     // tabs closed. Then reload once to serve the new version.
     // Force SW update check on every page load — ensures stale SWs get replaced quickly.
     // Hard-reset escape hatch: ?nocache or ?reset in URL unregisters all SWs
-    if (window.location.search.includes('nocache') || window.location.search.includes('reset')) {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
-            caches.keys().then(function(keys) {
-              Promise.all(keys.map(function(k) { return caches.delete(k); })).then(function() {
-                window.location.replace(window.location.pathname);
-              });
-            });
-          });
-        });
-      }
-      return;
-    }
+    (function() {
+      if (!window.location.search.includes('nocache') && !window.location.search.includes('reset')) return;
+      if (!('serviceWorker' in navigator)) { window.location.replace(window.location.pathname); return; }
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        return Promise.all(regs.map(function(r) { return r.unregister(); }));
+      }).then(function() {
+        return caches.keys();
+      }).then(function(keys) {
+        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      }).then(function() {
+        window.location.replace(window.location.pathname);
+      });
+    })();
     if ('serviceWorker' in navigator) {
       // If a SW is already controlling, immediately trigger an update check.
       if (navigator.serviceWorker.controller) {
