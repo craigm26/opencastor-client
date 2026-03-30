@@ -9,10 +9,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../../core/constants.dart';
 import '../../data/services/auth_service.dart';
 import '../../ui/core/theme/app_theme.dart';
 import 'theme_mode_provider.dart';
+
+final _packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
+  return PackageInfo.fromPlatform();
+});
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -144,7 +150,11 @@ class SettingsScreen extends ConsumerWidget {
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('OpenCastor Client'),
-                  subtitle: Text('v${AppConstants.appVersion}'),
+                  subtitle: ref.watch(_packageInfoProvider).when(
+                    data: (info) => Text('v\${info.version}+\${info.buildNumber}'),
+                    loading: () => Text('v\${AppConstants.appVersion}'),
+                    error: (_, __) => Text('v\${AppConstants.appVersion}'),
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.hub_outlined),
