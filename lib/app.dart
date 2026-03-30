@@ -744,7 +744,7 @@ class _LoginState extends State<_LoginScreen> {
                   Consumer(builder: (context, ref, _) {
                     final pkgAsync = ref.watch(_pkgInfoProvider);
                     final label = pkgAsync.maybeWhen(
-                      data: (info) => 'v\${info.version} · RCAN v\${AppConstants.rcanVersion}',
+                      data: (info) => 'v${info.version} · RCAN v${AppConstants.rcanVersion}',
                       orElse: () => AppConstants.versionLabel,
                     );
                     return Text(label,

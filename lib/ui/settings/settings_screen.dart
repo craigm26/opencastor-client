@@ -151,7 +151,7 @@ class SettingsScreen extends ConsumerWidget {
                   leading: const Icon(Icons.info_outline),
                   title: const Text('OpenCastor Client'),
                   subtitle: ref.watch(_packageInfoProvider).when(
-                    data: (info) => Text('v\${info.version}+\${info.buildNumber}'),
+                    data: (info) => Text('v${info.version}+${info.buildNumber}'),
                     loading: () => Text('v\${AppConstants.appVersion}'),
                     error: (_, __) => Text('v\${AppConstants.appVersion}'),
                   ),
