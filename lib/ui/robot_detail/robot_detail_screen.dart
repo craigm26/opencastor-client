@@ -1402,9 +1402,12 @@ class _HardwareSection extends StatelessWidget {
     final diskFree = sys['disk_free_gb'] as num?;
     final diskTotal = sys['disk_total_gb'] as num?;
     final cpuTemp = sys['cpu_temp_c'] as num?;
-    final npu = sys['npu_detected'] as String?;
+    // npu_detected may be bool (new bridge) or String (legacy) — handle both
+    final npuRaw = sys['npu_detected'];
+    final npu = npuRaw is bool ? (npuRaw ? (sys['npu_model'] as String? ?? 'NPU') : null) : npuRaw as String?;
     final npuTops = sys['npu_tops'] as num?;
-    final gpu = sys['gpu_detected'] as String?;
+    final gpuRaw = sys['gpu_detected'];
+    final gpu = gpuRaw is bool ? (gpuRaw ? 'GPU' : null) : gpuRaw as String?;
 
     final chips = <Widget>[];
 
