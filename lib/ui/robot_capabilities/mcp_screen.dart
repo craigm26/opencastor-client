@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
 class McpScreen extends ConsumerWidget {
   final String rrn;
@@ -27,8 +29,8 @@ class McpScreen extends ConsumerWidget {
         elevation: 0,
       ),
       body: robotAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (robot) => _McpBody(rrn: rrn),
       ),
     );

@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/models/mission.dart';
 import 'create_mission_sheet.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -84,7 +87,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
-      return const Scaffold(body: Center(child: Text('Not signed in')));
+      return const Scaffold(body: EmptyView(title: 'Not signed in'));
     }
 
     return Scaffold(
@@ -106,10 +109,10 @@ class _MissionListScreenState extends State<MissionListScreen> {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView();
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return ErrorView(error: snapshot.error.toString());
           }
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {

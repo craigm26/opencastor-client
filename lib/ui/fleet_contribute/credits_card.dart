@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'credits_redeem_sheet.dart';
+import '../shared/loading_view.dart';
 
 // ── Model ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +158,7 @@ class CreditsCard extends ConsumerWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator()),
+          child: const LoadingView(),
         ),
       ),
       error: (e, _) => Card(

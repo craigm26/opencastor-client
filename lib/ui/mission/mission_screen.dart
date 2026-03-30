@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 
 import '../../data/models/mission.dart';
 import '../widgets/thinking_indicator.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 
 // ---------------------------------------------------------------------------
 // RCAN scope badge
@@ -248,11 +250,11 @@ class _MissionScreenState extends State<MissionScreen> {
       builder: (context, missionSnap) {
         if (missionSnap.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-              body: Center(child: CircularProgressIndicator()));
+              body: LoadingView());
         }
         if (!missionSnap.hasData || !missionSnap.data!.exists) {
           return const Scaffold(
-              body: Center(child: Text('Mission not found')));
+              body: const EmptyView(title: 'Mission not found'));
         }
 
         final mission = Mission.fromDocument(missionSnap.data!);
@@ -567,7 +569,7 @@ class _MessagesList extends StatelessWidget {
           .snapshots(),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return const LoadingView();
         }
         final docs = snap.data?.docs ?? [];
         if (docs.isEmpty) {

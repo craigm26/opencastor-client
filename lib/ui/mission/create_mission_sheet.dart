@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/models/mission.dart';
+import '../shared/loading_view.dart';
 
 class CreateMissionSheet extends StatefulWidget {
   const CreateMissionSheet({super.key});
@@ -176,7 +177,7 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
                           if (snap.connectionState == ConnectionState.waiting) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 16),
-                              child: Center(child: CircularProgressIndicator()),
+                              child: const LoadingView(),
                             );
                           }
                           final docs = snap.data?.docs ?? [];

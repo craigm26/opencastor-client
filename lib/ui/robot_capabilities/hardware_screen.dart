@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../harness/hardware_provider.dart';
 import '../../data/services/ws_telemetry_service.dart';
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
 import 'provenance_card.dart';
 
@@ -23,7 +24,7 @@ class HardwareScreen extends ConsumerWidget {
     return hwAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: const Text('Hardware')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const LoadingView(),
       ),
       error: (_, __) => Scaffold(
         appBar: AppBar(title: const Text('Hardware')),

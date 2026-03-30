@@ -9,6 +9,7 @@ import '../../data/models/robot.dart';
 import 'fleet_view_model.dart'
     show estopCommandProvider, fleetProvider;
 import 'robot_card.dart';
+import '../shared/error_view.dart';
 
 /// Maximum robots a free account may register. Matches MAX_ROBOTS in
 /// functions/src/registration.ts — update both when pricing launches.
@@ -58,7 +59,7 @@ class FleetScreen extends ConsumerWidget {
               duration: const Duration(milliseconds: 300),
               child: fleet.when(
                 loading: () => const _ShimmerFleetList(),
-                error: (err, _) => _ErrorView(error: err.toString()),
+                error: (err, _) => ErrorView(error: err.toString(), title: 'Fleet unavailable'),
                 data: (robots) {
                   if (robots.isEmpty) {
                     final user = FirebaseAuth.instance.currentUser;
@@ -578,32 +579,7 @@ class _ShimmerFleetList extends StatelessWidget {
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  final String error;
-  const _ErrorView({required this.error});
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_outlined, size: 48),
-            const SizedBox(height: 16),
-            Text('Fleet unavailable',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(error,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ── Profile avatar button ─────────────────────────────────────────────────────
 

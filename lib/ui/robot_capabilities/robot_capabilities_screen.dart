@@ -20,6 +20,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../core/widgets/health_indicator.dart';
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
 
 // Re-export helper so any callers that imported _asList from here still compile.
@@ -41,12 +44,12 @@ class RobotCapabilitiesScreen extends ConsumerWidget {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     return robotAsync.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+          const Scaffold(body: LoadingView()),
+      error: (e, _) => Scaffold(body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
           return const Scaffold(
-              body: Center(child: Text('Robot not found')));
+              body: const EmptyView(title: 'Robot not found'));
         }
 
         // If anchor is set, immediately navigate to the matching sub-screen.

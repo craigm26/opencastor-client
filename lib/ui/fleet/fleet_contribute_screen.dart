@@ -11,6 +11,8 @@ import 'package:go_router/go_router.dart';
 
 import '../fleet_contribute/credits_card.dart';
 import '../shared/pipeline_explainer.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
 /// Aggregate fleet contribution stats.
 class _FleetContributeStats {
@@ -136,8 +138,8 @@ class FleetContributeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Fleet Contribution')),
       body: statsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (stats) {
           if (stats.totalRobots == 0) {
             return Center(

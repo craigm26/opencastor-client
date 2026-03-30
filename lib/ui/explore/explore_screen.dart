@@ -10,6 +10,8 @@ import '../../data/models/harness_config.dart';
 import '../../ui/harness/harness_viewer.dart';
 import 'explore_view_model.dart';
 import 'social_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
 class ExploreScreen extends ConsumerWidget {
   const ExploreScreen({super.key});
@@ -89,9 +91,9 @@ class _DiscoverTab extends StatelessWidget {
         // ── Config grid ─────────────────────────────────────────────
         Expanded(
           child: configs.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => _ErrorState(
-              message: e.toString(),
+            loading: () => const LoadingView(),
+            error: (e, _) => ErrorView(
+              error: e.toString(),
               onRetry: () => ref.invalidate(exploreConfigsProvider(filter)),
             ),
             data: (items) => items.isEmpty
@@ -129,8 +131,8 @@ class _MyStarsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stars = ref.watch(myStarsProvider);
     return stars.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(error: e.toString()),
       data: (configs) => configs.isEmpty
           ? const Center(
               child: Column(
@@ -167,8 +169,8 @@ class _MyConfigsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final myConfigs = ref.watch(myConfigsProvider);
     return myConfigs.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(error: e.toString()),
       data: (configs) => configs.isEmpty
           ? const Center(
               child: Column(
@@ -441,8 +443,8 @@ class ExploreDetailScreen extends ConsumerWidget {
         ],
       ),
       body: configAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (config) => SingleChildScrollView(
           child: Column(
             children: [
@@ -1029,33 +1031,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-  final String message;
-  final VoidCallback onRetry;
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.cloud_off_outlined, size: 48, color: Colors.grey),
-          const SizedBox(height: 12),
-          Text('Could not load hub', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            message.length > 80 ? '${message.substring(0, 80)}…' : message,
-            style: Theme.of(context).textTheme.bodySmall,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          FilledButton.tonal(onPressed: onRetry, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Display helpers ───────────────────────────────────────────────────────────
 

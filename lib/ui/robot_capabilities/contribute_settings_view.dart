@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/robot.dart';
+import '../shared/loading_view.dart';
 
 class ContributeSettingsView extends ConsumerStatefulWidget {
   final Robot robot;
@@ -175,7 +176,7 @@ class _ContributeSettingsViewState
     final cs = theme.colorScheme;
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     return Column(

@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../robot_detail/robot_detail_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
 
 class ProvidersScreen extends ConsumerWidget {
@@ -17,15 +20,15 @@ class ProvidersScreen extends ConsumerWidget {
     final robotAsync = ref.watch(robotDetailProvider(rrn));
     return robotAsync.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+          const Scaffold(body: LoadingView()),
       error: (e, _) => Scaffold(
           appBar: AppBar(title: const Text('Gated Providers')),
-          body: Center(child: Text('Error: $e'))),
+          body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
           return Scaffold(
               appBar: AppBar(title: const Text('Gated Providers')),
-              body: const Center(child: Text('Robot not found')));
+              body: const EmptyView(title: 'Robot not found'));
         }
         return _ProvidersView(robot: robot);
       },

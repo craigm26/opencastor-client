@@ -24,6 +24,7 @@ import '../../data/repositories/consent_repository_provider.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import '../shared/loading_view.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ class PendingConsentScreen extends ConsumerWidget {
         title: const Text('Pending Consent Requests'),
       ),
       body: pendingAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const LoadingView(),
         error: (e, _) => Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
