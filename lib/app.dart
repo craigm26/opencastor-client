@@ -58,6 +58,7 @@ import 'ui/fleet_leaderboard/fleet_leaderboard_screen.dart';
 import 'ui/mission/mission_list_screen.dart';
 import 'ui/mission/mission_screen.dart';
 import 'ui/pro/pro_screen.dart';
+import 'routes.dart';
 
 // ---------------------------------------------------------------------------
 // RouterNotifier — Riverpod-aware GoRouter refresh bridge
@@ -528,19 +529,10 @@ class _AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
 
-    int selectedIndex = 0;
-    if (location.startsWith('/fleet') || location.startsWith('/robot')) {
-      selectedIndex = 0;
-    } else if (location.startsWith('/explore')) {
-      selectedIndex = 1;
-    } else if (location.startsWith('/compete') ||
-        location.startsWith('/fleet/leaderboard')) {
-      selectedIndex = 2;
-    } else if (location.startsWith('/alerts')) {
-      selectedIndex = 3;
-    } else if (location.startsWith('/settings')) {
-      selectedIndex = 4;
-    }
+    // Use AppRoutes.selectedIndexFor() instead of a hand-rolled startsWith
+    // chain — avoids brittle ordering issues (e.g. /fleet/leaderboard vs /fleet)
+    // and keeps tab mapping in a single, tested place.
+    final selectedIndex = AppRoutes.selectedIndexFor(location);
 
     const destinations = [
       NavigationDestination(
@@ -572,20 +564,8 @@ class _AppShell extends StatelessWidget {
 
     return AdaptiveScaffold(
       selectedIndex: selectedIndex,
-      onDestinationSelected: (i) {
-        switch (i) {
-          case 0:
-            context.go('/fleet');
-          case 1:
-            context.go('/explore');
-          case 2:
-            context.go('/fleet/leaderboard');
-          case 3:
-            context.go('/alerts');
-          case 4:
-            context.go('/settings');
-        }
-      },
+      // Navigate to the canonical root for each tab via AppRoutes constants.
+      onDestinationSelected: (i) => context.go(AppRoutes.tabRouteFor(i)),
       destinations: destinations,
       body: child,
     );
