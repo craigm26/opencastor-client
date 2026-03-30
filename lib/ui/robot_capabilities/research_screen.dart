@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/personal_research.dart';
 import '../../data/services/personal_research_service.dart';
 import '../fleet_leaderboard/personal_research_card.dart';
+import '../fleet_leaderboard/personal_research_view_model.dart';
+import '../shared/loading_view.dart';
 
 class ResearchScreen extends ConsumerStatefulWidget {
   final String rrn;
@@ -70,7 +72,7 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           summaryAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
+              child: const LoadingView(),
             ),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(16),

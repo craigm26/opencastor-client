@@ -14,8 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
-import '../../data/models/command.dart' show CommandScope;
-import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
+import '../shared/loading_view.dart';
 
 // ── LoA enforcement command provider ─────────────────────────────────────────
 
@@ -418,7 +417,7 @@ class CapLoadingSection extends StatelessWidget {
           margin: EdgeInsets.zero,
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Center(child: CircularProgressIndicator()),
+            child: const LoadingView(),
           ),
         ),
       ],

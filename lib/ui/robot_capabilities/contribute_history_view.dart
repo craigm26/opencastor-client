@@ -4,29 +4,14 @@
 /// Reads from telemetry.contribute_history in Firestore.
 library;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Provider for contribution history (last 90 days).
-final contributeHistoryProvider =
-    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, rrn) async {
-  try {
-    final doc = await FirebaseFirestore.instance
-        .collection('robots')
-        .doc(rrn)
-        .collection('telemetry')
-        .doc('contribute_history')
-        .get();
-    if (!doc.exists) return [];
-    final data = doc.data();
-    if (data == null) return [];
-    final history = data['history'] as List<dynamic>? ?? [];
-    return history.cast<Map<String, dynamic>>();
-  } catch (_) {
-    return [];
-  }
-});
+import 'contribute_history_view_model.dart';
+
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
+
 
 class ContributeHistoryView extends ConsumerWidget {
   final String rrn;
@@ -39,8 +24,8 @@ class ContributeHistoryView extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return historyAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      loading: () => const LoadingView(),
+      error: (e, _) => ErrorView(error: e.toString()),
       data: (history) {
         if (history.isEmpty) {
           return Center(

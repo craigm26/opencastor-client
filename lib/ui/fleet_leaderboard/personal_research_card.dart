@@ -4,44 +4,12 @@
 /// Also exports [PersonalResearchMiniCard] for compact use on robot detail.
 library;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/personal_research.dart';
 import '../../data/services/personal_research_service.dart';
-
-// ── Provider ──────────────────────────────────────────────────────────────────
-
-/// Resolves the signed-in user's first robot RRN from Firestore.
-/// Returns null when not signed in or no robots registered.
-final _userRrnProvider = FutureProvider.autoDispose<String?>((ref) async {
-  final uid = FirebaseAuth.instance.currentUser?.uid;
-  if (uid == null) return null;
-  final snap = await FirebaseFirestore.instance
-      .collection('robots')
-      .where('firebase_uid', isEqualTo: uid)
-      .limit(1)
-      .get();
-  if (snap.docs.isEmpty) return null;
-  return snap.docs.first.id;
-});
-
-/// Fetches the personal research summary for the signed-in user's first robot.
-final personalResearchProvider =
-    FutureProvider.autoDispose<PersonalResearchSummary?>((ref) async {
-  final rrn = await ref.watch(_userRrnProvider.future);
-  if (rrn == null) return null;
-  return PersonalResearchService().getSummary(rrn);
-});
-
-/// Family variant scoped to a specific RRN (used by robot detail screen).
-/// Reads from Firestore stream (robots/{rrn}/telemetry/research) — no CF relay needed.
-final personalResearchRrnProvider =
-    StreamProvider.autoDispose.family<PersonalResearchSummary?, String>(
-  (ref, rrn) => PersonalResearchService().summaryStream(rrn),
-);
+import 'personal_research_view_model.dart';
 
 // ── Full card ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +42,7 @@ class PersonalResearchCard extends ConsumerWidget {
   }
 
   Future<void> _onRun(BuildContext context, WidgetRef ref) async {
-    final rrn = await ref.read(_userRrnProvider.future);
+    final rrn = await ref.read(userRrnProvider.future);
     if (rrn == null) return;
     // Fire-and-forget — show snackbar immediately per UX spec.
     PersonalResearchService().triggerRun(rrn);
@@ -99,7 +67,7 @@ class PersonalResearchCard extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
-    final rrn = await ref.read(_userRrnProvider.future);
+    final rrn = await ref.read(userRrnProvider.future);
     if (rrn == null) return;
     final ok = await PersonalResearchService().submitToCommunity(rrn, run.runId);
 
