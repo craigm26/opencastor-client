@@ -503,16 +503,43 @@ class _SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Use a visible background colour — avoid #0a0b1e which looks like a
+    // black screen on device before the first frame renders properly.
+    final bg = isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFF);
+    final fg = isDark ? Colors.white70 : Colors.black54;
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF0a0b1e) : const Color(0xFFF8FAFF),
+      backgroundColor: bg,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset('assets/images/icon-128.png', width: 72, height: 72),
-            const SizedBox(height: 24),
-            const CircularProgressIndicator(),
+            Image.asset(
+              'assets/images/icon-128.png',
+              width: 80,
+              height: 80,
+              // If asset not found, show fallback icon instead of crashing
+              errorBuilder: (_, __, ___) =>
+                  Icon(Icons.precision_manufacturing_outlined, size: 64, color: fg),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: isDark ? const Color(0xFF55d7ed) : const Color(0xFF4F46E5),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'OpenCastor',
+              style: TextStyle(
+                color: fg,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
           ],
         ),
       ),

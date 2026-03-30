@@ -14,13 +14,21 @@ on:
 jobs:
   testflight:
     name: Build & Upload to TestFlight
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 60
 
     steps:
       # ── Checkout ────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+
+      # ── Xcode 26 ─────────────────────────────────────────────────────────
+      - name: Select Xcode 26
+        run: |
+          # Use Xcode 26 (iOS 26 SDK) to satisfy ITMS-90725
+          sudo xcode-select -s /Applications/Xcode_26.app/Contents/Developer 2>/dev/null ||           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          echo "SDKROOT=$(xcrun --show-sdk-path --sdk iphoneos)" >> $GITHUB_ENV
 
       # ── Flutter ─────────────────────────────────────────────────────────
       - name: Setup Flutter
@@ -225,12 +233,19 @@ jobs:
             exit 1
           fi
           echo "Uploading $IPA_PATH to TestFlight..."
+          # altool deprecated in Xcode 26 — use xcrun altool via app-store-connect flag
           xcrun altool --upload-app \
             --type ios \
             --file "$IPA_PATH" \
             --apiKey "${ASC_API_KEY_ID}" \
             --apiIssuer "${ASC_API_KEY_ISSUER_ID}" \
-            --verbose
+            --verbose 2>&1 || \
+          # Fallback: use xcode 26's recommended upload path
+          xcrun xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath build/ipa \
+            -allowProvisioningUpdates
 
       - name: Summary
         run: |

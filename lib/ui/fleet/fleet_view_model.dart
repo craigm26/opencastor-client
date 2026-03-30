@@ -29,7 +29,19 @@ export '../../data/repositories/robot_repository_provider.dart'
 
 /// Auth state stream — single source of truth for sign-in status.
 final authStateProvider = StreamProvider<User?>(
-  (_) => FirebaseAuth.instance.authStateChanges(),
+  (_) {
+    // On iOS, authStateChanges() can take several seconds on first launch
+    // while Firebase checks persisted credentials. Without a timeout the
+    // router stays at /splash indefinitely (dark bg looks like black screen).
+    // After 8s we emit null (unauthenticated) so the router falls through to
+    // /login instead of looping at /splash forever.
+    return FirebaseAuth.instance
+        .authStateChanges()
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: (sink) => sink.add(null),
+        );
+  },
 );
 
 // ---------------------------------------------------------------------------
