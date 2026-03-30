@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/services/ws_telemetry_service.dart';
 
 import '../robot_detail/robot_detail_view_model.dart';
 import '../robot_detail/slash_command_provider.dart';
@@ -41,7 +42,9 @@ class _SoftwareView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final skillsAsync = ref.watch(slashCommandsProvider(robot.rrn));
-    final t = robot.telemetry;
+    // Use live WS telemetry when available; fall back to Firestore snapshot
+    final liveData = ref.watch(wsTelemetryProvider(robot.rrn)).valueOrNull;
+    final t = liveData ?? robot.telemetry;
 
     final brainPrimary = t['brain_primary'] is Map
         ? Map<String, dynamic>.from(t['brain_primary'] as Map)
