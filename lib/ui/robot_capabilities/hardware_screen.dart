@@ -320,8 +320,9 @@ class _LiveStatsSection extends StatelessWidget {
       ));
     }
 
-    // NPU
-    final npu = sys['npu_detected'] as String?;
+    // NPU — bridge may push bool or String
+    final npuRaw = sys['npu_detected'];
+    final npu = npuRaw is bool ? (npuRaw ? (sys['npu_model'] as String? ?? 'NPU') : null) : npuRaw as String?;
     final npuTops = sys['npu_tops'] as num?;
     if (npu != null) {
       rows.add(CapabilityRow(
@@ -333,8 +334,9 @@ class _LiveStatsSection extends StatelessWidget {
       ));
     }
 
-    // GPU
-    final gpu = sys['gpu_detected'] as String?;
+    // GPU — bridge may push bool or String
+    final gpuRaw = sys['gpu_detected'];
+    final gpu = gpuRaw is bool ? (gpuRaw ? (sys['gpu_model'] as String? ?? 'GPU') : null) : gpuRaw as String?;
     if (gpu != null) {
       rows.add(CapabilityRow(
         label: gpu,
