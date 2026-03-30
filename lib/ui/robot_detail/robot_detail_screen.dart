@@ -11,7 +11,6 @@ library;
 
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:http/http.dart' as http;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -39,6 +38,9 @@ import '../widgets/thinking_indicator.dart';
 import 'robot_detail_view_model.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -643,11 +645,11 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
     return robotAsync.when(
       loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+          const Scaffold(body: LoadingView()),
+      error: (e, _) => Scaffold(body: ErrorView(error: e.toString())),
       data: (robot) {
         if (robot == null) {
-          return const Scaffold(body: Center(child: Text('Robot not found')));
+          return const Scaffold(body: EmptyView(title: 'Robot not found'));
         }
         return _buildScaffold(context, robot, commandsAsync);
       },
@@ -785,8 +787,8 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
           Expanded(
             child: commandsAsync.when(
               loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+                  const LoadingView(),
+              error: (e, _) => ErrorView(error: e.toString()),
               data: (cmds) {
                 if (cmds.isEmpty) {
                   return Center(
@@ -1200,21 +1202,6 @@ class _StatusBadge extends StatelessWidget {
 
 // ── OpenCastor version badge + latest version check ──────────────────────────
 
-/// Fetches the latest opencastor version from PyPI (cached for session).
-final _latestVersionProvider = FutureProvider<String?>((ref) async {
-  try {
-    final resp = await http.get(
-      Uri.parse('https://pypi.org/pypi/opencastor/json'),
-      headers: {'Accept': 'application/json'},
-    ).timeout(const Duration(seconds: 6));
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      return (data['info'] as Map<String, dynamic>)['version'] as String?;
-    }
-  } catch (_) {}
-  return null;
-});
-
 class _VersionBadge extends ConsumerWidget {
   final String? version;
   final String rrn;
@@ -1234,7 +1221,7 @@ class _VersionBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final latestAsync = ref.watch(_latestVersionProvider);
+    final latestAsync = ref.watch(latestVersionProvider);
     final current = version;
 
     final currentBadge = Tooltip(
@@ -1379,7 +1366,7 @@ class _VersionBadge extends ConsumerWidget {
         );
         // Refresh badge after delay (pip takes ~20–30s)
         Future.delayed(const Duration(seconds: 35), () {
-          if (context.mounted) ref.invalidate(_latestVersionProvider);
+          if (context.mounted) ref.invalidate(latestVersionProvider);
         });
       }
     } catch (e) {

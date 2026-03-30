@@ -10,17 +10,11 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
-import '../fleet/fleet_view_model.dart' show fleetProvider, robotRepositoryProvider;
+import '../fleet/fleet_view_model.dart' show fleetProvider;
+import 'alerts_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
-// ── Providers ─────────────────────────────────────────────────────────────────
-
-/// Per-robot alert stream (ESTOP events, faults).
-final _alertsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, rrn) {
-  return ref
-      .read(robotRepositoryProvider)
-      .watchAlerts(rrn, limit: 30);
-});
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -36,8 +30,8 @@ class AlertsScreen extends ConsumerWidget {
         title: const Text('Alerts'),
       ),
       body: fleetAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorState(error: e.toString()),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (robots) {
           if (robots.isEmpty) {
             return const _EmptyState();
@@ -65,7 +59,7 @@ class _RobotAlertSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final alertsAsync = ref.watch(_alertsProvider(robot.rrn));
+    final alertsAsync = ref.watch(alertsProvider(robot.rrn));
     final cs = Theme.of(context).colorScheme;
 
     return Card(
@@ -246,31 +240,4 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  final String error;
-  const _ErrorState({required this.error});
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 16),
-            Text('Something went wrong',
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              error.length > 200 ? '${error.substring(0, 200)}…' : error,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -13,8 +13,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'fleet_leaderboard_view_model.dart';
 import 'personal_research_card.dart';
 import '../shared/pipeline_explainer.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -195,8 +198,8 @@ class _FleetLeaderboardScreenState
         ),
       ),
       body: tiersAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (tiers) {
           // Filter tiers and entries based on search
           final filteredTiers = <String, List<_LeaderboardEntry>>{};
@@ -722,34 +725,6 @@ class _CommunityBoardHeader extends StatelessWidget {
   }
 }
 
-// ── Research status provider ──────────────────────────────────────────────────
-
-/// Fetches /api/research/status via robotApiGet to get explored %, champion.
-final _researchStatusProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
-  try {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return {};
-    final snap = await FirebaseFirestore.instance
-        .collection('robots')
-        .where('firebase_uid', isEqualTo: uid)
-        .limit(1)
-        .get();
-    if (snap.docs.isEmpty) return {};
-    final rrn = snap.docs.first.id;
-    final callable = FirebaseFunctions.instance.httpsCallable(
-      'robotApiGet',
-      options: HttpsCallableOptions(timeout: const Duration(seconds: 8)),
-    );
-    final result = await callable.call(<String, dynamic>{
-      'rrn': rrn,
-      'path': '/api/research/status',
-    });
-    final data = result.data;
-    if (data is Map) return Map<String, dynamic>.from(data);
-  } catch (_) {}
-  return {};
-});
-
 // ── Research Projects Section (#32) ──────────────────────────────────────────
 
 class _ResearchProjectsHeader extends StatelessWidget {
@@ -823,7 +798,7 @@ class _ResearchProjectsSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statusAsync = ref.watch(_researchStatusProvider);
+    final statusAsync = ref.watch(researchStatusProvider);
     final status = statusAsync.valueOrNull ?? {};
     return Column(
       children: [

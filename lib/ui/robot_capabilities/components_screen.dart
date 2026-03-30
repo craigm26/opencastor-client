@@ -6,25 +6,14 @@
 /// Components are read from Firestore robots/{rrn}/components subcollection.
 library;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'capabilities_widgets.dart';
+import 'components_view_model.dart';
+import '../shared/error_view.dart';
+import '../shared/loading_view.dart';
 
-// ── Provider ──────────────────────────────────────────────────────────────────
-
-final _componentsProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, rrn) {
-  return FirebaseFirestore.instance
-      .collection('robots')
-      .doc(rrn)
-      .collection('components')
-      .snapshots()
-      .map((snap) =>
-          snap.docs.map((d) => {'id': d.id, ...d.data()}).toList()
-            ..sort((a, b) => (a['type'] as String? ?? '').compareTo(b['type'] as String? ?? '')));
-});
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -34,7 +23,7 @@ class ComponentsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final compsAsync = ref.watch(_componentsProvider(rrn));
+    final compsAsync = ref.watch(componentsProvider(rrn));
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hardware Components'),
@@ -42,13 +31,13 @@ class ComponentsScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.refresh_outlined),
             tooltip: 'Re-detect components',
-            onPressed: () => ref.invalidate(_componentsProvider(rrn)),
+            onPressed: () => ref.invalidate(componentsProvider(rrn)),
           ),
         ],
       ),
       body: compsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (components) => components.isEmpty
             ? _EmptyComponents(rrn: rrn)
             : _ComponentsList(components: components, rrn: rrn),

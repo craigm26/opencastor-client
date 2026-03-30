@@ -5,7 +5,11 @@
 /// methods, it never talks to a repository directly.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+
 import '../../data/models/command.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/robot_repository.dart';
@@ -57,3 +61,21 @@ final sendChatProvider =
     AsyncNotifierProvider.autoDispose<SendChatNotifier, String?>(
   SendChatNotifier.new,
 );
+
+/// Fetches the latest opencastor version from PyPI (cached for the session).
+/// Used by the version badge in [RobotDetailScreen].
+final latestVersionProvider = FutureProvider<String?>((ref) async {
+  try {
+    final resp = await http
+        .get(
+          Uri.parse('https://pypi.org/pypi/opencastor/json'),
+          headers: {'Accept': 'application/json'},
+        )
+        .timeout(const Duration(seconds: 6));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      return (data['info'] as Map<String, dynamic>)['version'] as String?;
+    }
+  } catch (_) {}
+  return null;
+});

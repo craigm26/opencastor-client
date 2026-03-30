@@ -11,27 +11,12 @@ import 'package:http/http.dart' as http;
 import '../../data/models/robot.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import '../core/theme/app_theme.dart';
+import '../shared/error_view.dart';
+import '../shared/empty_view.dart';
+import '../shared/loading_view.dart';
+
 
 const _rrfBaseUrl = 'https://api.rrf.rcan.dev';
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
-final orchestratorsProvider = FutureProvider.family<List<Map<String, dynamic>>, String>(
-  (ref, rrn) async {
-    // In production: fetch from RRF or Firestore
-    // Returns pending + active orchestrators for this robot
-    final resp = await http.get(
-      Uri.parse('$_rrfBaseUrl/v2/orchestrators?fleet_rrn=$rrn'),
-    );
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      return List<Map<String, dynamic>>.from(data['orchestrators'] as List? ?? []);
-    }
-    return [];
-  },
-);
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -56,10 +41,10 @@ class OrchestratorScreen extends ConsumerWidget {
         ],
       ),
       body: robotAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        loading: () => const LoadingView(),
+        error: (e, _) => ErrorView(error: e.toString()),
         data: (robot) {
-          if (robot == null) return const Center(child: Text('Robot not found'));
+          if (robot == null) return const EmptyView(title: 'Robot not found');
           return _OrchestratorList(robot: robot);
         },
       ),
