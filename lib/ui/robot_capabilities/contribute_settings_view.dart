@@ -71,25 +71,25 @@ class _ContributeSettingsViewState
   Future<void> _toggleDonate(bool v) async {
     setState(() => _savingDonate = true);
     try {
-      final db = FirebaseFirestore.instance;
-      final rrn = widget.robot.rrn;
-
-      // Write command to Firestore commands subcollection.
-      // Bridge polls this and executes /contribute start|stop locally.
-      await db.collection('robots').doc(rrn).collection('commands').add({
-        'instruction': v ? '/contribute start' : '/contribute stop',
+      // R2RAM command flow: write to robots/{rrn}/commands subcollection.
+      // The bridge polls `.where("status", "==", "pending")` and executes
+      // the instruction locally. Never write to the root robot doc for
+      // operational state — the bridge owns that after execution.
+      //
+      // Instruction naming convention: <noun>_<verb> (no slash prefix).
+      //   contribute_start → bridge enables idle-compute donation
+      //   contribute_stop  → bridge disables idle-compute donation
+      await FirebaseFirestore.instance
+          .collection('robots')
+          .doc(widget.robot.rrn)
+          .collection('commands')
+          .add({
+        'instruction': v ? 'contribute_start' : 'contribute_stop',
         'scope': 'system',
         'source': 'app',
         'status': 'pending',
-        'created_at': FieldValue.serverTimestamp(),
         'issued_at': FieldValue.serverTimestamp(),
       });
-
-      // Mirror state directly so UI is immediately consistent.
-      await db
-          .collection('robots')
-          .doc(rrn)
-          .set({'contribute': {'enabled': v}}, SetOptions(merge: true));
 
       if (mounted) setState(() => _donateEnabled = v);
     } catch (e) {
@@ -106,12 +106,23 @@ class _ContributeSettingsViewState
   Future<void> _toggleAutoApply(bool v) async {
     setState(() => _savingAutoApply = true);
     try {
+      // R2RAM command flow: route through commands subcollection so the bridge
+      // can validate and apply the change. Direct root-doc writes bypass the
+      // authorization model and are silently ignored by the bridge.
+      //
+      //   contribute_auto_apply_on  → bridge enables auto-champion installs
+      //   contribute_auto_apply_off → bridge disables auto-champion installs
       await FirebaseFirestore.instance
           .collection('robots')
           .doc(widget.robot.rrn)
-          .set({
-        'contribute': {'auto_apply_champion': v}
-      }, SetOptions(merge: true));
+          .collection('commands')
+          .add({
+        'instruction': v ? 'contribute_auto_apply_on' : 'contribute_auto_apply_off',
+        'scope': 'system',
+        'source': 'app',
+        'status': 'pending',
+        'issued_at': FieldValue.serverTimestamp(),
+      });
       if (mounted) setState(() => _autoApply = v);
     } catch (e) {
       if (mounted) {
