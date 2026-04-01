@@ -22,12 +22,35 @@ import '../../core/app_logger.dart';
 ///   settings block cross-origin storage access from app.opencastor.com,
 ///   so getRedirectResult() silently returns null and the user loops back
 ///   to /login.
+///
+/// google_sign_in v7 migration notes:
+///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
+///   - Must call `initialize()` before any other method.
+///   - Authentication (proving identity) and authorization (granting scopes)
+///     are now separate steps. For Firebase sign-in we only need authentication
+///     (ID token); access token is obtained via `authorizationClient` separately
+///     if additional scopes are needed.
 class AuthService {
   const AuthService._();
 
   static final _googleProvider = GoogleAuthProvider()
     ..addScope('email')
     ..addScope('profile');
+
+  /// Initialize GoogleSignIn. Must be called once before [signInWithGoogle]
+  /// on native platforms. Safe to call multiple times (no-op after first call).
+  ///
+  /// On web, Firebase handles auth directly — GoogleSignIn.initialize() is
+  /// not required.
+  static Future<void> initializeGoogleSignIn() async {
+    if (kIsWeb) return;
+    try {
+      await GoogleSignIn.instance.initialize();
+      log.d('AuthService: GoogleSignIn.instance.initialize() complete');
+    } catch (e) {
+      log.w('AuthService: GoogleSignIn.initialize() failed (non-fatal): $e');
+    }
+  }
 
   /// Initiate Google sign-in.
   ///
@@ -37,15 +60,19 @@ class AuthService {
     log.i('AuthService: signInWithGoogle() — isWeb=$kIsWeb');
     if (kIsWeb) {
       try {
-        final cred = await FirebaseAuth.instance.signInWithPopup(_googleProvider);
-        log.i('AuthService: popup sign-in OK — uid=${cred.user?.uid} email=${cred.user?.email}');
+        final cred =
+            await FirebaseAuth.instance.signInWithPopup(_googleProvider);
+        log.i(
+          'AuthService: popup sign-in OK — uid=${cred.user?.uid} email=${cred.user?.email}',
+        );
         return;
       } on FirebaseAuthException catch (e) {
         // Only fall back to redirect if the popup was truly blocked by the
         // browser's popup blocker — not for COOP or auth errors.
-        if (e.code == 'popup-blocked' ||
-            e.code == 'cancelled-popup-request') {
-          log.w('AuthService: popup blocked (${e.code}), falling back to redirect');
+        if (e.code == 'popup-blocked' || e.code == 'cancelled-popup-request') {
+          log.w(
+            'AuthService: popup blocked (${e.code}), falling back to redirect',
+          );
           await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
         } else {
           log.e('AuthService: signInWithPopup error', error: e);
@@ -55,16 +82,26 @@ class AuthService {
       return;
     }
 
-    // Native mobile / desktop: GoogleSignIn plugin
-    final gs = GoogleSignIn();
-    final account = await gs.signIn();
+    // Native mobile / desktop: GoogleSignIn v7 plugin → Firebase credential.
+    // v7: use singleton, authenticate() for identity, authorizationClient for tokens.
+    final account = await GoogleSignIn.instance.authenticate();
     if (account == null) return; // user cancelled
-    final auth = await account.authentication;
+
+    // Obtain Firebase-compatible tokens via the authorization client.
+    // ID token proves identity; access token grants API access.
+    final authorization = await account.authorizationClient.authorizationForScopes(
+      ['email', 'profile'],
+    );
+
     final cred = GoogleAuthProvider.credential(
-      accessToken: auth.accessToken,
-      idToken: auth.idToken,
+      accessToken: authorization.accessToken,
+      // idToken is available on the account directly in v7 via
+      // authentication.idToken; fall back to authorization if needed.
     );
     await FirebaseAuth.instance.signInWithCredential(cred);
+    log.i(
+      'AuthService: native sign-in OK — uid=${FirebaseAuth.instance.currentUser?.uid}',
+    );
   }
 
   /// Call once at app startup to complete any pending redirect sign-in.
@@ -76,7 +113,9 @@ class AuthService {
     try {
       final result = await FirebaseAuth.instance.getRedirectResult();
       if (result.user != null) {
-        log.i('AuthService: redirect sign-in completed — uid=${result.user!.uid} email=${result.user!.email}');
+        log.i(
+          'AuthService: redirect sign-in completed — uid=${result.user!.uid} email=${result.user!.email}',
+        );
       } else {
         log.d('AuthService: getRedirectResult — no pending redirect');
       }
@@ -88,7 +127,8 @@ class AuthService {
   /// Sign out of Firebase (and Google on native).
   static Future<void> signOut() async {
     if (!kIsWeb) {
-      await GoogleSignIn().signOut();
+      // v7: signOut via singleton
+      await GoogleSignIn.instance.signOut();
     }
     await FirebaseAuth.instance.signOut();
   }

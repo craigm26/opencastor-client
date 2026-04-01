@@ -34,6 +34,7 @@ Future<void> main() async {
     // Complete any pending redirect sign-in (web only).
     // Guarded by a 5s timeout — getRedirectResult() can hang if the Firebase
     // auth domain is slow or unreachable, which would block runApp() forever.
+    await AuthService.initializeGoogleSignIn();
     await AuthService.handleRedirectResult()
         .timeout(const Duration(seconds: 5), onTimeout: () {});
   } catch (e, st) {
