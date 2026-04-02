@@ -23,7 +23,7 @@ import '../../core/app_logger.dart';
 ///   so getRedirectResult() silently returns null and the user loops back
 ///   to /login.
 ///
-/// google_sign_in v7 migration notes:
+/// google_sign_in v7 migration notes (see PR #82):
 ///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
 ///   - Must call `initialize()` before any other method.
 ///   - Authentication (proving identity) and authorization (granting scopes)
