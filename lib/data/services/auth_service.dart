@@ -27,9 +27,9 @@ import '../../core/app_logger.dart';
 ///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
 ///   - Must call `initialize()` before any other method.
 ///   - Authentication (identity) and authorization (API scopes) are now separate.
-///     Firebase sign-in uses `account.authentication` for idToken + accessToken.
-///     `authorizationClient.authorizationForScopes()` is only for additional
-///     OAuth scopes beyond basic sign-in — it does NOT return an idToken.
+///     Firebase sign-in uses `account.authentication.idToken` only.
+///     `accessToken` was removed from `GoogleSignInAuthentication` in v7;
+///     use `authorizationClient.authorizationForScopes()` for additional scopes.
 class AuthService {
   const AuthService._();
 
@@ -88,15 +88,15 @@ class AuthService {
     if (account == null) return; // user cancelled
 
     // Obtain Firebase-compatible tokens via account.authentication.
-    // - idToken: proves identity to Firebase (required)
-    // - accessToken: grants API access (optional but included for parity)
-    // Note: authorizationClient.authorizationForScopes() returns only an
-    // access token for additional scopes — it does NOT return an idToken
-    // and should NOT be used for Firebase sign-in.
+    // In google_sign_in v7, GoogleSignInAuthentication only exposes:
+    //   - idToken: proves identity to Firebase (required for signInWithCredential)
+    //   - serverAuthCode: for server-side token exchange (not needed here)
+    // accessToken is no longer on GoogleSignInAuthentication in v7;
+    // use account.authorizationClient.authorizationForScopes() if additional
+    // OAuth scopes are needed (separate from Firebase sign-in).
     final authentication = await account.authentication;
     final cred = GoogleAuthProvider.credential(
       idToken: authentication.idToken,
-      accessToken: authentication.accessToken,
     );
     await FirebaseAuth.instance.signInWithCredential(cred);
     log.i(
