@@ -26,10 +26,10 @@ import '../../core/app_logger.dart';
 /// google_sign_in v7 migration notes (see PR #82):
 ///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
 ///   - Must call `initialize()` before any other method.
-///   - Authentication (proving identity) and authorization (granting scopes)
-///     are now separate steps. For Firebase sign-in we only need authentication
-///     (ID token); access token is obtained via `authorizationClient` separately
-///     if additional scopes are needed.
+///   - Authentication (identity) and authorization (API scopes) are now separate.
+///     Firebase sign-in uses `account.authentication` for idToken + accessToken.
+///     `authorizationClient.authorizationForScopes()` is only for additional
+///     OAuth scopes beyond basic sign-in — it does NOT return an idToken.
 class AuthService {
   const AuthService._();
 
@@ -83,20 +83,20 @@ class AuthService {
     }
 
     // Native mobile / desktop: GoogleSignIn v7 plugin → Firebase credential.
-    // v7: use singleton, authenticate() for identity, authorizationClient for tokens.
+    // v7: use singleton; authenticate() returns the signed-in account.
     final account = await GoogleSignIn.instance.authenticate();
     if (account == null) return; // user cancelled
 
-    // Obtain Firebase-compatible tokens via the authorization client.
-    // ID token proves identity; access token grants API access.
-    final authorization = await account.authorizationClient.authorizationForScopes(
-      ['email', 'profile'],
-    );
-
+    // Obtain Firebase-compatible tokens via account.authentication.
+    // - idToken: proves identity to Firebase (required)
+    // - accessToken: grants API access (optional but included for parity)
+    // Note: authorizationClient.authorizationForScopes() returns only an
+    // access token for additional scopes — it does NOT return an idToken
+    // and should NOT be used for Firebase sign-in.
+    final authentication = await account.authentication;
     final cred = GoogleAuthProvider.credential(
-      accessToken: authorization.accessToken,
-      // idToken is available on the account directly in v7 via
-      // authentication.idToken; fall back to authorization if needed.
+      idToken: authentication.idToken,
+      accessToken: authentication.accessToken,
     );
     await FirebaseAuth.instance.signInWithCredential(cred);
     log.i(
