@@ -49,7 +49,7 @@ flutter {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.21"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.0"
     // Firebase BoM — manages Firebase lib versions
     implementation platform('com.google.firebase:firebase-bom:33.0.0')
     implementation 'com.google.firebase:firebase-analytics'
