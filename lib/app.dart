@@ -10,6 +10,9 @@
 /// Screen-level state lives in the per-feature ViewModels.
 library;
 
+import 'dart:async';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -18,6 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'core/constants.dart';
 import 'data/models/harness_config.dart';
 import 'data/services/auth_service.dart';
+import 'data/services/notification_service.dart';
 import 'ui/alerts/alerts_screen.dart';
 import 'ui/consent/consent_screen.dart';
 import 'ui/consent/pending_consent_screen.dart';
@@ -66,6 +70,11 @@ import 'routes.dart';
 // ---------------------------------------------------------------------------
 
 final _pkgInfoProvider = FutureProvider<PackageInfo>((ref) => PackageInfo.fromPlatform());
+
+/// Singleton NotificationService — exposes message and tap streams to the UI.
+final _notificationServiceProvider = Provider<NotificationService>(
+  (_) => NotificationService(),
+);
 
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
@@ -551,9 +560,64 @@ class _SplashScreen extends StatelessWidget {
 // App shell — adaptive navigation (Fleet · Alerts · Settings)
 // ---------------------------------------------------------------------------
 
-class _AppShell extends StatelessWidget {
+class _AppShell extends ConsumerStatefulWidget {
   final Widget child;
   const _AppShell({required this.child});
+
+  @override
+  ConsumerState<_AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<_AppShell> {
+  StreamSubscription<RemoteMessage>? _foregroundSub;
+  StreamSubscription<RemoteMessage>? _tapSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final svc = ref.read(_notificationServiceProvider);
+    _foregroundSub = svc.messageStream.listen(_handleForeground);
+    _tapSub = svc.tapStream.listen(_handleTap);
+    // App opened by tapping a notification from terminated state
+    svc.getInitialMessage().then((msg) {
+      if (msg != null && mounted) _handleTap(msg);
+    });
+  }
+
+  @override
+  void dispose() {
+    _foregroundSub?.cancel();
+    _tapSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleForeground(RemoteMessage message) {
+    final type = message.data['type'] as String?;
+    final name = message.data['name'] as String? ?? 'Robot';
+    if (type == 'robot_offline') {
+      final rrn = message.data['rrn'] as String?;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$name went offline'),
+          action: rrn != null
+              ? SnackBarAction(
+                  label: 'View',
+                  onPressed: () => context.go(AppRoutes.robot(rrn)),
+                )
+              : null,
+        ),
+      );
+    }
+  }
+
+  void _handleTap(RemoteMessage message) {
+    final rrn = message.data['rrn'] as String?;
+    if (rrn == null) return;
+    // addPostFrameCallback ensures the router is ready before navigating
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go(AppRoutes.robot(rrn));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -597,7 +661,7 @@ class _AppShell extends StatelessWidget {
       // Navigate to the canonical root for each tab via AppRoutes constants.
       onDestinationSelected: (i) => context.go(AppRoutes.tabRouteFor(i)),
       destinations: destinations,
-      body: child,
+      body: widget.child,
     );
   }
 }

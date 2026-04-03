@@ -31,3 +31,6 @@ export { validateAndSaveHarness } from "./harness_validator";
 
 // Robot API proxy — relays GET requests to robots behind NAT
 export { robotApiGet } from "./robot_api";
+
+// Robot offline push notifications
+export { onRobotOffline } from "./notifications";
