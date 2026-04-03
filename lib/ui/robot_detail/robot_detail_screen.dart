@@ -42,6 +42,7 @@ import 'slash_command_provider.dart';
 import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
+import 'robot_telemetry_panel.dart';
 
 enum _RobotAction { control, share, docs, capabilities, harness }
 
@@ -781,6 +782,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
           // ── Telemetry + condensed badge row ───────────────────────────────
           _TelemetryPanel(robot: robot),
+          RobotTelemetryPanel(robot: robot),
           _ShortcutRow(robot: robot),
           const Divider(height: 1),
 
