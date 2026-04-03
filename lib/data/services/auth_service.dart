@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:web/web.dart' as web;
+import 'ua_detector_stub.dart'
+    if (dart.library.js_interop) 'ua_detector_web.dart';
 import '../../core/app_logger.dart';
 
 /// Centralises all authentication logic.
@@ -68,12 +69,7 @@ class AuthService {
       // iOS Safari cannot reliably open popups from Flutter web canvas apps —
       // the canvas rendering model doesn't propagate user gestures to the
       // window level. Skip signInWithPopup and go straight to redirect.
-      final userAgent =
-          web.window.navigator.userAgent.toLowerCase();
-      final isIosSafari =
-          userAgent.contains('iphone') || userAgent.contains('ipad');
-
-      if (isIosSafari) {
+      if (isMobileSafari()) {
         log.i(
           'AuthService: iOS Safari detected — using signInWithRedirect directly',
         );
