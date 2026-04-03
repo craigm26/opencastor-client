@@ -28,39 +28,22 @@ export '../../data/repositories/robot_repository_provider.dart'
 // ---------------------------------------------------------------------------
 
 /// Auth state stream — single source of truth for sign-in status.
-final authStateProvider = StreamProvider<User?>((_) async* {
-  // On iOS, Firebase checks persisted credentials asynchronously — the first
-  // authStateChanges() event can arrive several seconds after cold start.
-  // Without a guard the router would sit on /splash forever (looks like a
-  // black-screen crash).
-  //
-  // Fix: race the first emission against a 10s deadline. If no event arrives
-  // in time we yield null so the router falls through to /login.
-  //
-  // IMPORTANT: the timeout applies ONLY to the first emission. After that the
-  // stream passes through with no timeout. The previous implementation used
-  // .timeout() on the entire stream, which re-arms every 10 s of inactivity
-  // (i.e. while the user is authenticated and auth state is stable). That
-  // caused a hard redirect to /login after ~10 s on any screen — the
-  // "auth loop on robot detail" bug.
-  final stream = FirebaseAuth.instance.authStateChanges();
-  bool firstEmitted = false;
-
-  await for (final user in stream.timeout(
-    const Duration(seconds: 10),
-    onTimeout: (sink) {
-      if (!firstEmitted) sink.add(null); // only emit null if still waiting
-    },
-  )) {
-    firstEmitted = true;
-    yield user;
-    // After the first value, break out and re-subscribe WITHOUT a timeout
-    break;
-  }
-
-  // Tail: pass remaining events through with no timeout
-  yield* stream;
-});
+/// Auth state stream — single source of truth for sign-in status.
+///
+/// Uses [FirebaseAuth.authStateChanges] directly with no timeout wrapper.
+///
+/// History of bugs avoided here:
+/// - v1: .timeout(8s) on the full stream → re-armed every 8 s of inactivity,
+///   emitting null while authenticated → kicked user to /login on robot detail.
+/// - v2: break-then-yield* approach → created a second subscription that
+///   immediately emitted null before Firebase resolved credentials → same loop.
+///
+/// The router redirect guards against AsyncLoading with a /splash redirect,
+/// which is correct. Firebase web SDK emits within milliseconds on subsequent
+/// visits (credentials cached in IndexedDB). No timeout needed.
+final authStateProvider = StreamProvider<User?>(
+  (_) => FirebaseAuth.instance.authStateChanges(),
+);
 
 // ---------------------------------------------------------------------------
 // Fleet data stream
