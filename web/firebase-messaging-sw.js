@@ -15,7 +15,7 @@ importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-comp
 
 firebase.initializeApp({
   apiKey: "%%FIREBASE_API_KEY%%",
-  authDomain: "opencastor.firebaseapp.com",
+  authDomain: "app.opencastor.com",
   projectId: "opencastor",
   storageBucket: "opencastor.firebasestorage.app",
   messagingSenderId: "360358330839",
