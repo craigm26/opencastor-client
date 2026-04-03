@@ -4,6 +4,21 @@ All notable changes to opencastor-client are documented here.
 
 ---
 
+## [1.1.0] - 2026-04-02
+
+### Added
+- Real-time telemetry panel in robot detail screen — live CPU, disk, memory, and uptime via Firestore stream (#90/#93)
+- FCM push notifications for robot offline status — background alerts when a robot goes offline (#91/#94)
+
+### Fixed
+- Safari login loop on web — proxy Firebase auth domain via Cloudflare Pages Function (#85)
+- google_sign_in v7 cancellation now handled via exception instead of null check (#86/#88)
+- SetupScreen delegates auth to AuthService instead of direct Firebase calls (#87/#92)
+- Android build stack overhaul — Gradle 8.11.1 / AGP 8.9.1 / Kotlin 2.2.0 (#82)
+- CI branch target fix (#83)
+
+---
+
 ## [1.4.0] - 2026-03-28
 
 ### Added
