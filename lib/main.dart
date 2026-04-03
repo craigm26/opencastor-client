@@ -50,6 +50,23 @@ Future<void> main() async {
     await AuthService.handleRedirectResult()
         .timeout(const Duration(seconds: 5), onTimeout: () {});
 
+    // On web, Firebase Auth resolves persisted credentials from IndexedDB
+    // asynchronously AFTER initializeApp(). Until it resolves, currentUser
+    // is null and authStateChanges() emits null — causing the router to
+    // briefly redirect to /login before the real user is emitted.
+    //
+    // Fix: wait for the first authStateChanges() emission here, before
+    // runApp(). After this point, Firebase Auth is fully initialized and
+    // any new subscription to authStateChanges() emits the stable state
+    // immediately (no transient null). The 5s timeout is a safety valve
+    // for offline/slow-network cold starts.
+    if (kIsWeb) {
+      await FirebaseAuth.instance
+          .authStateChanges()
+          .first
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
+    }
+
     // Register native background message handler (web uses firebase-messaging-sw.js).
     if (!kIsWeb) FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
 

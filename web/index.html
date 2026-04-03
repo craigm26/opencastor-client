@@ -100,28 +100,25 @@
       });
     })();
     if ('serviceWorker' in navigator) {
-      // If a SW is already controlling, immediately trigger an update check.
+      // Trigger a background SW update check on every page load.
+      // The new SW downloads silently and waits — it does NOT activate
+      // immediately (no SKIP_WAITING) and does NOT force a page reload.
+      //
+      // Why no auto-reload:
+      //   The previous pattern sent SKIP_WAITING + reloaded on controllerchange.
+      //   This caused mid-session page reloads on every deploy. During reload,
+      //   Firebase Auth briefly emits null before re-reading IndexedDB, which
+      //   the router interpreted as "signed out" and redirected to /login —
+      //   the root cause of the auth loop on robot detail.
+      //
+      // New SW activates on the user's next natural page load (close + reopen,
+      // or manual refresh). Users get updates within one session boundary with
+      // no disruption to the current session.
       if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'CHECK_FOR_UPDATE' });
       }
       navigator.serviceWorker.getRegistrations().then(function(regs) {
         regs.forEach(function(reg) { reg.update(); });
-      });
-      navigator.serviceWorker.addEventListener('controllerchange', function() {
-        window.location.reload();
-      });
-      navigator.serviceWorker.ready.then(function(reg) {
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
-        reg.addEventListener('updatefound', function() {
-          var newWorker = reg.installing;
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              newWorker.postMessage({ type: 'SKIP_WAITING' });
-            }
-          });
-        });
       });
     }
   </script>
