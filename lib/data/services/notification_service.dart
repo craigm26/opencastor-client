@@ -47,6 +47,9 @@ class NotificationService {
   /// Stream of incoming FCM messages while app is in foreground.
   Stream<RemoteMessage> get messageStream => FirebaseMessaging.onMessage;
 
-  /// Get the initial message if app was launched from a notification.
+  /// Stream of FCM messages that tapped the app open from background state.
+  Stream<RemoteMessage> get tapStream => FirebaseMessaging.onMessageOpenedApp;
+
+  /// Get the initial message if app was launched by tapping a notification.
   Future<RemoteMessage?> getInitialMessage() => _msg.getInitialMessage();
 }
