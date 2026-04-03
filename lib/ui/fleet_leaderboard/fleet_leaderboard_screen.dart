@@ -990,7 +990,7 @@ class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.emoji_events_outlined,
+                  const Icon(Icons.emoji_events_outlined,
                       size: 14, color: amber),
                   const SizedBox(width: 6),
                   Text(
@@ -1016,12 +1016,12 @@ class _FeaturedProjectCardState extends State<_FeaturedProjectCard> {
             ),
             const SizedBox(height: 10),
             // Robot avatar row
-            Row(
+            const Row(
               children: [
                 _RobotBadge(name: 'Bob', contributing: true),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 _RobotBadge(name: 'Alex', contributing: true),
-                const Spacer(),
+                Spacer(),
               ],
             ),
             // Error message (inline, not snackbar)

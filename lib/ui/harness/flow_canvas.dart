@@ -1011,7 +1011,7 @@ class _FlowNode extends StatelessWidget {
               child: Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: _kConnectHighlight,
                   shape: BoxShape.circle,
                 ),

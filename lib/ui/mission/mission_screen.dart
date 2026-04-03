@@ -254,7 +254,7 @@ class _MissionScreenState extends State<MissionScreen> {
         }
         if (!missionSnap.hasData || !missionSnap.data!.exists) {
           return const Scaffold(
-              body: const EmptyView(title: 'Mission not found'));
+              body: EmptyView(title: 'Mission not found'));
         }
 
         final mission = Mission.fromDocument(missionSnap.data!);
@@ -900,7 +900,7 @@ class _MentionSuggestions extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      color: cs.surfaceVariant,
+      color: cs.surfaceContainerHighest,
       child: Column(
         children: suggestions
             .map((token) {
@@ -937,7 +937,7 @@ class _ObserverBanner extends StatelessWidget {
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        color: cs.surfaceVariant,
+        color: cs.surfaceContainerHighest,
         child: Row(
           children: [
             Icon(Icons.visibility_outlined,

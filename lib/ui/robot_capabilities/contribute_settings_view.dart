@@ -309,7 +309,7 @@ class _ModeCard extends StatelessWidget {
                   )
                 : Switch.adaptive(
                     value: enabled,
-                    activeColor: accentColor,
+                    activeTrackColor: accentColor,
                     onChanged: onChanged,
                   ),
           ],

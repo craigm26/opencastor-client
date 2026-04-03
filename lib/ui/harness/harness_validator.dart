@@ -149,7 +149,7 @@ class HarnessValidator {
     if (graph.edges.isNotEmpty) {
       final reachable = _reachableFrom('__input__', graph);
       if (!reachable.contains('__output__')) {
-        issues.add(ValidationIssue(
+        issues.add(const ValidationIssue(
           severity: ValidationSeverity.block,
           code: 'NO_PATH_TO_OUTPUT',
           message: 'No path from the input node to the output (response) node.',
@@ -188,7 +188,7 @@ class HarnessValidator {
 
     // ── Check 7: Empty harness ─────────────────────────────────────────────
     if (layers.isEmpty) {
-      issues.add(ValidationIssue(
+      issues.add(const ValidationIssue(
         severity: ValidationSeverity.warn,
         code: 'EMPTY_HARNESS',
         message: 'Harness has no layers.',
@@ -272,7 +272,7 @@ class HarnessValidator {
       try {
         final layer = layers.firstWhere((l) => l.id == id);
         if (layer.label.toLowerCase().contains('timeout') ||
-            layer.label.toLowerCase().contains('deadline')) return true;
+            layer.label.toLowerCase().contains('deadline')) { return true; }
       } catch (_) {}
     }
     // Check for exit edge

@@ -158,7 +158,7 @@ class CreditsCard extends ConsumerWidget {
       loading: () => const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: const LoadingView(),
+          child: LoadingView(),
         ),
       ),
       error: (e, _) => Card(

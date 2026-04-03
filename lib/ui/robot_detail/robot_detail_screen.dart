@@ -10,7 +10,6 @@
 library;
 
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -29,7 +28,6 @@ import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../../ui/chat/image_annotation_screen.dart';
-import '../../data/models/command.dart' hide CommandScope;
 import '../../data/models/slash_command.dart';
 import '../../data/services/github_release_service.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
@@ -402,7 +400,6 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
       final data = result.data;
       final configUrl = data['url'] as String? ?? 'opencastor.com/explore';
-      final installCmd = data['install_cmd'] as String? ?? '';
 
       if (ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
@@ -923,11 +920,11 @@ class _OfflineBanner extends StatelessWidget {
             border: Border(
                 bottom: BorderSide(
                     color: AppTheme.warning.withValues(alpha: 0.3)))),
-        child: Row(
+        child: const Row(
           children: [
             Icon(Icons.wifi_off_outlined,
                 size: 14, color: AppTheme.warning),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text(
               'OFFLINE — Robot operating on cached credentials',
               style: TextStyle(fontSize: 12, color: AppTheme.warning),
@@ -970,18 +967,18 @@ class _UpdateBanner extends StatelessWidget {
                   bottom: BorderSide(color: color.withValues(alpha: 0.35)))),
           child: Row(
             children: [
-              Icon(Icons.system_update_alt_outlined, size: 15, color: color),
+              const Icon(Icons.system_update_alt_outlined, size: 15, color: color),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Update available: v$current → v$latestVersion',
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: color),
                 ),
               ),
-              Text(
+              const Text(
                 'View release notes',
                 style: TextStyle(
                     fontSize: 12,
@@ -989,7 +986,7 @@ class _UpdateBanner extends StatelessWidget {
                     color: color),
               ),
               const SizedBox(width: 4),
-              Icon(Icons.open_in_new, size: 12, color: color),
+              const Icon(Icons.open_in_new, size: 12, color: color),
             ],
           ),
         ),
@@ -1399,202 +1396,6 @@ class _VersionBadge extends ConsumerWidget {
 
 
 
-
-// ── Hardware section — RAM, disk, temp, NPU ──────────────────────────────────
-
-class _HardwareSection extends StatelessWidget {
-  final Map<String, dynamic> t;
-  const _HardwareSection({required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final sys = t['system'] as Map<String, dynamic>?;
-    if (sys == null || sys.isEmpty) return const SizedBox.shrink();
-
-    final ramAvail = sys['ram_available_gb'] as num?;
-    final ramTotal = sys['ram_total_gb'] as num?;
-    final diskFree = sys['disk_free_gb'] as num?;
-    final diskTotal = sys['disk_total_gb'] as num?;
-    final cpuTemp = sys['cpu_temp_c'] as num?;
-    // npu_detected may be bool (new bridge) or String (legacy) — handle both
-    final npuRaw = sys['npu_detected'];
-    final npu = npuRaw is bool ? (npuRaw ? (sys['npu_model'] as String? ?? 'NPU') : null) : npuRaw as String?;
-    final npuTops = sys['npu_tops'] as num?;
-    final gpuRaw = sys['gpu_detected'];
-    final gpu = gpuRaw is bool ? (gpuRaw ? 'GPU' : null) : gpuRaw as String?;
-
-    final chips = <Widget>[];
-
-    if (ramAvail != null && ramTotal != null) {
-      chips.add(_HwChip(
-        Icons.memory_outlined,
-        '${ramAvail.toStringAsFixed(1)} / ${ramTotal.toStringAsFixed(0)} GB',
-        label: 'RAM',
-        color: _ramColor(context, ramAvail.toDouble(), ramTotal.toDouble()),
-      ));
-    }
-    if (diskFree != null && diskTotal != null) {
-      chips.add(_HwChip(
-        Icons.storage_outlined,
-        '${diskFree.toStringAsFixed(0)} GB free',
-        label: 'Disk',
-      ));
-    }
-    if (cpuTemp != null) {
-      chips.add(_HwChip(
-        Icons.thermostat_outlined,
-        '${cpuTemp.toStringAsFixed(0)}°C',
-        label: 'CPU',
-        color: _tempColor(context, cpuTemp.toDouble()),
-      ));
-    }
-    if (npu != null) {
-      final topsLabel = npuTops != null ? ' · ${npuTops.toStringAsFixed(0)} TOPS' : '';
-      chips.add(_HwChip(Icons.bolt_outlined, '$npu$topsLabel', label: 'NPU',
-          color: cs.primary));
-    }
-    if (gpu != null) {
-      chips.add(_HwChip(Icons.videocam_outlined, gpu, label: 'GPU'));
-    }
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Wrap(spacing: 8, runSpacing: 6, children: chips),
-    );
-  }
-
-  Color _ramColor(BuildContext ctx, double avail, double total) {
-    final cs = Theme.of(ctx).colorScheme;
-    final pct = avail / total;
-    if (pct < 0.15) return cs.error;
-    if (pct < 0.30) return Colors.orange;
-    return cs.onSurfaceVariant;
-  }
-
-  Color _tempColor(BuildContext ctx, double t) {
-    final cs = Theme.of(ctx).colorScheme;
-    if (t >= 80) return cs.error;
-    if (t >= 65) return Colors.orange;
-    return cs.onSurfaceVariant;
-  }
-}
-
-// ── Model runtime section — model, KV compression, llmfit ────────────────────
-
-class _ModelRuntimeSection extends StatelessWidget {
-  final Map<String, dynamic> t;
-  const _ModelRuntimeSection({required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final mr = t['model_runtime'] as Map<String, dynamic>?;
-    if (mr == null || mr.isEmpty) return const SizedBox.shrink();
-
-    final model = mr['active_model'] as String?;
-    final provider = mr['provider'] as String?;
-    final modelGb = mr['model_size_gb'] as num?;
-    final ctx = mr['context_window'] as num?;
-    final kvComp = mr['kv_compression'] as String?;
-    final kvBits = mr['kv_bits'] as num?;
-    final llmfitStatus = mr['llmfit_status'] as String?;
-    final headroom = mr['llmfit_headroom_gb'] as num?;
-    final tps = mr['tokens_per_sec'] as num?;
-
-    if (model == null || model == 'unknown') return const SizedBox.shrink();
-
-    final chips = <Widget>[];
-
-    // Model + size
-    final sizeLabel = modelGb != null ? ' · ${modelGb.toStringAsFixed(1)} GB' : '';
-    chips.add(_HwChip(Icons.psychology_outlined, '$model$sizeLabel',
-        label: provider ?? 'model'));
-
-    // Context window
-    if (ctx != null) {
-      final ctxK = (ctx / 1024).round();
-      chips.add(_HwChip(Icons.chat_bubble_outline, '${ctxK}k ctx', label: 'ctx'));
-    }
-
-    // TurboQuant KV
-    if (kvComp != null && kvComp != 'none') {
-      chips.add(_HwChip(
-        Icons.compress_outlined,
-        '${kvComp}${kvBits != null ? ' ${kvBits}-bit' : ''}',
-        label: 'KV',
-        color: cs.primary,
-      ));
-    }
-
-    // LLMFit
-    if (llmfitStatus != null) {
-      final fitIcon = llmfitStatus == 'ok' ? Icons.check_circle_outline : Icons.warning_amber_outlined;
-      final fitColor = llmfitStatus == 'ok' ? Colors.green : cs.error;
-      final headroomLabel = headroom != null
-          ? (llmfitStatus == 'ok'
-              ? '+${headroom.toStringAsFixed(1)} GB'
-              : '${headroom.abs().toStringAsFixed(1)} GB OOM')
-          : '';
-      chips.add(_HwChip(fitIcon, headroomLabel.isNotEmpty ? headroomLabel : llmfitStatus,
-          label: 'fit', color: fitColor));
-    }
-
-    // Tokens/sec
-    if (tps != null) {
-      chips.add(_HwChip(Icons.speed_outlined, '${tps.toStringAsFixed(0)} tok/s',
-          label: 'speed'));
-    }
-
-    if (chips.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Wrap(spacing: 8, runSpacing: 6, children: chips),
-    );
-  }
-}
-
-// ── Hardware chip ──────────────────────────────────────────────────────────────
-
-class _HwChip extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color? color;
-  const _HwChip(this.icon, this.value, {required this.label, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final fg = color ?? cs.onSurfaceVariant;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              color: fg,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ── Image preview ─────────────────────────────────────────────────────────────
 

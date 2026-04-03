@@ -103,7 +103,7 @@ class _PipelineExplainerState extends State<PipelineExplainer>
                   ),
                   if (isCommunity) ...[
                     const SizedBox(width: 8),
-                    _MiniChip(
+                    const _MiniChip(
                       label: 'Earn Credits',
                       color: amber,
                     ),

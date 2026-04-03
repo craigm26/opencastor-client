@@ -7,8 +7,6 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../data/models/robot.dart';
-import '../../data/models/command.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/confirmation_dialog.dart';
 import '../../ui/core/widgets/health_indicator.dart';
@@ -392,8 +390,8 @@ class _SafetyBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: AppTheme.warning.withValues(alpha: 0.12),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           Icon(Icons.warning_amber_rounded,
               color: AppTheme.warning, size: 16),
           SizedBox(width: 8),

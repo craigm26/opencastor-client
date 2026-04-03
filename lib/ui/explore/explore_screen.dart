@@ -297,7 +297,7 @@ class _ConfigCard extends ConsumerWidget {
                   _TypeBadge(type: config.type),
                   if (config.pqEnabled) ...[
                     const SizedBox(width: 6),
-                    _PqBadge(),
+                    const _PqBadge(),
                   ],
                   const Spacer(),
                   GestureDetector(

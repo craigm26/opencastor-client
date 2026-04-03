@@ -708,12 +708,12 @@ class _LoginState extends State<_LoginScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline,
+                                const Icon(Icons.error_outline,
                                     color: AppTheme.danger, size: 16),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(_error!,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           color: AppTheme.danger,
                                           fontSize: 13)),
                                 ),

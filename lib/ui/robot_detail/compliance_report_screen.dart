@@ -8,9 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/models/robot.dart';
 import '../robot_detail/robot_detail_view_model.dart';
-import '../core/theme/app_theme.dart';
 import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
@@ -226,7 +224,7 @@ class _ComplianceReportView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cs.surfaceVariant.withValues(alpha: 0.5),
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(8),
             ),
             child: SelectableText(

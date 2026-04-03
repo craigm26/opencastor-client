@@ -8,9 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-import '../../data/models/robot.dart';
 import '../robot_detail/robot_detail_view_model.dart';
-import '../core/theme/app_theme.dart';
 import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
@@ -76,7 +74,7 @@ class _OrchestratorList extends StatelessWidget {
       children: [
         // Status banner
         if (!robot.isRcanV21)
-          _InfoBanner(
+          const _InfoBanner(
             icon: Icons.info_outline,
             color: Colors.orange,
             message: 'Robot must run RCAN v2.1 to accept M2M_TRUSTED sessions.',
@@ -110,7 +108,7 @@ class _OrchestratorList extends StatelessWidget {
         const SizedBox(height: 8),
 
         // Revocation info
-        _InfoBanner(
+        const _InfoBanner(
           icon: Icons.security,
           color: Colors.blue,
           message: 'Any owner can revoke an orchestrator at any time. '

@@ -465,7 +465,7 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
 
   // Fallback when offline — mirrors index.json
   static final _fallbackConfigs = [
-    HarnessConfigEntry(
+    const HarnessConfigEntry(
       id: 'lower_cost',
       name: 'Lower Cost',
       description: 'Best overall balance of quality vs. cost. OHB-1 champion.',
@@ -476,7 +476,7 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
       isChampion: true,
       tags: ['recommended', 'all-hardware'],
     ),
-    HarnessConfigEntry(
+    const HarnessConfigEntry(
       id: 'local_only',
       name: 'Local Only',
       description: 'Fully offline. Zero cloud calls. gemma3:1b via Ollama.',
@@ -487,7 +487,7 @@ class _ConfigLibraryViewState extends State<ConfigLibraryView> {
       isChampion: false,
       tags: ['offline', 'privacy'],
     ),
-    HarnessConfigEntry(
+    const HarnessConfigEntry(
       id: 'industrial_optimized',
       name: 'Industrial Optimized',
       description: 'Retry-heavy, alert-aware. +12% industrial median.',

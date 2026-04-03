@@ -380,7 +380,7 @@ class _ParticipantAvatarRow extends StatelessWidget {
                 width: size,
                 height: size,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   shape: BoxShape.circle,
                   border: Border.all(
                       color: Theme.of(context).colorScheme.outline,

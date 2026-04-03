@@ -24,8 +24,6 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/models/command.dart';
-import '../../data/models/robot.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 

@@ -123,7 +123,7 @@ class _SoftwareView extends ConsumerWidget {
             description: cliCmds.length > 5 ? '$preview, …' : preview,
           );
         } else {
-          return CapabilityRow(
+          return const CapabilityRow(
             label: 'No skills active',
             status: CapStatus.info,
             description: 'No skills enabled in RCAN config',

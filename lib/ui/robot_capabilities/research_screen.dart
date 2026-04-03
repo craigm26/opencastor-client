@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/personal_research.dart';
 import '../../data/services/personal_research_service.dart';
-import '../fleet_leaderboard/personal_research_card.dart';
 import '../fleet_leaderboard/personal_research_view_model.dart';
 import '../shared/loading_view.dart';
 
@@ -72,7 +71,7 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
           summaryAsync.when(
             loading: () => const Padding(
               padding: EdgeInsets.all(32),
-              child: const LoadingView(),
+              child: LoadingView(),
             ),
             error: (e, _) => Padding(
               padding: const EdgeInsets.all(16),
@@ -102,10 +101,11 @@ class _ResearchScreenState extends ConsumerState<ResearchScreen> {
   Future<void> _triggerRun(BuildContext context) async {
     if (_running) return;
     setState(() => _running = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final ok = await PersonalResearchService().triggerRun(widget.rrn);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(ok
               ? 'Research run queued — bridge will process shortly'

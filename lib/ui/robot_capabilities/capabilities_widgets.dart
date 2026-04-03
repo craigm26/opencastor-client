@@ -417,7 +417,7 @@ class CapLoadingSection extends StatelessWidget {
           margin: EdgeInsets.zero,
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: const LoadingView(),
+            child: LoadingView(),
           ),
         ),
       ],
@@ -585,7 +585,7 @@ class CapInstructionSheet extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline,
+                    const Icon(Icons.info_outline,
                         size: 14, color: AppTheme.warning),
                     const SizedBox(width: 8),
                     Expanded(
@@ -873,8 +873,8 @@ void showLoaBottomSheet(BuildContext context, {required String rrn, required Wid
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (_) => ProviderScope(
-      parent: ProviderScope.containerOf(context),
+    builder: (_) => UncontrolledProviderScope(
+      container: ProviderScope.containerOf(context),
       child: _LoaEnableSheet(rrn: rrn, ref: ref),
     ),
   );
@@ -986,14 +986,14 @@ class _LoaEnableSheetState extends ConsumerState<_LoaEnableSheet> {
           Text('Or enable manually:',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 8),
-          _InstructionStep(number: 1, text: 'Via CLI (on the robot):'),
-          _CodeChip(code: cliSnippet),
+          const _InstructionStep(number: 1, text: 'Via CLI (on the robot):'),
+          const _CodeChip(code: cliSnippet),
           const SizedBox(height: 8),
-          _InstructionStep(number: 2, text: 'Or edit .rcan.yaml and add:'),
-          _CodeChip(code: snippet),
+          const _InstructionStep(number: 2, text: 'Or edit .rcan.yaml and add:'),
+          const _CodeChip(code: snippet),
           const SizedBox(height: 8),
-          _InstructionStep(number: 3, text: 'Restart the bridge:'),
-          _CodeChip(code: 'castor bridge restart'),
+          const _InstructionStep(number: 3, text: 'Restart the bridge:'),
+          const _CodeChip(code: 'castor bridge restart'),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(10),

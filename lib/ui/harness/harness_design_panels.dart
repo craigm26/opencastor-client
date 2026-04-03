@@ -309,21 +309,21 @@ class HarnessDesignPanels extends StatelessWidget {
             ),
           ),
         ),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: const PatternPanel(),
+        const Card(
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: PatternPanel(),
         ),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: const MemoryPanel(),
+        const Card(
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: MemoryPanel(),
         ),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: const SecurityPanel(),
+        const Card(
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: SecurityPanel(),
         ),
-        Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: const VisualPlannerPanel(),
+        const Card(
+          margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: VisualPlannerPanel(),
         ),
         const SizedBox(height: 16),
       ],
@@ -407,11 +407,11 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
                           ),
                         ]),
                         const SizedBox(height: 8),
-                        _InfoRow(icon: Icons.memory_outlined,
+                        const _InfoRow(icon: Icons.memory_outlined,
                             text: '15M params · raw pixels · ~1s on Pi5+Hailo8L'),
-                        _InfoRow(icon: Icons.hub_outlined,
+                        const _InfoRow(icon: Icons.hub_outlined,
                             text: 'JEPA architecture — no LLM needed for motor tasks'),
-                        _InfoRow(icon: Icons.route_outlined,
+                        const _InfoRow(icon: Icons.route_outlined,
                             text: 'Routes grip / navigate / place / reach commands\nthrough pixel-based planning, bypassing the model router'),
                         const SizedBox(height: 8),
                         Container(
@@ -510,7 +510,7 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: cs.outlineVariant),
                     ),
-                    child: Column(
+                    child: const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _InfoRow(icon: Icons.warning_amber_outlined,

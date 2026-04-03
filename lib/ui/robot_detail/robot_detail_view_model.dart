@@ -10,8 +10,6 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-import '../../data/models/command.dart';
-import '../../data/models/robot.dart';
 import '../../data/repositories/robot_repository.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 

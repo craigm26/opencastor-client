@@ -99,7 +99,6 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -164,7 +163,7 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
                     const SizedBox(height: 20),
 
                     // ── Select robots ──────────────────────────────────────
-                    _SectionHeader(
+                    const _SectionHeader(
                         icon: Icons.smart_toy_outlined, label: 'Select robots'),
                     const SizedBox(height: 8),
                     if (uid != null)
@@ -177,7 +176,7 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
                           if (snap.connectionState == ConnectionState.waiting) {
                             return const Padding(
                               padding: EdgeInsets.symmetric(vertical: 16),
-                              child: const LoadingView(),
+                              child: LoadingView(),
                             );
                           }
                           final docs = snap.data?.docs ?? [];
@@ -226,7 +225,7 @@ class _CreateMissionSheetState extends State<CreateMissionSheet> {
                     const SizedBox(height: 20),
 
                     // ── Invite teammates ───────────────────────────────────
-                    _SectionHeader(
+                    const _SectionHeader(
                         icon: Icons.group_add_outlined,
                         label: 'Invite teammates'),
                     const SizedBox(height: 4),
@@ -384,7 +383,7 @@ class _InviteeRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: cs.surfaceVariant.withValues(alpha: 0.5),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: cs.outlineVariant),
       ),

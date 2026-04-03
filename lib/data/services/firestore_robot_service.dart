@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import '../../core/app_logger.dart';
-import '../models/command.dart';
-import '../models/robot.dart';
 import '../repositories/robot_repository.dart';
 
 /// Firestore + Cloud Functions implementation of [RobotRepository].
@@ -35,7 +33,7 @@ class FirestoreRobotService implements RobotRepository {
             ..sort((a, b) => a.name.compareTo(b.name));
         })
         .handleError((e, st) {
-          log.e('watchFleet ERROR — uid="$uid"', error: e, stackTrace: st as StackTrace?);
+          log.e('watchFleet ERROR — uid="$uid"', error: e, stackTrace: st);
         });
   }
 
@@ -84,7 +82,7 @@ class FirestoreRobotService implements RobotRepository {
             // Exclude mission_thread commands — those belong in the Mission screen,
             // not the individual robot chat history.
             .where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
+              final data = doc.data();
               return data['context'] != 'mission_thread';
             })
             .map(RobotCommand.fromDoc)

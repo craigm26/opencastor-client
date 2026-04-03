@@ -36,7 +36,7 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           // ── Appearance ────────────────────────────────────────────────
-          _SectionHeader(label: 'Appearance'),
+          const _SectionHeader(label: 'Appearance'),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -81,7 +81,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 8),
 
           // ── Account ───────────────────────────────────────────────────
-          _SectionHeader(label: 'Account'),
+          const _SectionHeader(label: 'Account'),
           Card(
             child: Column(
               children: [
@@ -129,7 +129,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 8),
 
           // ── Pro ───────────────────────────────────────────────────────
-          _SectionHeader(label: 'Subscription'),
+          const _SectionHeader(label: 'Subscription'),
           Card(
             child: ListTile(
               leading: const Icon(Icons.workspace_premium_outlined),
@@ -143,7 +143,7 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 8),
 
           // ── About ─────────────────────────────────────────────────────
-          _SectionHeader(label: 'About'),
+          const _SectionHeader(label: 'About'),
           Card(
             child: Column(
               children: [
@@ -152,13 +152,13 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('OpenCastor Client'),
                   subtitle: ref.watch(_packageInfoProvider).when(
                     data: (info) => Text('v${info.version}+${info.buildNumber}'),
-                    loading: () => Text('v\${AppConstants.appVersion}'),
-                    error: (_, __) => Text('v\${AppConstants.appVersion}'),
+                    loading: () => const Text('v\${AppConstants.appVersion}'),
+                    error: (_, __) => const Text('v\${AppConstants.appVersion}'),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.hub_outlined),
-                  title: const Text('RCAN Protocol'),
+                const ListTile(
+                  leading: Icon(Icons.hub_outlined),
+                  title: Text('RCAN Protocol'),
                   subtitle: Text('v${AppConstants.rcanVersion}'),
                 ),
                 ListTile(

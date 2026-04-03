@@ -49,7 +49,7 @@ class RobotCapabilitiesScreen extends ConsumerWidget {
       data: (robot) {
         if (robot == null) {
           return const Scaffold(
-              body: const EmptyView(title: 'Robot not found'));
+              body: EmptyView(title: 'Robot not found'));
         }
 
         // If anchor is set, immediately navigate to the matching sub-screen.

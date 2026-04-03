@@ -328,6 +328,7 @@ class _ConsentRequestFormState
   /// Parses formats: QR shows bare RRN, rcan:// URI, or opencastor.com URL.
   Future<void> _scanRrn(
       BuildContext context, _ConsentFormNotifier notifier) async {
+    final messenger = ScaffoldMessenger.of(context);
     final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -339,7 +340,7 @@ class _ConsentRequestFormState
     if (result != null && result.isNotEmpty && mounted) {
       _rrnCtrl.text = result;
       notifier.setTargetRrn(result);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('RRN set: $result'),
           behavior: SnackBarBehavior.floating,
@@ -373,7 +374,7 @@ class _ConsentRequestFormState
         const SizedBox(height: 24),
 
         // ── Source robot (my robot making the request) ─────────────────
-        _SectionHeader(label: '1. Your Robot (Requester)'),
+        const _SectionHeader(label: '1. Your Robot (Requester)'),
         const SizedBox(height: 8),
         myFleet.when(
           loading: () => const LinearProgressIndicator(),
@@ -394,7 +395,7 @@ class _ConsentRequestFormState
         const SizedBox(height: 20),
 
         // ── Target RRN ─────────────────────────────────────────────────
-        _SectionHeader(label: '2. Target Robot RRN'),
+        const _SectionHeader(label: '2. Target Robot RRN'),
         const SizedBox(height: 8),
         TextField(
           controller: _rrnCtrl,
@@ -415,7 +416,7 @@ class _ConsentRequestFormState
         const SizedBox(height: 20),
 
         // ── Requested scopes ───────────────────────────────────────────
-        _SectionHeader(label: '3. Requested Scopes'),
+        const _SectionHeader(label: '3. Requested Scopes'),
         const SizedBox(height: 4),
         Text(
           'Select only what you need. The owner sees exactly these scopes.',
@@ -430,7 +431,7 @@ class _ConsentRequestFormState
         const SizedBox(height: 20),
 
         // ── Expiry ─────────────────────────────────────────────────────
-        _SectionHeader(label: '4. Access Duration'),
+        const _SectionHeader(label: '4. Access Duration'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -446,7 +447,7 @@ class _ConsentRequestFormState
         const SizedBox(height: 20),
 
         // ── Reason ────────────────────────────────────────────────────
-        _SectionHeader(label: '5. Reason (optional)'),
+        const _SectionHeader(label: '5. Reason (optional)'),
         const SizedBox(height: 8),
         TextField(
           controller: _reasonCtrl,
@@ -663,7 +664,7 @@ class _RobotPickerDropdownState
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<Robot>(
-      value: _selected,
+      initialValue: _selected,
       decoration: InputDecoration(
         labelText: widget.label,
         border: const OutlineInputBorder(),

@@ -12,8 +12,6 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/harness_config.dart';
 import '../../ui/core/theme/app_theme.dart';
-import 'flow_canvas.dart';
-import 'flow_graph.dart';
 import 'harness_design_panels.dart';
 import '../shared/loading_view.dart';
 
@@ -228,26 +226,15 @@ class HarnessViewer extends StatefulWidget {
 
 class _HarnessViewerState extends State<HarnessViewer> {
   final _expanded = <String, bool>{};
-  bool _showFlow = false;
-  late FlowGraph _flowGraph;
 
   @override
   void initState() {
     super.initState();
-    _flowGraph = FlowGraph.autoLayout(
-      widget.config.layers.map((l) => l.id).toList(),
-    );
   }
 
   @override
   void didUpdateWidget(HarnessViewer old) {
     super.didUpdateWidget(old);
-    if (old.config.layers != widget.config.layers) {
-      // Rebuild internal flow graph to match new layer order
-      _flowGraph = FlowGraph.autoLayout(
-        widget.config.layers.map((l) => l.id).toList(),
-      );
-    }
   }
 
   bool _isExpanded(String id) => _expanded[id] ?? false;

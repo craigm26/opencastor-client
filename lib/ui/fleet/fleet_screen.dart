@@ -37,7 +37,7 @@ class FleetScreen extends ConsumerWidget {
             onPressed: () => launchUrl(Uri.parse(AppConstants.docsRoot)),
           ),
           // Profile avatar — shows photo if signed in, fallback icon if not
-          _ProfileAvatarButton(),
+          const _ProfileAvatarButton(),
         ],
       ),
       body: Column(
@@ -51,7 +51,7 @@ class FleetScreen extends ConsumerWidget {
               : const SizedBox.shrink(),
 
           // ── Missions quick-access strip ───────────────────────────────
-          _MissionsStrip(),
+          const _MissionsStrip(),
 
           // ── Main content with AnimatedSwitcher ────────────────────────
           Expanded(
@@ -571,7 +571,7 @@ class _ShimmerFleetList extends StatelessWidget {
       itemBuilder: (_, __) => Shimmer.fromColors(
         baseColor: cs.surfaceContainerLow,
         highlightColor: cs.surfaceContainer,
-        child: Card(
+        child: const Card(
           child: SizedBox(height: 120),
         ),
       ),

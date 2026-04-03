@@ -129,7 +129,7 @@ class _RobotAlertSection extends ConsumerWidget {
                       horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.check_circle_outline,
                         size: 16,
                         color: AppTheme.online,

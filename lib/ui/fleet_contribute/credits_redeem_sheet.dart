@@ -73,6 +73,9 @@ class _CreditsRedeemSheetState extends ConsumerState<CreditsRedeemSheet> {
   bool _redeeming = false;
 
   Future<void> _redeem(BuildContext context, _RedeemOption option) async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -120,8 +123,8 @@ class _CreditsRedeemSheetState extends ConsumerState<CreditsRedeemSheet> {
 
       if (mounted) {
         ref.invalidate(creditsProvider);
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
+        navigator.pop();
+        messenger.showSnackBar(
           SnackBar(
             content: Text('${option.label} redeemed!'),
             backgroundColor: Colors.green,
@@ -130,10 +133,10 @@ class _CreditsRedeemSheetState extends ConsumerState<CreditsRedeemSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text('Redemption failed: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            backgroundColor: errorColor,
           ),
         );
       }

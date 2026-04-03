@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/robot.dart';
-import '../core/theme/app_theme.dart';
 
 class AttestationCard extends StatelessWidget {
   final Robot robot;
@@ -191,7 +190,7 @@ class _ConformanceLevelBar extends StatelessWidget {
           child: LinearProgressIndicator(
             value: level / 5.0,
             minHeight: 6,
-            backgroundColor: cs.surfaceVariant,
+            backgroundColor: cs.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation(levelColor),
           ),
         ),

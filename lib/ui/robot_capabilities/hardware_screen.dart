@@ -80,7 +80,7 @@ class HardwareScreen extends ConsumerWidget {
             rows: _buildRows(effectiveHw, robot: robot),
           )
         else
-          CapSection(
+          const CapSection(
             title: 'Detected Hardware',
             icon: Icons.memory_outlined,
             rows: [
@@ -166,7 +166,7 @@ class HardwareScreen extends ConsumerWidget {
 
   List<CapabilityRow> _buildRows(Map<String, dynamic> hw, {dynamic robot}) {
     if (hw.isEmpty) {
-      return [
+      return const [
         CapabilityRow(
           label: 'Hardware data unavailable',
           status: CapStatus.info,
@@ -209,7 +209,7 @@ class HardwareScreen extends ConsumerWidget {
         description: 'Hardware class for LLM model selection',
       ),
       if (accel.isEmpty)
-        CapabilityRow(
+        const CapabilityRow(
           label: 'No accelerators detected',
           status: CapStatus.info,
           description: 'NPU/GPU not found',
@@ -229,7 +229,7 @@ class HardwareScreen extends ConsumerWidget {
           description: '${ollama.length} model(s) available via Ollama',
         )
       else
-        CapabilityRow(
+        const CapabilityRow(
           label: 'No local models',
           status: CapStatus.info,
           description: 'No Ollama models installed',
@@ -369,7 +369,7 @@ class _LiveStatsSection extends StatelessWidget {
       rows.add(CapabilityRow(
         label: '$model$sizeLabel',
         status: fitStatus == 'oom' ? CapStatus.missing : CapStatus.ok,
-        description: '${provider.isNotEmpty ? "$provider" : ""}$ctxLabel$kvLabel'
+        description: '${provider.isNotEmpty ? provider : ""}$ctxLabel$kvLabel'
             '${fitLabel.isNotEmpty ? " · $fitLabel" : ""}'
             '${tps != null ? " · ${tps.toStringAsFixed(0)} tok/s" : ""}',
       ));

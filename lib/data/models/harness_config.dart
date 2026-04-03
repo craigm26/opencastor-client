@@ -184,45 +184,45 @@ class HarnessConfig {
           ),
 
           // ── SKILLS ────────────────────────────────────────────────────────
-          HarnessLayer(
+          const HarnessLayer(
             id: 'skill-navigate-to',
             type: 'skill',
             label: 'navigate-to',
             description: 'Autonomous waypoint navigation',
             enabled: true,
-            config: const {'order': 0},
+            config: {'order': 0},
           ),
-          HarnessLayer(
+          const HarnessLayer(
             id: 'skill-camera-describe',
             type: 'skill',
             label: 'camera-describe',
             description: 'Describe scene from camera feed',
             enabled: true,
-            config: const {'order': 1},
+            config: {'order': 1},
           ),
-          HarnessLayer(
+          const HarnessLayer(
             id: 'skill-web-lookup',
             type: 'skill',
             label: 'web-lookup',
             description: 'Web search and knowledge retrieval',
             enabled: true,
-            config: const {'order': 2},
+            config: {'order': 2},
           ),
-          HarnessLayer(
+          const HarnessLayer(
             id: 'skill-arm-manipulate',
             type: 'skill',
             label: 'arm-manipulate',
             description: 'Arm/gripper manipulation primitives',
             enabled: false,
-            config: const {'order': 3},
+            config: {'order': 3},
           ),
-          HarnessLayer(
+          const HarnessLayer(
             id: 'skill-peer-coordinate',
             type: 'skill',
             label: 'peer-coordinate',
             description: 'Multi-robot coordination via RCAN',
             enabled: false,
-            config: const {'order': 4},
+            config: {'order': 4},
           ),
 
           // ── CONFIDENCE & SAFETY GATES ─────────────────────────────────────

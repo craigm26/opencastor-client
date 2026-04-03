@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import '../models/consent_request.dart';
 import '../repositories/consent_repository.dart';
 
 /// Firestore + Cloud Functions implementation of [ConsentRepository].

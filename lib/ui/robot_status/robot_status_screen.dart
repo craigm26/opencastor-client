@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../data/models/robot.dart';
 import '../../ui/core/theme/app_theme.dart';
 import '../../ui/core/widgets/health_indicator.dart';
 import '../robot_detail/robot_detail_view_model.dart';
@@ -28,7 +27,7 @@ class RobotStatusScreen extends ConsumerWidget {
       data: (robot) {
         if (robot == null) {
           return const Scaffold(
-              body: const EmptyView(title: 'Robot not found'));
+              body: EmptyView(title: 'Robot not found'));
         }
         return _StatusView(robot: robot);
       },
@@ -61,7 +60,7 @@ class _StatusView extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // ── Online status ──────────────────────────────────────────────────
-          _SectionHeader('Connection Status'),
+          const _SectionHeader('Connection Status'),
           _StatusCard(
             children: [
               _StatusRow(
@@ -94,7 +93,7 @@ class _StatusView extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── Identity ───────────────────────────────────────────────────────
-          _SectionHeader('Identity'),
+          const _SectionHeader('Identity'),
           _StatusCard(
             children: [
               _StatusRow(label: 'Name', value: robot.name),
@@ -117,7 +116,7 @@ class _StatusView extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── RCAN ──────────────────────────────────────────────────────────
-          _SectionHeader('RCAN Protocol'),
+          const _SectionHeader('RCAN Protocol'),
           _StatusCard(
             children: [
               _StatusRow(
@@ -143,7 +142,7 @@ class _StatusView extends StatelessWidget {
 
           // ── Telemetry ──────────────────────────────────────────────────────
           if (robot.telemetry.isNotEmpty) ...[
-            _SectionHeader('Telemetry'),
+            const _SectionHeader('Telemetry'),
             _StatusCard(
               children: robot.telemetry.entries
                   .map((e) => _StatusRow(

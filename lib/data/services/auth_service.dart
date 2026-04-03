@@ -83,19 +83,8 @@ class AuthService {
     }
 
     // Native mobile / desktop: GoogleSignIn v7 plugin → Firebase credential.
-    // v7: authenticate() throws GoogleSignInException(code: canceled) when the
-    // user dismisses the picker — it never returns null. Catch that and return
-    // silently; all other exceptions propagate.
-    final GoogleSignInAccount account;
-    try {
-      account = await GoogleSignIn.instance.authenticate();
-    } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled) {
-        log.d('AuthService: Google sign-in cancelled by user');
-        return;
-      }
-      rethrow;
-    }
+    // v7: use singleton; authenticate() returns the signed-in account.
+    final account = await GoogleSignIn.instance.authenticate();
 
     // Obtain Firebase-compatible tokens via account.authentication.
     // In google_sign_in v7, GoogleSignInAuthentication only exposes:
@@ -104,7 +93,7 @@ class AuthService {
     // accessToken is no longer on GoogleSignInAuthentication in v7;
     // use account.authorizationClient.authorizationForScopes() if additional
     // OAuth scopes are needed (separate from Firebase sign-in).
-    final authentication = await account.authentication;
+    final authentication = account.authentication;
     final cred = GoogleAuthProvider.credential(
       idToken: authentication.idToken,
     );

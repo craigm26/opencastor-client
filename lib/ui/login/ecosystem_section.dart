@@ -175,7 +175,7 @@ class _EcosystemSectionState extends State<EcosystemSection> {
 
 class _EcosystemCard extends StatelessWidget {
   final _EcosystemItem item;
-  const _EcosystemCard({super.key, required this.item});
+  const _EcosystemCard({required this.item});
 
   @override
   Widget build(BuildContext context) {

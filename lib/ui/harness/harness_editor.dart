@@ -685,7 +685,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
     }
 
     setState(() => _deploying = true);
-    var hubError = '';
     try {
       // ── Step 1: Persist to Firestore (always, regardless of CF) ──────────
       // This is the primary persistence mechanism — read back on next page
@@ -709,7 +708,6 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
         });
       } catch (cfErr) {
         // Hub upload failed — not fatal, Firestore copy is already saved
-        hubError = ' (hub sync skipped)';
       }
 
       // ── Step 3: Send RELOAD_CONFIG command to robot ───────────────────────
@@ -729,18 +727,18 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
       if (mounted) {
         setState(() => _deployedConfig = _config);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Harness saved\$hubError'),
+          const SnackBar(
+            content: Text('Harness saved'),
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
+            duration: Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Save failed: \$e'),
+          const SnackBar(
+            content: Text('Save failed'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -983,6 +981,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                 // ── Community inspiration panel ──────────────────────
                 _CommunityInspirationPanel(
                   onApplyPreset: (id, name) async {
+                    final navigator = Navigator.of(context);
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -1006,8 +1005,7 @@ class _HarnessEditorScreenState extends ConsumerState<HarnessEditorScreen> {
                       ),
                     );
                     if (confirmed == true && mounted) {
-                      Navigator.push(
-                        context,
+                      navigator.push(
                         MaterialPageRoute<void>(
                           builder: (_) =>
                               ConfigLibraryView(robotId: widget.rrn),
@@ -1155,12 +1153,12 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
                       ? 'Trajectory logging is always on — required for RCAN audit compliance'
                       : 'P66 layer cannot be disabled',
                   child: Chip(
-                    avatar: Icon(Icons.lock_outline,
+                    avatar: const Icon(Icons.lock_outline,
                         size: 12, color: AppTheme.danger),
                     label: const Text('always-on'),
                     backgroundColor: AppTheme.danger.withValues(alpha: 0.12),
                     labelStyle:
-                        TextStyle(fontSize: 10, color: AppTheme.danger),
+                        const TextStyle(fontSize: 10, color: AppTheme.danger),
                     visualDensity: VisualDensity.compact,
                   ),
                 ),
@@ -1182,7 +1180,7 @@ class _LayerEditPanelState extends State<_LayerEditPanel> {
               // Delete button for removable layers
               if (widget.onRemove != null)
                 IconButton(
-                  icon: Icon(Icons.delete_outline,
+                  icon: const Icon(Icons.delete_outline,
                       size: 18, color: AppTheme.danger),
                   tooltip: 'Remove block from harness',
                   visualDensity: VisualDensity.compact,
@@ -1377,9 +1375,9 @@ class _SkillEditor extends StatelessWidget {
             const Spacer(),
             if (onRemove != null)
               OutlinedButton.icon(
-                icon: Icon(Icons.delete_outline,
+                icon: const Icon(Icons.delete_outline,
                     size: 14, color: AppTheme.danger),
-                label: Text('Remove',
+                label: const Text('Remove',
                     style: TextStyle(color: AppTheme.danger)),
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: AppTheme.danger.withValues(alpha: 0.5)),
@@ -2172,8 +2170,8 @@ class _AddBlockSheet extends StatelessWidget {
                 ),
               ),
             ),
-            Text('Add a harness block',
-                style: const TextStyle(
+            const Text('Add a harness block',
+                style: TextStyle(
                     fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             ...blocks.map((b) => _BlockRow(entry: b)),
@@ -2390,13 +2388,13 @@ class _SkillBrowserSheetState extends ConsumerState<SkillBrowserSheet>
           padding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: TextField(
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Search skills…',
-              prefixIcon: const Icon(Icons.search, size: 20),
+              prefixIcon: Icon(Icons.search, size: 20),
               isDense: true,
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(),
               contentPadding:
-                  const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  EdgeInsets.symmetric(vertical: 8, horizontal: 12),
             ),
             onChanged: (v) => setState(() => _search = v.toLowerCase()),
           ),

@@ -61,10 +61,10 @@ class _ConfirmationDialog extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppTheme.danger.withValues(alpha: 0.3)),
               ),
-              child: Row(
+              child: const Row(
                 children: [
-                  const Icon(Icons.info_outline, size: 14, color: AppTheme.danger),
-                  const SizedBox(width: 8),
+                  Icon(Icons.info_outline, size: 14, color: AppTheme.danger),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'This will physically move the robot arm.',

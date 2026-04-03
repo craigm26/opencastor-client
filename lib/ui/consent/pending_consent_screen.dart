@@ -17,7 +17,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
-import '../../data/models/consent_request.dart';
 import '../../data/models/robot.dart';
 import '../../data/repositories/consent_repository.dart';
 import '../../data/repositories/consent_repository_provider.dart';
@@ -419,7 +418,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle_outline,
             size: 64,
             color: AppTheme.online,

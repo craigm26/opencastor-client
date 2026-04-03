@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/models/robot.dart';
-import '../core/theme/app_theme.dart';
 
 class ProvenanceCard extends StatelessWidget {
   final Robot robot;
