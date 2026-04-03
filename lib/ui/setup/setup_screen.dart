@@ -14,6 +14,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import '../../data/services/auth_service.dart';
 import '../shared/google_sign_in_button.dart';
 import '../shared/loading_view.dart';
 
@@ -42,8 +43,7 @@ class _SetupScreenState extends State<SetupScreen> {
       _error = null;
     });
     try {
-      final provider = GoogleAuthProvider();
-      await FirebaseAuth.instance.signInWithPopup(provider);
+      await AuthService.signInWithGoogle();
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
@@ -77,7 +77,7 @@ class _SetupScreenState extends State<SetupScreen> {
         ),
       ),
       body: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
+        stream: AuthService.authStateChanges,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const LoadingView();
@@ -112,7 +112,7 @@ class _SetupScreenState extends State<SetupScreen> {
                     email: user.email,
                     copied: _copied,
                     onCopy: () => _copyUid(user.uid),
-                    onSignOut: () => FirebaseAuth.instance.signOut(),
+                    onSignOut: () => AuthService.signOut(),
                   ),
                   const SizedBox(height: 24),
                   _InstructionsCard(uid: user.uid),
