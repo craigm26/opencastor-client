@@ -1,22 +1,27 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'ua_detector_stub.dart'
+    if (dart.library.js_interop) 'ua_detector_web.dart';
 import '../../core/app_logger.dart';
 
 /// Centralises all authentication logic.
 ///
 /// Web auth strategy (per Firebase docs + flutter/web constraints):
-///   1. Use signInWithPopup — this is the documented primary method.
-///      Firebase handles the entire flow on opencastor.firebaseapp.com,
+///   1. iOS Safari: skip signInWithPopup entirely — Flutter web canvas apps
+///      cannot reliably propagate user gestures to the window level on
+///      iPhone/iPad, so popups fail silently. Go straight to redirect.
+///   2. Other browsers: Use signInWithPopup — this is the documented primary
+///      method. Firebase handles the entire flow on opencastor.firebaseapp.com,
 ///      so no cross-origin storage issues.
-///   2. The Cloudflare Pages _headers file sets:
+///   3. The Cloudflare Pages _headers file sets:
 ///         Cross-Origin-Opener-Policy: same-origin-allow-popups
 ///      which allows the popup to post the auth result back to the opener.
-///   3. Fallback to signInWithRedirect ONLY for browsers that block all
-///      popups (popup-blocked, cancelled-popup-request). getRedirectResult()
+///   4. Fallback to signInWithRedirect for browsers that block popups or
+///      return a popup-related FirebaseAuthException. getRedirectResult()
 ///      in main() catches the result on return.
 ///
-/// Why not redirect-first:
+/// Why not redirect-first (non-iOS):
 ///   signInWithRedirect stores pending state in IndexedDB on the authDomain
 ///   (opencastor.firebaseapp.com). Modern browsers with strict privacy
 ///   settings block cross-origin storage access from app.opencastor.com,
@@ -54,11 +59,34 @@ class AuthService {
 
   /// Initiate Google sign-in.
   ///
-  /// Web: signInWithPopup (primary) → signInWithRedirect (popup-blocked fallback).
+  /// Web: iOS Safari → signInWithRedirect directly.
+  ///      Other browsers → signInWithPopup (primary) → signInWithRedirect
+  ///      fallback for any popup-related FirebaseAuthException.
   /// Native: GoogleSignIn plugin → Firebase credential.
   static Future<void> signInWithGoogle() async {
     log.i('AuthService: signInWithGoogle() — isWeb=$kIsWeb');
     if (kIsWeb) {
+      // iOS Safari cannot reliably open popups from Flutter web canvas apps —
+      // the canvas rendering model doesn't propagate user gestures to the
+      // window level. Skip signInWithPopup and go straight to redirect.
+      if (isMobileSafari()) {
+        log.i(
+          'AuthService: iOS Safari detected — using signInWithRedirect directly',
+        );
+        await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
+        return;
+      }
+
+      // Error codes where popup failed for environmental reasons — fall back
+      // to redirect rather than surfacing an error to the user.
+      const popupFallbackCodes = {
+        'popup-blocked',
+        'cancelled-popup-request',
+        'web-context-cancelled',
+        'operation-not-supported-in-this-environment',
+        'web-storage-unsupported',
+      };
+
       try {
         final cred =
             await FirebaseAuth.instance.signInWithPopup(_googleProvider);
@@ -67,11 +95,9 @@ class AuthService {
         );
         return;
       } on FirebaseAuthException catch (e) {
-        // Only fall back to redirect if the popup was truly blocked by the
-        // browser's popup blocker — not for COOP or auth errors.
-        if (e.code == 'popup-blocked' || e.code == 'cancelled-popup-request') {
+        if (popupFallbackCodes.contains(e.code)) {
           log.w(
-            'AuthService: popup blocked (${e.code}), falling back to redirect',
+            'AuthService: popup failed (${e.code}), falling back to redirect',
           );
           await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
         } else {
