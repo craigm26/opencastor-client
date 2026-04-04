@@ -18,6 +18,8 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -106,20 +108,37 @@ String? _resolveWsUrl(Map<String, dynamic>? telemetry) {
 
   // Explicit URL from bridge
   final explicit = telemetry['ws_telemetry_url'] as String?;
-  if (explicit != null && explicit.isNotEmpty) return explicit;
-
-  // Derive from local IP
-  final localIp = telemetry['local_ip'] as String?;
-  if (localIp != null && localIp.isNotEmpty) {
-    return 'ws://$localIp:8001/ws/telemetry';
+  if (explicit != null && explicit.isNotEmpty) {
+    return _guardMixedContent(explicit);
   }
 
-  // Derive from gateway_url
+  // Derive from local IP — always ws://, only usable on HTTP or native
+  final localIp = telemetry['local_ip'] as String?;
+  if (localIp != null && localIp.isNotEmpty) {
+    return _guardMixedContent('ws://$localIp:8001/ws/telemetry');
+  }
+
+  // Derive from gateway_url — replaceFirst(r'^http', 'ws') converts:
+  //   http://foo  → ws://foo
+  //   https://foo → wss://foo  (correct; regex matches 'http' not 'https')
   final gwUrl = telemetry['gateway_url'] as String?;
   if (gwUrl != null && gwUrl.isNotEmpty) {
-    final base = gwUrl.replaceFirst(RegExp(r'^https?'), 'ws');
-    return '$base/ws/telemetry';
+    final base = gwUrl.replaceFirst(RegExp(r'^http'), 'ws');
+    return _guardMixedContent('$base/ws/telemetry');
   }
 
   return null;
+}
+
+/// Returns null if [url] would be blocked as mixed content.
+///
+/// Browsers block ws:// connections from HTTPS pages. When the app is served
+/// over HTTPS and the resolved URL is ws:// (e.g. a local robot IP without
+/// TLS), there is no way to connect — skip it and let callers fall back to
+/// Firestore telemetry instead of spamming mixed-content errors.
+String? _guardMixedContent(String url) {
+  if (kIsWeb && url.startsWith('ws://') && Uri.base.scheme == 'https') {
+    return null;
+  }
+  return url;
 }

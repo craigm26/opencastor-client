@@ -1,32 +1,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'ua_detector_stub.dart'
-    if (dart.library.js_interop) 'ua_detector_web.dart';
 import '../../core/app_logger.dart';
 
 /// Centralises all authentication logic.
 ///
-/// Web auth strategy (per Firebase docs + flutter/web constraints):
-///   1. iOS Safari: skip signInWithPopup entirely — Flutter web canvas apps
-///      cannot reliably propagate user gestures to the window level on
-///      iPhone/iPad, so popups fail silently. Go straight to redirect.
-///   2. Other browsers: Use signInWithPopup — this is the documented primary
-///      method. Firebase handles the entire flow on opencastor.firebaseapp.com,
-///      so no cross-origin storage issues.
-///   3. The Cloudflare Pages _headers file sets:
-///         Cross-Origin-Opener-Policy: same-origin-allow-popups
-///      which allows the popup to post the auth result back to the opener.
-///   4. Fallback to signInWithRedirect for browsers that block popups or
-///      return a popup-related FirebaseAuthException. getRedirectResult()
-///      in main() catches the result on return.
+/// Web auth strategy:
+///   All web browsers use signInWithRedirect. signInWithPopup was tried
+///   previously but COOP on Google's auth servers blocks window.close() in
+///   the popup, causing Firebase to throw auth/popup-closed-by-user. That
+///   error was not in the popup fallback list, so it rethrowed — eventually
+///   triggering a redirect anyway via a second popup attempt, causing a full
+///   page navigation mid-session and breaking the auth state.
 ///
-/// Why not redirect-first (non-iOS):
-///   signInWithRedirect stores pending state in IndexedDB on the authDomain
-///   (opencastor.firebaseapp.com). Modern browsers with strict privacy
-///   settings block cross-origin storage access from app.opencastor.com,
-///   so getRedirectResult() silently returns null and the user loops back
-///   to /login.
+///   signInWithRedirect is safe since authDomain is app.opencastor.com
+///   (same origin) — no cross-origin IndexedDB issues. getRedirectResult()
+///   in main() catches the result on return.
 ///
 /// google_sign_in v7 migration notes (see PR #82):
 ///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
@@ -66,45 +55,8 @@ class AuthService {
   static Future<void> signInWithGoogle() async {
     log.i('AuthService: signInWithGoogle() — isWeb=$kIsWeb');
     if (kIsWeb) {
-      // iOS Safari cannot reliably open popups from Flutter web canvas apps —
-      // the canvas rendering model doesn't propagate user gestures to the
-      // window level. Skip signInWithPopup and go straight to redirect.
-      if (isMobileSafari()) {
-        log.i(
-          'AuthService: iOS Safari detected — using signInWithRedirect directly',
-        );
-        await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
-        return;
-      }
-
-      // Error codes where popup failed for environmental reasons — fall back
-      // to redirect rather than surfacing an error to the user.
-      const popupFallbackCodes = {
-        'popup-blocked',
-        'cancelled-popup-request',
-        'web-context-cancelled',
-        'operation-not-supported-in-this-environment',
-        'web-storage-unsupported',
-      };
-
-      try {
-        final cred =
-            await FirebaseAuth.instance.signInWithPopup(_googleProvider);
-        log.i(
-          'AuthService: popup sign-in OK — uid=${cred.user?.uid} email=${cred.user?.email}',
-        );
-        return;
-      } on FirebaseAuthException catch (e) {
-        if (popupFallbackCodes.contains(e.code)) {
-          log.w(
-            'AuthService: popup failed (${e.code}), falling back to redirect',
-          );
-          await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
-        } else {
-          log.e('AuthService: signInWithPopup error', error: e);
-          rethrow;
-        }
-      }
+      log.i('AuthService: web — using signInWithRedirect');
+      await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
       return;
     }
 
