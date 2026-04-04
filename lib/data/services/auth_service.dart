@@ -1,21 +1,23 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:web/web.dart' as web;
 import '../../core/app_logger.dart';
 
 /// Centralises all authentication logic.
 ///
 /// Web auth strategy:
-///   All web browsers use signInWithRedirect. signInWithPopup was tried
-///   previously but COOP on Google's auth servers blocks window.close() in
-///   the popup, causing Firebase to throw auth/popup-closed-by-user. That
-///   error was not in the popup fallback list, so it rethrowed — eventually
-///   triggering a redirect anyway via a second popup attempt, causing a full
-///   page navigation mid-session and breaking the auth state.
+///   iOS (WebKit) browsers use signInWithPopup. iOS Intelligent Tracking
+///   Prevention (ITP) clears or blocks IndexedDB storage during the redirect
+///   chain, so getRedirectResult() returns null on return — the user appears
+///   signed out. Popups work fine on iOS since COOP does not block
+///   window.close() in WebKit.
 ///
-///   signInWithRedirect is safe since authDomain is app.opencastor.com
-///   (same origin) — no cross-origin IndexedDB issues. getRedirectResult()
-///   in main() catches the result on return.
+///   Desktop / non-iOS browsers use signInWithRedirect. COOP on Google's auth
+///   servers blocks window.close() in the popup, causing Firebase to throw
+///   auth/popup-closed-by-user. Since authDomain is app.opencastor.com
+///   (same origin), the redirect is safe — no cross-origin IndexedDB issues.
+///   getRedirectResult() in main() catches the result on return.
 ///
 /// google_sign_in v7 migration notes (see PR #82):
 ///   - `GoogleSignIn()` constructor removed — use `GoogleSignIn.instance` singleton.
@@ -30,6 +32,14 @@ class AuthService {
   static final _googleProvider = GoogleAuthProvider()
     ..addScope('email')
     ..addScope('profile');
+
+  /// True when running in a web browser on iOS (iPhone / iPad / iPod).
+  /// Chrome iOS is WebKit under the hood — ITP breaks signInWithRedirect.
+  static bool get _isIOSWeb {
+    if (!kIsWeb) return false;
+    final ua = web.window.navigator.userAgent.toLowerCase();
+    return ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod');
+  }
 
   /// Initialize GoogleSignIn. Must be called once before [signInWithGoogle]
   /// on native platforms. Safe to call multiple times (no-op after first call).
@@ -48,15 +58,21 @@ class AuthService {
 
   /// Initiate Google sign-in.
   ///
-  /// Web: iOS Safari → signInWithRedirect directly.
-  ///      Other browsers → signInWithPopup (primary) → signInWithRedirect
-  ///      fallback for any popup-related FirebaseAuthException.
+  /// Web: iOS (WebKit) → signInWithPopup (ITP breaks redirect storage).
+  ///      Desktop/other → signInWithRedirect (COOP blocks popup window.close).
   /// Native: GoogleSignIn plugin → Firebase credential.
   static Future<void> signInWithGoogle() async {
     log.i('AuthService: signInWithGoogle() — isWeb=$kIsWeb');
     if (kIsWeb) {
-      log.i('AuthService: web — using signInWithRedirect');
-      await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
+      if (_isIOSWeb) {
+        // iOS WebKit: ITP blocks IndexedDB across redirect — use popup instead.
+        log.i('AuthService: iOS web — using signInWithPopup');
+        await FirebaseAuth.instance.signInWithPopup(_googleProvider);
+      } else {
+        // Desktop/other: COOP blocks popup window.close() — use redirect.
+        log.i('AuthService: web — using signInWithRedirect');
+        await FirebaseAuth.instance.signInWithRedirect(_googleProvider);
+      }
       return;
     }
 
