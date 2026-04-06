@@ -31,7 +31,15 @@ class NotificationService {
         },
       );
     } catch (e) {
-      debugPrint('FCM getToken failed: $e');
+      final s = e.toString();
+      if (s.contains('apns-token-not-set')) {
+        debugPrint(
+          'FCM: no APNS token yet (normal on Simulator until push is set up; '
+          'use a device with Push capability for remote notifications)',
+        );
+      } else {
+        debugPrint('FCM getToken failed: $e');
+      }
     }
     if (token != null) {
       await _registerToken(token);
