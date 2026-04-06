@@ -1626,7 +1626,7 @@ class _ModelEditorState extends State<_ModelEditor> {
                       style: TextStyle(fontSize: 11)),
                   DropdownButtonFormField<String>(
                     key: ValueKey('fast-provider-$_fastProvider'),
-                    initialValue: _fastProvider,
+                    value: _fastProvider,
                     isDense: true,
                     decoration: const InputDecoration(
                         isDense: true, border: OutlineInputBorder()),
@@ -1641,7 +1641,7 @@ class _ModelEditorState extends State<_ModelEditor> {
                       style: TextStyle(fontSize: 11)),
                   DropdownButtonFormField<String>(
                     key: ValueKey('fast-model-$fastDropVal-$_fastProvider'),
-                    initialValue: fastDropVal,
+                    value: fastDropVal,
                     isDense: true,
                     decoration: const InputDecoration(
                         isDense: true, border: OutlineInputBorder()),
@@ -1681,7 +1681,7 @@ class _ModelEditorState extends State<_ModelEditor> {
                       style: TextStyle(fontSize: 11)),
                   DropdownButtonFormField<String>(
                     key: ValueKey('slow-provider-$_slowProvider'),
-                    initialValue: _slowProvider,
+                    value: _slowProvider,
                     isDense: true,
                     decoration: const InputDecoration(
                         isDense: true, border: OutlineInputBorder()),
@@ -1696,7 +1696,7 @@ class _ModelEditorState extends State<_ModelEditor> {
                       style: TextStyle(fontSize: 11)),
                   DropdownButtonFormField<String>(
                     key: ValueKey('slow-model-$slowDropVal-$_slowProvider'),
-                    initialValue: slowDropVal,
+                    value: slowDropVal,
                     isDense: true,
                     decoration: const InputDecoration(
                         isDense: true, border: OutlineInputBorder()),

@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:web/web.dart' as web;
 import '../../core/app_logger.dart';
+import 'web_user_agent.dart';
 
 /// Centralises all authentication logic.
 ///
@@ -37,8 +37,7 @@ class AuthService {
   /// Chrome iOS is WebKit under the hood — ITP breaks signInWithRedirect.
   static bool get _isIOSWeb {
     if (!kIsWeb) return false;
-    final ua = web.window.navigator.userAgent.toLowerCase();
-    return ua.contains('iphone') || ua.contains('ipad') || ua.contains('ipod');
+    return isIOSWebKitUserAgent();
   }
 
   /// Initialize GoogleSignIn. Must be called once before [signInWithGoogle]

@@ -45,7 +45,7 @@ dependencies:
   image_picker: ^1.1.0
   file_picker: ^10.3.10
   shimmer: ^3.0.0
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
@@ -55,15 +55,19 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   flutter_launcher_icons: ^0.14.1
 
+# All launcher sources live under assets/images/ (PNG masters + SVG lockups for UI).
 flutter_launcher_icons:
   android: true
   ios: true
+  # Default + platform-specific paths (explicit so iOS/Android never drift).
   image_path: "assets/images/icon-1024.png"
+  image_path_android: "assets/images/icon-1024.png"
+  image_path_ios: "assets/images/icon-1024.png"
   remove_alpha_ios: true
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/images/icon-1024.png"
+    image_path: "assets/images/icon-512.png"
   adaptive_icon_background: "#0e1416"
   adaptive_icon_foreground: "assets/images/icon-1024.png"
 

@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-platform :ios, '26.0'
+# Minimum iOS for current Firebase / FlutterFire pods (simulator + device).
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -42,7 +42,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '26.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       # Pod targets don't support provisioning profiles — disable signing entirely.
       # Only the main Runner target (managed by Xcode) needs code signing.
       config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
@@ -50,12 +50,13 @@ post_install do |installer|
       # Flutter Firebase plugin wrappers (ObjC) import <Firebase/Firebase.h> inside
       # their framework module headers. DEFINES_MODULE=NO removes the module constraint.
       # Use exact pod names — prefix matching would hit FirebaseAuthInterop etc.
+      # Do not set DEFINES_MODULE=NO on firebase_core or cloud_functions — Swift
+      # imports `firebase_core` / `firebase_core_shared`, and ObjC needs
+      # `@import cloud_functions` from GeneratedPluginRegistrant.
       flutter_firebase_pods = %w[
         firebase_auth
-        firebase_core
         firebase_messaging
         cloud_firestore
-        cloud_functions
         firebase_messaging_platform_interface
       ]
       if flutter_firebase_pods.include?(target.name)
@@ -66,6 +67,37 @@ post_install do |installer|
         '$(inherited)',
         'PERMISSION_NOTIFICATIONS=1',
       ]
+    end
+  end
+
+  # flutter pub get regenerates GeneratedPluginRegistrant.m with alphabetical plugin
+  # order. Firebase Core must register before Firestore/Functions or the app can
+  # crash in +[GeneratedPluginRegistrant registerWithRegistry:] on startup.
+  registrant = File.expand_path('Runner/GeneratedPluginRegistrant.m', __dir__)
+  if File.file?(registrant)
+    text = File.read(registrant)
+    if (m = text.match(/\+ \(void\)registerWithRegistry:\(NSObject<FlutterPluginRegistry>\*\)registry \{\n([\s\S]*?)\n\}/))
+      body = m[1]
+      plugin_lines = body.lines.map(&:rstrip).map(&:strip).reject(&:empty?).select { |l| l.start_with?('[') && l.end_with?('];') }
+      unless plugin_lines.empty?
+        priority = [
+          /FLTFirebaseCorePlugin/,
+          /FLTFirebaseAuthPlugin/,
+          /FLTFirebaseMessagingPlugin/,
+          /FLTFirebaseFirestorePlugin/,
+          /FirebaseFunctionsPlugin/,
+        ]
+        fb = priority.map { |re| plugin_lines.find { |l| l =~ re } }.compact
+        rest = plugin_lines.reject { |l| priority.any? { |re| l =~ re } }
+        ordered = fb + rest
+        if ordered != plugin_lines
+          header = "  // Firebase plugin order fixed by ios/Podfile (Core before Firestore/Functions).\n"
+          new_body = header + ordered.map { |l| "  #{l}" }.join("\n") + "\n"
+          text = text.sub(m[0], "+ (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {\n#{new_body}}")
+          File.write(registrant, text)
+          puts 'Podfile: reordered Firebase plugins in GeneratedPluginRegistrant.m'
+        end
+      end
     end
   end
 end

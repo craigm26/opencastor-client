@@ -42,7 +42,14 @@
 		<string>remote-notification</string>
 	</array>
 
-	<!-- Network -->
+	<!-- Network: LAN robots + iOS 14+ local network privacy + Flutter VM service (debug) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>OpenCastor connects to robots on your local network when you are on the same Wi-Fi. In debug builds, development tools also use the local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_dartVmService._tcp</string>
+		<string>_dartobservatory._tcp</string>
+	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- Local robot gateway (LAN only — used when on same network) -->
@@ -80,5 +87,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 </dict>
 </plist>

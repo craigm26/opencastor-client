@@ -31,7 +31,7 @@ class _PatternPanelState extends State<PatternPanel> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          initialValue: _pattern,
+          value: _pattern,
           decoration: InputDecoration(
             labelText: 'Pattern',
             border: OutlineInputBorder(
@@ -125,7 +125,7 @@ class _MemoryPanelState extends State<MemoryPanel> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       children: [
         DropdownButtonFormField<String>(
-          initialValue: _backend,
+          value: _backend,
           decoration: InputDecoration(
             labelText: 'Backend',
             border: OutlineInputBorder(
@@ -160,7 +160,7 @@ class _MemoryPanelState extends State<MemoryPanel> {
         ],
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          initialValue: _overflow,
+          value: _overflow,
           decoration: InputDecoration(
             labelText: 'Overflow strategy',
             border: OutlineInputBorder(
@@ -441,7 +441,7 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
                 const Text('Goal source',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 DropdownButtonFormField<String>(
-                  initialValue: _goalSource,
+                  value: _goalSource,
                   isDense: true,
                   decoration: const InputDecoration(
                       isDense: true, border: OutlineInputBorder()),
@@ -487,7 +487,7 @@ class _VisualPlannerPanelState extends State<VisualPlannerPanel> {
                 const Text('Inference device',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                 DropdownButtonFormField<String>(
-                  initialValue: _device,
+                  value: _device,
                   isDense: true,
                   decoration: const InputDecoration(
                       isDense: true, border: OutlineInputBorder()),

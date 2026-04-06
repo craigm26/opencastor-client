@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -16,7 +18,21 @@ class NotificationService {
     // Request permission (iOS/web — Android grants by default)
     await _msg.requestPermission(alert: true, badge: true, sound: true);
 
-    final token = await _msg.getToken();
+    // getToken() can hang on iOS Simulator (no APNS) — never block app startup.
+    String? token;
+    try {
+      token = await _msg.getToken().timeout(
+        const Duration(seconds: 12),
+        onTimeout: () {
+          debugPrint(
+            'FCM getToken timed out (normal on iOS Simulator without push)',
+          );
+          return null;
+        },
+      );
+    } catch (e) {
+      debugPrint('FCM getToken failed: $e');
+    }
     if (token != null) {
       await _registerToken(token);
     }

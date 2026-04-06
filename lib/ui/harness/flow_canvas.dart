@@ -1032,13 +1032,13 @@ class _ZoomControls extends StatelessWidget {
 
   void _zoomIn() {
     final m = controller.value.clone();
-    m.scaleByDouble(1.25, 1.25, 1.0, 1.0);
+    m.scale(1.25, 1.25, 1.0);
     controller.value = m;
   }
 
   void _zoomOut() {
     final m = controller.value.clone();
-    m.scaleByDouble(0.8, 0.8, 1.0, 1.0);
+    m.scale(0.8, 0.8, 1.0);
     controller.value = m;
   }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -29,6 +30,31 @@ String? _startupError;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  assert(() {
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      debugPrint('ErrorWidget: ${details.exception}\n${details.stack}');
+      return Material(
+        color: const Color(0xFF0e1416),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SingleChildScrollView(
+              child: Text(
+                details.exceptionAsString(),
+                style: const TextStyle(
+                  color: Color(0xFFfca5a5),
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    };
+    return true;
+  }());
+
   // On web: trigger a service-worker update check on every app start.
   // Without this, stale SWs persist across Cloudflare Pages deploys and
   // serve wrong cached resources — including blocking Firestore requests.
@@ -47,33 +73,28 @@ Future<void> main() async {
     // Complete any pending redirect sign-in (web only).
     // Guarded by a 5s timeout — getRedirectResult() can hang if the Firebase
     // auth domain is slow or unreachable, which would block runApp() forever.
-    await AuthService.initializeGoogleSignIn();
+    await AuthService.initializeGoogleSignIn().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        debugPrint('AuthService.initializeGoogleSignIn timed out (continuing)');
+      },
+    );
     await AuthService.handleRedirectResult()
         .timeout(const Duration(seconds: 5), onTimeout: () {});
 
-    // On web, Firebase Auth resolves persisted credentials from IndexedDB
-    // asynchronously AFTER initializeApp(). Until it resolves, currentUser
-    // is null and authStateChanges() emits null — causing the router to
-    // briefly redirect to /login before the real user is emitted.
-    //
-    // Fix: wait for the first authStateChanges() emission here, before
-    // runApp(). After this point, Firebase Auth is fully initialized and
-    // any new subscription to authStateChanges() emits the stable state
-    // immediately (no transient null). The 5s timeout is a safety valve
-    // for offline/slow-network cold starts.
-    if (kIsWeb) {
-      await FirebaseAuth.instance
-          .authStateChanges()
-          .first
-          .timeout(const Duration(seconds: 5), onTimeout: () => null);
-    }
+    // Prime auth before the first UI frame: web needs this for IndexedDB;
+    // iOS/Android benefit too (native SDK can delay the first emission).
+    await FirebaseAuth.instance
+        .authStateChanges()
+        .first
+        .timeout(const Duration(seconds: 8), onTimeout: () => null);
 
     // Register native background message handler (web uses firebase-messaging-sw.js).
     if (!kIsWeb) FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
 
-    // Request notification permission and register FCM token.
-    // _registerToken() catches its own errors, so this is non-fatal.
-    await NotificationService().init();
+    // NEVER await FCM setup before runApp: on iOS Simulator there is often no
+    // APNS token — getToken() / permission flows can hang for a long time and
+    // leave a blank white screen forever. Defer to first frame + timeout.
   } catch (e, st) {
     // Firebase init failure must never black-screen the app.
     // Store the error so _ErrorApp can display it on screen for debugging.
@@ -86,6 +107,26 @@ Future<void> main() async {
         ? _ErrorApp(error: _startupError!)
         : const ProviderScope(child: OpenCastorApp()),
   );
+
+  if (_startupError == null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        NotificationService()
+            .init()
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                debugPrint(
+                  'NotificationService.init timed out (common on iOS Simulator without APNS)',
+                );
+              },
+            )
+            .catchError((Object e, StackTrace st) {
+              debugPrint('NotificationService.init failed: $e');
+            }),
+      );
+    });
+  }
 }
 
 /// Shown when Firebase (or another startup step) throws before runApp().

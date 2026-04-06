@@ -87,8 +87,13 @@ class _RouterNotifier extends ChangeNotifier {
     final authAsync = _ref.read(authStateProvider);
     final loc = state.matchedLocation;
 
-    if (authAsync.isLoading || authAsync.hasError) {
+    if (authAsync.isLoading) {
       return loc == '/splash' ? null : '/splash';
+    }
+    // Auth stream failed — avoid infinite splash; let user retry sign-in.
+    if (authAsync.hasError) {
+      debugPrint('authStateProvider error: ${authAsync.error}');
+      return loc == '/login' ? null : '/login';
     }
 
     final user = authAsync.asData?.value;
@@ -713,8 +718,16 @@ class _LoginState extends State<_LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // ── Logo ───────────────────────────────────────────────
-                  Image.asset('assets/images/icon-128.png',
-                      height: 200, width: 200),
+                  Image.asset(
+                    'assets/images/icon-128.png',
+                    height: 200,
+                    width: 200,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.precision_manufacturing_outlined,
+                      size: 120,
+                      color: cs.primary,
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'OpenCastor',
