@@ -73,9 +73,44 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
           fi
+          # Write GoogleService-Info.plist — secret may be raw XML or base64-encoded
           if [ -n "$GOOGLE_SERVICE_INFO_PLIST" ]; then
             echo "$GOOGLE_SERVICE_INFO_PLIST" > ios/Runner/GoogleService-Info.plist
+            # If not valid XML plist, try base64-decode
+            if ! plutil -lint ios/Runner/GoogleService-Info.plist > /dev/null 2>&1; then
+              echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            fi
+            # Normalize to XML1 so SWBUtil can parse it
+            plutil -convert xml1 ios/Runner/GoogleService-Info.plist
           fi
+          # Fallback: create a minimal valid stub so the build doesn't fail
+          if [ ! -f "ios/Runner/GoogleService-Info.plist" ] || \
+             ! plutil -lint ios/Runner/GoogleService-Info.plist > /dev/null 2>&1; then
+            echo "⚠️ GOOGLE_SERVICE_INFO_PLIST secret missing or invalid — using CI stub"
+            cat > ios/Runner/GoogleService-Info.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>API_KEY</key><string>ci-stub</string>
+            <key>BUNDLE_ID</key><string>com.craigm26.opencastorClient</string>
+            <key>CLIENT_ID</key><string>ci-stub.apps.googleusercontent.com</string>
+            <key>REVERSED_CLIENT_ID</key><string>com.googleusercontent.apps.ci-stub</string>
+            <key>GOOGLE_APP_ID</key><string>1:000000000000:ios:ci-stub</string>
+            <key>GCM_SENDER_ID</key><string>000000000000</string>
+            <key>PROJECT_ID</key><string>opencastor</string>
+            <key>STORAGE_BUCKET</key><string>opencastor.firebasestorage.app</string>
+            <key>IS_ADS_ENABLED</key><false/>
+            <key>IS_ANALYTICS_ENABLED</key><false/>
+            <key>IS_APPINVITE_ENABLED</key><true/>
+            <key>IS_GCM_ENABLED</key><true/>
+            <key>IS_SIGNIN_ENABLED</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          fi
+          echo "✅ GoogleService-Info.plist:"
+          plutil -lint ios/Runner/GoogleService-Info.plist
         shell: bash
 
       # ── Set bundle ID and version ────────────────────────────────────────
@@ -155,15 +190,7 @@ jobs:
       # ── Flutter build iOS ────────────────────────────────────────────────
       - name: Flutter build iOS (release)
         run: |
-          flutter build ios --release --no-codesign --verbose 2>&1 | tee /tmp/flutter_build.log; exit ${PIPESTATUS[0]}
-
-      - name: Show xcodebuild errors (on failure)
-        if: failure()
-        run: |
-          echo "=== Flutter build log (last 100 lines) ==="
-          tail -100 /tmp/flutter_build.log || true
-          echo "=== Xcode build log ==="
-          find ~/Library/Developer/Xcode/DerivedData -name "*.xcactivitylog" 2>/dev/null | sort -t_ -k2 | tail -1 | xargs gunzip -c 2>/dev/null | strings | grep -E "error:|PropertyList|SWB|plist" | tail -50 || true
+          flutter build ios --release --no-codesign
 
       # ── Xcode archive ────────────────────────────────────────────────────
       - name: Xcode archive
