@@ -24,8 +24,6 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- Omit FirebaseAppDelegateProxyEnabled to use default YES — required for
-	     FCM method swizzling with FlutterAppDelegate; setting NO caused I-SWZ001014. -->
 	<key>NSFaceIDUsageDescription</key>
 	<string>Used for secure authentication</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
@@ -36,15 +34,11 @@
 	<string>Used to attach photos to robot commands</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to take photos for robot commands</string>
-
-	<!-- FCM push notifications -->
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
-
-	<!-- Network: LAN robots + iOS 14+ local network privacy + Flutter VM service (debug) -->
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>OpenCastor connects to robots on your local network when you are on the same Wi-Fi. In debug builds, development tools also use the local network.</string>
 	<key>NSBonjourServices</key>
@@ -54,15 +48,13 @@
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Local robot gateway (LAN only — used when on same network) -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
+	<string></string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -78,6 +70,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -89,9 +85,5 @@
 			</array>
 		</dict>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 </dict>
 </plist>
