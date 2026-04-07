@@ -155,7 +155,15 @@ jobs:
       # ── Flutter build iOS ────────────────────────────────────────────────
       - name: Flutter build iOS (release)
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --verbose 2>&1 | tee /tmp/flutter_build.log; exit ${PIPESTATUS[0]}
+
+      - name: Show xcodebuild errors (on failure)
+        if: failure()
+        run: |
+          echo "=== Flutter build log (last 100 lines) ==="
+          tail -100 /tmp/flutter_build.log || true
+          echo "=== Xcode build log ==="
+          find ~/Library/Developer/Xcode/DerivedData -name "*.xcactivitylog" 2>/dev/null | sort -t_ -k2 | tail -1 | xargs gunzip -c 2>/dev/null | strings | grep -E "error:|PropertyList|SWB|plist" | tail -50 || true
 
       # ── Xcode archive ────────────────────────────────────────────────────
       - name: Xcode archive
