@@ -1,5 +1,5 @@
-# Match Xcode 26 / iOS 26 SDK (project targets iOS 26+).
-platform :ios, '26.0'
+# Minimum iOS 13.0 — broadest compatible baseline.
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
