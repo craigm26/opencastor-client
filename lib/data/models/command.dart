@@ -16,7 +16,7 @@ class RobotCommand {
   final DateTime? completedAt;
 
   /// GAP-08: Sender type for audit trail display.
-  /// e.g. "human via OpenCastor app" | "service:opencastor-cloud-relay" | "robot:<rrn>"
+  /// e.g. "human via OpenCastor app" | "service:opencastor-cloud-relay" | "robot:`<rrn>`"
   final String? senderType;
 
   const RobotCommand({

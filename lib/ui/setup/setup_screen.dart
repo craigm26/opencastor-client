@@ -1,4 +1,4 @@
-/// SetupScreen — Route: /setup?robot=<name>&owner=<owner>
+/// SetupScreen — Route: `/setup?robot=<name>&owner=<owner>`
 ///
 /// Purpose: User lands here from the QR code shown during `castor setup`.
 /// Flow:

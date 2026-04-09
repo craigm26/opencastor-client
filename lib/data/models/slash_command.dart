@@ -141,7 +141,7 @@ class SlashCommand {
     };
   }
 
-  /// Usage string shown as placeholder, e.g. "/navigate-to <destination>".
+  /// Usage string shown as placeholder, e.g. "/navigate-to `<destination>`".
   String get usageString {
     if (args.isEmpty) return cmd;
     final parts = args.map((a) => a.optional ? '[${a.name}]' : '<${a.name}>');

@@ -1,7 +1,7 @@
 /// FlowGraph — data model for the visual harness flow-graph editor.
 ///
 /// Stores node positions, directed edges (including feedback loops),
-/// and group containers. Serialises to/from plain Map<String,dynamic>
+/// and group containers. Serialises to/from plain `Map<String,dynamic>`
 /// for YAML persistence alongside the harness layers.
 library;
 

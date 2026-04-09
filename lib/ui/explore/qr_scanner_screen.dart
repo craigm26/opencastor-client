@@ -6,7 +6,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 /// QR scanner screen for scanning castor install QR codes.
 ///
 /// Scans codes in the format:
-///   castor install opencastor.com/config/<id>
+///   castor install opencastor.com/config/`<id>`
 ///
 /// On success, navigates to /explore/:id for confirmation before installing.
 ///

@@ -117,7 +117,7 @@ final myConfigsProvider = FutureProvider<List<HubConfig>>((ref) async {
       .toList();
 });
 
-/// Deep-cast a Map<Object?, Object?> → Map<String, dynamic>.
+/// Deep-cast a `Map<Object?, Object?>` → `Map<String, dynamic>`.
 /// Firebase Functions returns untyped maps; this normalises nested values.
 Map<String, dynamic> _deepCastMap(Map m) => m.map(
       (k, v) => MapEntry(

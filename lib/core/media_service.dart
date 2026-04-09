@@ -40,7 +40,7 @@ class MediaService {
   }
 
   Future<Uint8List?> _pickFromFilePickerWeb() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.instance.pickFiles(
       type: FileType.image,
       allowMultiple: false,
       withData: true,

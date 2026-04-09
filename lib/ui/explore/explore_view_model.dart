@@ -120,7 +120,7 @@ Future<bool> toggleStar(String configId, WidgetRef ref) async {
   }
 }
 
-/// Deep-cast Map<Object?, Object?> → Map<String, dynamic> for Firebase responses.
+/// Deep-cast `Map<Object?, Object?>` → `Map<String, dynamic>` for Firebase responses.
 Map<String, dynamic> _deepCast(Map m) => m.map(
       (k, v) => MapEntry(
         k?.toString() ?? '',

@@ -1,6 +1,6 @@
 /// ws_telemetry_service.dart — WebSocket real-time telemetry stream.
 ///
-/// Connects to ws://<robot-local-ip>:8001/ws/telemetry when the robot
+/// Connects to `ws://<robot-local-ip>:8001/ws/telemetry` when the robot
 /// is on the same local network, and emits live telemetry maps at ~200 ms.
 ///
 /// Falls back silently to Firestore telemetry when:
@@ -9,7 +9,7 @@
 ///   - The device is not on the local network
 ///
 /// Usage:
-///   ref.watch(wsTelemetryProvider(rrn))  → AsyncValue<Map<String,dynamic>>
+///   ref.watch(wsTelemetryProvider(rrn))  → `AsyncValue<Map<String,dynamic>>`
 ///
 /// The provider auto-reconnects with exponential back-off (max 30s).
 /// It cancels cleanly when the widget is disposed.
