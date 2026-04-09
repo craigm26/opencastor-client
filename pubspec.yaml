@@ -25,8 +25,8 @@ dependencies:
   flutter_animate: ^4.5.0
 
   # State
-  riverpod: ^2.5.1
-  flutter_riverpod: ^2.5.1
+  riverpod: ^3.2.1
+  flutter_riverpod: ^3.3.1
   logger: ^2.4.0
 
   # Platform
@@ -43,7 +43,7 @@ dependencies:
   package_info_plus: ^9.0.1
   speech_to_text: ^7.3.0
   image_picker: ^1.1.0
-  file_picker: ^11.0.1
+  file_picker: ^11.0.2
   shimmer: ^3.0.0
   shared_preferences: ^2.5.3
 
@@ -51,8 +51,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  build_runner: ^2.5.4
-  riverpod_generator: ^2.4.0
+  build_runner: ^2.13.1
+  riverpod_generator: ^4.0.3
   flutter_launcher_icons: ^0.14.1
 
 # All launcher sources live under assets/images/ (PNG masters + SVG lockups for UI).
