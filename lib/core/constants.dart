@@ -4,9 +4,9 @@ library;
 class AppConstants {
   AppConstants._();
 
-  static const String appVersion = '1.4.4';
-  static const String rcanVersion = '2.2.1';
-  static const String versionLabel = 'v1.4.4 · RCAN v2.2.1';
+  static const String appVersion = '1.5.0';
+  static const String rcanVersion = '3.0';
+  static const String versionLabel = 'v1.5.0 · RCAN v3.0';
   static const String opencastorReleaseVersion = '2026.3.29.1';
 
   // Documentation URLs

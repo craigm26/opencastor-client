@@ -322,6 +322,15 @@ class Robot {
     return major >= 2 && minor >= 1;
   }
 
+  /// True if the robot supports RCAN v3.0 or later.
+  bool get isRcanV30 {
+    if (rcanVersion == null) return false;
+    final parts = rcanVersion!.split('.');
+    if (parts.isEmpty) return false;
+    final major = int.tryParse(parts[0]) ?? 0;
+    return major >= 3;
+  }
+
   /// True if firmware has been signed and attested (RCAN v2.1 §11).
   bool get isFirmwareAttested =>
       firmwareHash != null && firmwareHash!.startsWith('sha256:');

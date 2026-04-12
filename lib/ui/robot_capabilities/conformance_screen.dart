@@ -11,6 +11,7 @@ import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
 import 'capabilities_widgets.dart';
+import '../compliance/compliance_view_model.dart';
 
 class ConformanceScreen extends ConsumerWidget {
   final String rrn;
@@ -36,12 +37,14 @@ class ConformanceScreen extends ConsumerWidget {
   }
 }
 
-class _ConformanceView extends StatelessWidget {
+class _ConformanceView extends ConsumerWidget {
   final Robot robot;
   const _ConformanceView({required this.robot});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final friaAsync = ref.watch(friaProvider(robot.rrn));
+    final friaConformance = friaAsync.asData?.value?.conformance;
     final score = capConformanceScore(robot);
     final p66Pass = capP66PassCount(robot);
     return Scaffold(
@@ -49,6 +52,47 @@ class _ConformanceView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (friaConformance != null) ...[
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('FRIA Conformance (rcan.dev)', style: Theme.of(context).textTheme.titleSmall),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: friaConformance.score.clamp(0.0, 1.0),
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(children: [
+                          Text('${friaConformance.passCount}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 18)),
+                          Text('Pass', style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                        Column(children: [
+                          Text('${friaConformance.warnCount}', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade700, fontSize: 18)),
+                          Text('Warn', style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                        Column(children: [
+                          Text('${friaConformance.failCount}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 18)),
+                          Text('Fail', style: Theme.of(context).textTheme.bodySmall),
+                        ]),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else if (friaAsync.isLoading) ...[
+            const LinearProgressIndicator(),
+            const SizedBox(height: 16),
+          ],
           ConformanceCard(robot: robot, score: score, p66Pass: p66Pass),
           const SizedBox(height: 16),
           _ScoreBreakdown(robot: robot, score: score, p66Pass: p66Pass),

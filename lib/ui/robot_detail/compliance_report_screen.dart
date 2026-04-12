@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/models/robot.dart';
 import '../robot_detail/robot_detail_view_model.dart';
@@ -14,6 +15,8 @@ import '../core/theme/app_theme.dart';
 import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
+import '../compliance/compliance_view_model.dart';
+import '../../routes.dart';
 
 class ComplianceReportScreen extends ConsumerWidget {
   final String rrn;
@@ -42,11 +45,11 @@ class ComplianceReportScreen extends ConsumerWidget {
   }
 }
 
-class _ComplianceReportView extends StatelessWidget {
+class _ComplianceReportView extends ConsumerWidget {
   final Robot robot;
   const _ComplianceReportView({required this.robot});
 
-  Map<String, dynamic> _buildReport() {
+  Map<String, dynamic> _buildReport(ComplianceStatus? liveStatus) {
     final level = robot.conformanceLevel;
     final checks = [
       {
@@ -79,8 +82,14 @@ class _ComplianceReportView extends StatelessWidget {
       },
       {
         'id':     'rcan_version',
-        'status': robot.isRcanV21 ? 'pass' : 'fail',
-        'detail': 'RCAN version: ${robot.rcanVersion ?? 'unknown'}',
+        'status': (liveStatus?.complianceStatus == 'compliant') ? 'pass'
+            : (liveStatus?.complianceStatus == 'provisional') ? 'warn'
+            : robot.isRcanV30 ? 'pass'
+            : robot.isRcanV21 ? 'warn'
+            : 'fail',
+        'detail': liveStatus != null
+            ? 'RCAN compliance: ${liveStatus.complianceStatus} (RCAN v${robot.rcanVersion ?? "unknown"})'
+            : 'RCAN version: ${robot.rcanVersion ?? "unknown"}',
       },
     ];
 
@@ -115,9 +124,11 @@ class _ComplianceReportView extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(complianceStatusProvider(robot.rrn));
+    final liveStatus = statusAsync.asData?.value;
     final cs = Theme.of(context).colorScheme;
-    final report = _buildReport();
+    final report = _buildReport(liveStatus);
     final overall = report['overall_status'] as String;
     final statusColor = switch (overall) {
       'compliant'     => Colors.green,
@@ -233,6 +244,14 @@ class _ComplianceReportView extends StatelessWidget {
               prettyJson,
               style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
             ),
+          ),
+          const SizedBox(height: 16),
+          ListTile(
+            leading: const Icon(Icons.verified_user_outlined),
+            title: const Text('View Full Compliance'),
+            subtitle: const Text('FRIA, Safety Benchmark, EU Register'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(AppRoutes.robotComplianceFor(robot.rrn)),
           ),
         ],
       ),
