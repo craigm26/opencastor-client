@@ -35,7 +35,9 @@ import '../../data/services/github_release_service.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import '../widgets/thinking_indicator.dart';
+import 'lan_settings_card.dart';
 import 'robot_detail_view_model.dart';
+import '../../data/repositories/lan_mode_provider.dart';
 import '../../data/services/ws_telemetry_service.dart';
 import 'slash_command_palette.dart';
 import 'slash_command_provider.dart';
@@ -44,7 +46,7 @@ import '../shared/empty_view.dart';
 import '../shared/loading_view.dart';
 import 'robot_telemetry_panel.dart';
 
-enum _RobotAction { control, share, docs, capabilities, harness }
+enum _RobotAction { control, share, docs, capabilities, harness, lan }
 
 class RobotDetailScreen extends ConsumerStatefulWidget {
   final String rrn;
@@ -82,6 +84,25 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   Future<void> _fetchLatestVersion() async {
     final v = await GitHubReleaseService.getLatestVersion();
     if (mounted && v != null) setState(() => _latestVersion = v);
+  }
+
+  void _showLanSettings(Robot robot) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: LanSettingsCard(
+          rrn: robot.rrn,
+          localIp: robot.telemetry['local_ip'] as String?,
+        ),
+      ),
+    );
   }
 
   void _onTextChanged() {
@@ -642,8 +663,12 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Hydrate persisted LAN mode on first build
+    ref.watch(lanModeInitProvider(widget.rrn));
+
     final robotAsync = ref.watch(robotDetailProvider(widget.rrn));
-    final commandsAsync = ref.watch(commandsProvider(widget.rrn));
+    // mergedCommandsProvider combines in-memory LAN commands + Firestore history
+    final commandsAsync = ref.watch(mergedCommandsProvider(widget.rrn));
 
     return robotAsync.when(
       loading: () =>
@@ -667,7 +692,7 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     // Checking cmds.first was a race: it matched the PREVIOUS completed command
     // before the new one appeared in Firestore, clearing thinking immediately.
     ref.listen<AsyncValue<List<RobotCommand>>>(
-      commandsProvider(widget.rrn),
+      mergedCommandsProvider(widget.rrn),
       (prev, next) {
         next.whenData((cmds) {
           if (!_thinking) return;
@@ -706,6 +731,16 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 if (ok && context.mounted) await repo.sendEstop(robot.rrn);
               },
             ),
+          // LAN mode indicator — shown when LAN is active
+          if (ref.watch(lanModeProvider(widget.rrn)))
+            Tooltip(
+              message: 'LAN mode active — commands sent directly to robot',
+              child: Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(Icons.wifi, size: 18,
+                    color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
           // Overflow menu — secondary actions that don't need top-bar real estate
           PopupMenuButton<_RobotAction>(
             icon: const Icon(Icons.more_vert),
@@ -722,6 +757,8 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                   context.push('/robot/${robot.rrn}/capabilities');
                 case _RobotAction.harness:
                   context.push('/robot/${robot.rrn}/harness');
+                case _RobotAction.lan:
+                  _showLanSettings(robot);
               }
             },
             itemBuilder: (_) => [
@@ -755,6 +792,14 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
                 child: ListTile(
                   leading: Icon(Icons.share_outlined),
                   title: Text('Share Config to Hub'),
+                  dense: true,
+                ),
+              ),
+              const PopupMenuItem(
+                value: _RobotAction.lan,
+                child: ListTile(
+                  leading: Icon(Icons.wifi),
+                  title: Text('LAN Settings'),
                   dense: true,
                 ),
               ),

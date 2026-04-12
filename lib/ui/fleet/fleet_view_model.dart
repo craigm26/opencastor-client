@@ -15,9 +15,11 @@ library;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_logger.dart';
+import '../../data/repositories/lan_mode_provider.dart';
 import '../../data/repositories/robot_repository_provider.dart';
 
 export '../../data/repositories/robot_repository.dart';
+export '../../data/repositories/lan_mode_provider.dart' show lanModeProvider;
 // Re-export so existing UI files that `show robotRepositoryProvider` from here
 // continue to resolve without changes.
 export '../../data/repositories/robot_repository_provider.dart'
@@ -114,10 +116,32 @@ class EstopCommand extends AutoDisposeNotifier<EstopState> {
   EstopState build() => const EstopIdle();
 
   /// Send ESTOP to [rrn]. Never requires confirmation (immediate execution).
+  ///
+  /// When LAN mode is enabled for [rrn], attempts to send ESTOP directly to
+  /// the robot's local API for minimum latency (~30 ms vs ~500 ms cloud).
+  /// Falls back to Firebase Cloud Functions if LAN send fails.
   Future<void> send(String rrn) async {
     if (state is EstopSending) return; // debounce
     state = EstopSending(rrn);
     try {
+      // ── Try LAN ESTOP first if enabled ─────────────────────────────────────
+      final fleet = ref.read(fleetProvider).valueOrNull;
+      final robot = fleet?.where((r) => r.rrn == rrn).firstOrNull;
+      final localIp = robot?.telemetry['local_ip'] as String?;
+      final lan = await buildLanService(ref, rrn, localIp: localIp);
+
+      if (lan != null) {
+        try {
+          await lan.sendEstop();
+          state = EstopSent(rrn);
+          return;
+        } catch (_) {
+          // LAN ESTOP failed — fall through to cloud relay
+          log.w('LAN ESTOP failed for $rrn — falling back to Firebase');
+        }
+      }
+
+      // ── Firebase cloud relay ────────────────────────────────────────────────
       await ref.read(robotRepositoryProvider).sendEstop(rrn);
       state = EstopSent(rrn);
     } catch (e) {
