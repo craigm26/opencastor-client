@@ -26,13 +26,16 @@ class ComplianceStatus {
   });
 
   factory ComplianceStatus.fromJson(Map<String, dynamic> json) {
+    // rcan.dev API nests FRIA fields under a 'fria' object; fall back to
+    // top-level keys for forward-compat if the API shape is ever flattened.
+    final fria = json['fria'] as Map<String, dynamic>?;
     return ComplianceStatus(
       rrn: json['rrn'] as String,
       complianceStatus: json['compliance_status'] as String,
-      friaSubmittedAt: json['fria_submitted_at'] as String?,
-      sigVerified: (json['sig_verified'] as bool?) ?? false,
-      overallPass: (json['overall_pass'] as bool?) ?? false,
-      prerequisiteWaived: (json['prerequisite_waived'] as bool?) ?? false,
+      friaSubmittedAt: (fria?['submitted_at'] ?? json['fria_submitted_at']) as String?,
+      sigVerified: (fria?['sig_verified'] ?? json['sig_verified'] as bool?) ?? false,
+      overallPass: (fria?['overall_pass'] ?? json['overall_pass'] as bool?) ?? false,
+      prerequisiteWaived: (fria?['prerequisite_waived'] ?? json['prerequisite_waived'] as bool?) ?? false,
     );
   }
 }
@@ -82,14 +85,17 @@ class FriaDocument {
   });
 
   factory FriaDocument.fromJson(Map<String, dynamic> json) {
-    final conformanceJson = json['conformance'] as Map<String, dynamic>?;
+    // rcan.dev API wraps the signed blob under a 'document' key.
+    // Fall back to root if callers pass the inner document directly.
+    final doc = (json['document'] as Map<String, dynamic>?) ?? json;
+    final conformanceJson = doc['conformance'] as Map<String, dynamic>?;
     return FriaDocument(
-      schema: (json['schema'] as String?) ?? '',
-      generatedAt: (json['generated_at'] as String?) ?? '',
-      system: (json['system'] as Map<String, dynamic>?) ?? {},
-      deployment: (json['deployment'] as Map<String, dynamic>?) ?? {},
-      signingKey: (json['signing_key'] as Map<String, dynamic>?) ?? {},
-      sig: (json['sig'] as Map<String, dynamic>?) ?? {},
+      schema: (doc['schema'] as String?) ?? '',
+      generatedAt: (doc['generated_at'] as String?) ?? '',
+      system: (doc['system'] as Map<String, dynamic>?) ?? {},
+      deployment: (doc['deployment'] as Map<String, dynamic>?) ?? {},
+      signingKey: (doc['signing_key'] as Map<String, dynamic>?) ?? {},
+      sig: (doc['sig'] as Map<String, dynamic>?) ?? {},
       conformance: conformanceJson != null
           ? FriaConformance.fromJson(conformanceJson)
           : null,
