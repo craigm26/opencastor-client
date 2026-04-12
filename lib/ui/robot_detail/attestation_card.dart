@@ -207,7 +207,7 @@ class _ConformanceLevelBar extends StatelessWidget {
   }
 
   String _nextLevelHint(int current) => switch (current) {
-    1 => 'L2: Enable RCAN v2.1 + signed RURI',
+    1 => 'L2: Enable RCAN v2.1+ + signed RURI',
     2 => 'L3: Enable ESTOP QoS2 + replay protection',
     3 => 'L4: Run castor attest + castor sbom',
     4 => 'L5: Enable authority handler + 10yr audit retention (EU AI Act)',

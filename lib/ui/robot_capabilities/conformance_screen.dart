@@ -132,7 +132,7 @@ class _ScoreBreakdown extends StatelessWidget {
         earned: robot.loaEnforcement,
       ),
       _BreakdownItem(
-        label: 'RCAN v2.2 (ML-DSA-65)',
+        label: 'PQ Signing — ML-DSA-65',
         points: 10,
         earned: robot.isRcanV16,
       ),

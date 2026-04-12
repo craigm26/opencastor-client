@@ -129,7 +129,7 @@ class _StatusView extends StatelessWidget {
                   valueColor:
                       robot.isRcanV15 ? AppTheme.online : cs.onSurfaceVariant),
               _StatusRow(
-                  label: 'RCAN v2.2',
+                  label: 'ML-DSA-65 (PQ)',
                   value: robot.isRcanV16 ? 'Supported' : 'Not supported',
                   valueColor:
                       robot.isRcanV16 ? AppTheme.online : cs.onSurfaceVariant),

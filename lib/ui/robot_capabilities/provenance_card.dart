@@ -46,7 +46,7 @@ class ProvenanceCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text('RCAN v2.2 §21 — robotregistryfoundation.org',
+            Text('RCAN §21 — robotregistryfoundation.org',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall

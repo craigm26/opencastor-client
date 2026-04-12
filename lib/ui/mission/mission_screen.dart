@@ -1012,7 +1012,7 @@ class _MissionInfoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('RCAN v2.2 Mission',
+            Text('RCAN Mission',
                 style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: 4),
             Text('ID: ${mission.id}', style: theme.textTheme.bodySmall),

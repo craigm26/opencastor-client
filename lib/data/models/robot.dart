@@ -319,7 +319,7 @@ class Robot {
     if (parts.isEmpty) return false;
     final major = int.tryParse(parts[0]) ?? 0;
     final minor = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-    return major >= 2 && minor >= 1;
+    return major > 2 || (major == 2 && minor >= 1);
   }
 
   /// True if the robot supports RCAN v3.0 or later.
@@ -341,9 +341,11 @@ class Robot {
   /// RCAN conformance level (L1–L5).
   int get conformanceLevel {
     if (!isRcanV21) {
+      // Pre-v2.1: legacy L1–L3 path
       if (!isRcanV16) return isRcanV15 ? 2 : 1;
       return supportsQos2 ? 3 : 2;
     }
+    // v2.1+ (including v3.0): L3–L5 path
     if (!isFirmwareAttested || !isSbomPublished) return 3;
     if (!authorityHandlerEnabled) return 4;
     if ((auditRetentionDays ?? 0) < 3650) return 4;

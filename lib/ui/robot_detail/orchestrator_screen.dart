@@ -79,11 +79,11 @@ class _OrchestratorList extends StatelessWidget {
           _InfoBanner(
             icon: Icons.info_outline,
             color: Colors.orange,
-            message: 'Robot must run RCAN v2.1 to accept M2M_TRUSTED sessions.',
+            message: 'Robot must run RCAN v2.1 or later to accept M2M_TRUSTED sessions.',
           ),
 
         const SizedBox(height: 8),
-        Text('RCAN v2.1 §2.9 — M2M_TRUSTED Orchestrators',
+        Text('RCAN §2.9 — M2M_TRUSTED Orchestrators',
             style: TextStyle(
                 fontSize: 12, color: cs.onSurface.withValues(alpha: 0.6))),
         const SizedBox(height: 4),
