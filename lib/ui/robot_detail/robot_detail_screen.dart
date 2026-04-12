@@ -1156,7 +1156,7 @@ class _ShortcutRow extends StatelessWidget {
       _Shortcut(
         icon: Icons.fact_check_outlined,
         label: 'Compliance',
-        onTap: () => context.push('/robot/${robot.rrn}/compliance-report'),
+        onTap: () => context.push('/robot/${robot.effectiveComplianceRrn}/compliance-report'),
       ),
     ];
 

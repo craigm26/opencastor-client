@@ -43,7 +43,7 @@ class _ConformanceView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final friaAsync = ref.watch(friaProvider(robot.rrn));
+    final friaAsync = ref.watch(friaProvider(robot.effectiveComplianceRrn));
     final friaConformance = friaAsync.asData?.value?.conformance;
     final score = capConformanceScore(robot);
     final p66Pass = capP66PassCount(robot);

@@ -154,6 +154,16 @@ class Robot {
   /// Raw user_harness_config map — preserves flow_graph for the editor.
   final Map<String, dynamic>? userHarnessRaw;
 
+  /// Override RRN used for rcan.dev compliance/FRIA lookups.
+  ///
+  /// When set, compliance screens call rcan.dev with this RRN instead of [rrn].
+  /// Used to reconcile cases where the Firestore routing RRN (document path)
+  /// differs from the RRN registered on rcan.dev.
+  ///
+  /// Example: Bob's Firestore doc is RRN-000000000001 but FRIA lives at
+  /// RRN-000000000002 — so rcan_compliance_rrn = "RRN-000000000002".
+  final String? rcanComplianceRrn;
+
   const Robot({
     required this.rrn,
     required this.name,
@@ -194,6 +204,7 @@ class Robot {
     this.hardwareModel,
     this.userHarnessConfig,
     this.userHarnessRaw,
+    this.rcanComplianceRrn,
   });
 
   factory Robot.fromDoc(DocumentSnapshot doc) {
@@ -275,10 +286,17 @@ class Robot {
           ? Map<String, dynamic>.from(
               m['user_harness_config'] as Map<String, dynamic>)
           : null,
+      rcanComplianceRrn: m['rcan_compliance_rrn'] as String?,
     );
   }
 
   bool get isOnline => status.online;
+
+  /// RRN to use for rcan.dev compliance/FRIA API lookups.
+  ///
+  /// Returns [rcanComplianceRrn] when set (Firestore override), else [rrn].
+  /// This decouples the Firestore document routing RRN from the rcan.dev identity.
+  String get effectiveComplianceRrn => rcanComplianceRrn ?? rrn;
 
   /// Hardware snapshot from last telemetry push (may be null if not yet received).
   Map<String, dynamic>? get systemInfo =>

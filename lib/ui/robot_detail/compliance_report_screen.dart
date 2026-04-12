@@ -125,7 +125,7 @@ class _ComplianceReportView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final statusAsync = ref.watch(complianceStatusProvider(robot.rrn));
+    final statusAsync = ref.watch(complianceStatusProvider(robot.effectiveComplianceRrn));
     final liveStatus = statusAsync.asData?.value;
     final cs = Theme.of(context).colorScheme;
     final report = _buildReport(liveStatus);
