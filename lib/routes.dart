@@ -67,6 +67,22 @@ abstract final class AppRoutes {
   static const robotCapabilitiesComponents =
       '/robot/:rrn/capabilities/components';
   static const robotComplianceReport = '/robot/:rrn/compliance-report';
+
+  // ── Compliance hub + sub-screens (RCAN v3.0) ─────────────────────────────
+  static const robotCompliance = '/robot/:rrn/compliance';
+  static const robotComplianceFria = '/robot/:rrn/compliance/fria';
+  static const robotComplianceBenchmark = '/robot/:rrn/compliance/benchmark';
+  static const robotComplianceIfu = '/robot/:rrn/compliance/ifu';
+  static const robotComplianceIncidents = '/robot/:rrn/compliance/incidents';
+  static const robotComplianceEuRegister = '/robot/:rrn/compliance/eu-register';
+
+  static String robotComplianceFor(String rrn) => '/robot/$rrn/compliance';
+  static String robotComplianceFriaFor(String rrn) => '/robot/$rrn/compliance/fria';
+  static String robotComplianceBenchmarkFor(String rrn) => '/robot/$rrn/compliance/benchmark';
+  static String robotComplianceIfuFor(String rrn) => '/robot/$rrn/compliance/ifu';
+  static String robotComplianceIncidentsFor(String rrn) => '/robot/$rrn/compliance/incidents';
+  static String robotComplianceEuRegisterFor(String rrn) => '/robot/$rrn/compliance/eu-register';
+
   static const robotAttestation = '/robot/:rrn/attestation';
   static const robotResearch = '/robot/:rrn/research';
   static const robotOrchestrators = '/robot/:rrn/orchestrators';

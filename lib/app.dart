@@ -42,6 +42,12 @@ import 'ui/robot_capabilities/contribute_screen.dart';
 import 'ui/robot_capabilities/mcp_screen.dart';
 import 'ui/robot_capabilities/conformance_screen.dart';
 import 'ui/robot_detail/compliance_report_screen.dart';
+import 'ui/compliance/compliance_hub_screen.dart';
+import 'ui/compliance/fria_screen.dart';
+import 'ui/compliance/safety_benchmark_screen.dart';
+import 'ui/compliance/ifu_screen.dart';
+import 'ui/compliance/incidents_screen.dart';
+import 'ui/compliance/eu_register_screen.dart';
 import 'ui/robot_detail/orchestrator_screen.dart';
 import 'ui/robot_capabilities/hardware_screen.dart';
 import 'ui/robot_capabilities/identity_screen.dart';
@@ -287,6 +293,36 @@ final _routerProvider = Provider<GoRouter>((ref) {
             path: '/robot/:rrn/compliance-report',
             builder: (_, state) =>
                 ComplianceReportScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance',
+            builder: (_, state) =>
+                ComplianceHubScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance/fria',
+            builder: (_, state) =>
+                FriaScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance/benchmark',
+            builder: (_, state) =>
+                SafetyBenchmarkScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance/ifu',
+            builder: (_, state) =>
+                IfuScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance/incidents',
+            builder: (_, state) =>
+                IncidentsScreen(rrn: state.pathParameters['rrn']!),
+          ),
+          GoRoute(
+            path: '/robot/:rrn/compliance/eu-register',
+            builder: (_, state) =>
+                EuRegisterScreen(rrn: state.pathParameters['rrn']!),
           ),
           GoRoute(
             path: '/robot/:rrn/research',
