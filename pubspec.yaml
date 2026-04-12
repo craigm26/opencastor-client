@@ -1,7 +1,7 @@
 name: opencastor_client
 description: OpenCastor Fleet Management — control and monitor your robots from anywhere.
 publish_to: 'none'
-version: 1.5.0+2
+version: 2.0.0+3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

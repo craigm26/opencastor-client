@@ -4,6 +4,50 @@ All notable changes to opencastor-client are documented here.
 
 ---
 
+## [2.0.0] - 2026-04-12
+
+### Added
+
+**LAN Mode — direct robot connection over local Wi-Fi**
+- New `LanRobotService` sends commands directly to the robot's REST API at `http://[local_ip]:8000`, cutting round-trip latency from ~500 ms (Firebase relay) to ~30 ms
+- Per-robot LAN toggle + API token stored in SharedPreferences; survives app restarts
+- `LanSettingsCard` bottom sheet: token input, ping test, enable/disable toggle
+- WiFi indicator badge in app bar when LAN mode is active
+- ESTOP tries LAN first then falls back to Firebase (Protocol 66 §4.1 guarantee preserved)
+- Slash commands (`/status`, `/pause`, `/resume`, etc.) are fully LAN-aware; responses appear in chat immediately without Firestore polling
+- `mergedCommandsProvider` combines in-memory LAN command log with Firestore history for seamless chat display
+
+**EU AI Act Compliance Hub** (deadline: 2026-08-02)
+- New `/robot/:rrn/compliance` route with 5 sub-screens:
+  - **FRIA** — Fundamental Rights Impact Assessment viewer pulled from rcan.dev
+  - **Safety Benchmark** — Protocol 66 / OHB-1 results from rcan.dev
+  - **Instructions for Use** — §24 documentation checklist
+  - **Post-Market Monitoring** — §72 monitoring obligations
+  - **EU Register** — §49 high-risk system submission guide
+- **Compliance Report** screen (`/robot/:rrn/compliance-report`) — generates and copies a structured EU AI Act compliance JSON (article mapping, SBOM status, firmware attestation, authority handler, audit retention)
+- Article mapping: Art. 12, 16(a), 16(d), 16(j) with pass/warn indicators
+
+**RCAN v3.0 Conformance**
+- Conformance level engine updated: L3–L5 path for RCAN v2.1+; v3.0 robots now correctly reach L5
+- `isRcanV30` / `isRcanV21` version gates fixed (was incorrectly gating v2.1 as v3.0)
+- RCAN v3.0 badge (`_RcanVersionBadge`) — rose-gold color, replaces stale v2.x strings throughout
+
+**Other**
+- `rcanComplianceRrn` field on `Robot` model — allows Firestore routing RRN to differ from rcan.dev registration RRN; compliance screens use `effectiveComplianceRrn`
+- `castor fria publish` gap noted — FRIA documents can be generated locally but not yet pushed to rcan.dev from within the app
+
+### Fixed
+- `ComplianceStatus` / `FriaDocument` JSON deserialization aligned with actual rcan.dev API wire format
+- `FilePicker` API migration from deprecated `instance` to `PlatformFilePicker()`
+- `LanSettingsCard` — `AsyncValue` has no `.then()`: fixed hydration via `addPostFrameCallback`
+- Dependabot alert #109 (riverpod ^3.x major bump) closed — breaking change, not a simple bump
+
+### Security
+- rcan-spec: pnpm overrides patched for h3 (`<1.15.9`), smol-toml (`<1.6.1`), yaml (`<2.8.3`), vite (`<6.4.2`)
+- Dependabot alerts #14/#15 (picomatch 2.x) dismissed — lockfile only contains picomatch@4.0.4
+
+---
+
 ## [1.1.0] - 2026-04-02
 
 ### Added
