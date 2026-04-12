@@ -105,6 +105,24 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
     );
   }
 
+  /// Send ESTOP — tries LAN first (low-latency), falls back to Firebase.
+  ///
+  /// Protocol 66 §4.1: ESTOP must never be rate-limited and must reach the
+  /// robot even if the cloud relay is slow. LAN fallback is intentional.
+  Future<void> _sendEstop(Robot robot) async {
+    final localIp = robot.telemetry['local_ip'] as String?;
+    final lan = await buildLanServiceW(ref, robot.rrn, localIp: localIp);
+    if (lan != null) {
+      try {
+        await lan.sendEstop();
+        return;
+      } catch (e) {
+        debugPrint('LAN ESTOP failed ($e), falling back to Firebase');
+      }
+    }
+    await ref.read(robotRepositoryProvider).sendEstop(robot.rrn);
+  }
+
   void _onTextChanged() {
     final text = _ctrl.text;
     if (text.startsWith('/')) {
@@ -148,12 +166,42 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
   }
 
   /// Send a slash command by mapping to RCAN instruction + scope.
+  ///
+  /// Tries LAN first when enabled; falls back to Firebase Cloud Function relay.
   Future<void> _sendSlashCommand(
       String cmd, List<String> args, Robot robot) async {
     setState(() => _sending = true);
     try {
-      // Map slash command to RCAN instruction + scope
       final (instruction, scope) = _mapSlashCommand(cmd, args);
+
+      // Try LAN if enabled and robot exposes a local IP
+      final localIp = robot.telemetry['local_ip'] as String?;
+      final lan = await buildLanServiceW(ref, robot.rrn, localIp: localIp);
+      if (lan != null) {
+        try {
+          final result = await lan.sendCommand(instruction: instruction);
+          final syntheticCmd = RobotCommand(
+            id: result.cmdId,
+            instruction: instruction,
+            scope: scope,
+            issuedByUid: '',
+            issuedAt: DateTime.now(),
+            status: CommandStatus.complete,
+            result: {
+              'raw_text': result.rawText,
+              if (result.action != null) 'action': result.action,
+            },
+            senderType: 'human via OpenCastor app (LAN)',
+          );
+          addLanCommand(ref, robot.rrn, syntheticCmd);
+          if (mounted) setState(() => _pendingCmdId = result.cmdId);
+          return;
+        } catch (e) {
+          debugPrint('LAN slash command failed ($e), falling back to Firebase');
+        }
+      }
+
+      // Firebase fallback
       final cmdId = await ref.read(robotRepositoryProvider).sendCommand(
             rrn: robot.rrn,
             instruction: instruction,
@@ -728,7 +776,8 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
               tooltip: 'ESTOP',
               onPressed: () async {
                 final ok = await showEstopDialog(context, robot.name);
-                if (ok && context.mounted) await repo.sendEstop(robot.rrn);
+                if (!ok || !context.mounted) return;
+                await _sendEstop(robot);
               },
             ),
           // LAN mode indicator — shown when LAN is active
