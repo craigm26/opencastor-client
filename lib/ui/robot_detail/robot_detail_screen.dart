@@ -35,6 +35,7 @@ import '../../data/services/github_release_service.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import 'chat_bubble.dart';
 import '../widgets/thinking_indicator.dart';
+import '../widgets/task_progress_card.dart';
 import 'lan_settings_card.dart';
 import 'robot_detail_view_model.dart';
 import '../../data/repositories/lan_mode_provider.dart';
@@ -612,6 +613,10 @@ class _RobotDetailScreenState extends ConsumerState<RobotDetailScreen> {
           timestamp: cmd.issuedAt,
         ),
       ));
+
+      // Task progress card — rendered inline below the user command
+      if (cmd.taskId != null)
+        items.add(TaskProgressCard(rrn: widget.rrn, taskId: cmd.taskId!));
 
       // Date separator (inserted after the bubble, so visible above it in reverse list)
       if (lastDate == null || lastDate != dayKey) {
