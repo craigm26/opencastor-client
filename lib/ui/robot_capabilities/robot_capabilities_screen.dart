@@ -82,14 +82,16 @@ class RobotCapabilitiesScreen extends ConsumerWidget {
 
 // ── Index view ────────────────────────────────────────────────────────────────
 
-class _CapabilitiesIndex extends StatelessWidget {
+class _CapabilitiesIndex extends ConsumerWidget {
   final Robot robot;
   final String rrn;
 
   const _CapabilitiesIndex({required this.robot, required this.rrn});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final taskExecution = robot.telemetry['task_execution'] as String? ?? 'ask';
     final score = capConformanceScore(robot);
     final p66Pass = capP66PassCount(robot);
 
@@ -224,6 +226,39 @@ class _CapabilitiesIndex extends StatelessWidget {
                   title: 'Contribute',
                   onTap: () => context
                       .push('/robot/$rrn/capabilities/contribute'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // ── Task execution mode ───────────────────────────────────────────────
+          Card(
+            margin: EdgeInsets.zero,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    'Execution',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                SwitchListTile(
+                  title: const Text('Task execution'),
+                  subtitle: Text(
+                    taskExecution == 'automatic'
+                        ? 'Runs automatically without confirmation'
+                        : 'Asks for confirmation before executing',
+                  ),
+                  value: taskExecution == 'automatic',
+                  onChanged: (v) {
+                    final value = v ? 'automatic' : 'ask';
+                    ref
+                        .read(taskExecutionProvider.notifier)
+                        .set(rrn, value);
+                  },
                 ),
               ],
             ),

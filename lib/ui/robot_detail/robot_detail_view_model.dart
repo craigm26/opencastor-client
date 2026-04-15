@@ -166,3 +166,23 @@ final confirmTaskProvider =
     AsyncNotifierProvider.autoDispose<ConfirmTaskNotifier, void>(
   ConfirmTaskNotifier.new,
 );
+
+// ── Task execution setting ────────────────────────────────────────────────────
+
+/// Notifier for updating the task_execution setting (ask | automatic).
+class TaskExecutionNotifier extends AutoDisposeAsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<void> set(String rrn, String value) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(robotRepositoryProvider).updateTaskExecution(rrn, value),
+    );
+  }
+}
+
+final taskExecutionProvider =
+    AsyncNotifierProvider.autoDispose<TaskExecutionNotifier, void>(
+  TaskExecutionNotifier.new,
+);

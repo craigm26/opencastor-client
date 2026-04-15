@@ -68,4 +68,7 @@ abstract class RobotRepository {
 
   /// Confirm a pending task — writes confirmed=true to Firestore.
   Future<void> confirmTask(String rrn, String taskId);
+
+  /// Update the task_execution setting for [rrn]: 'ask' | 'automatic'.
+  Future<void> updateTaskExecution(String rrn, String value);
 }

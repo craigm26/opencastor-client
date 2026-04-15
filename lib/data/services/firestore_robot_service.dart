@@ -159,4 +159,8 @@ class FirestoreRobotService implements RobotRepository {
         .doc(taskId)
         .update({'confirmed': true, 'status': 'running'});
   }
+
+  @override
+  Future<void> updateTaskExecution(String rrn, String value) =>
+      _db.collection('robots').doc(rrn).update({'task_execution': value});
 }
