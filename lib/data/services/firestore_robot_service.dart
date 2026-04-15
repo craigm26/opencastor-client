@@ -157,7 +157,7 @@ class FirestoreRobotService implements RobotRepository {
         .doc(rrn)
         .collection('tasks')
         .doc(taskId)
-        .update({'confirmed': true, 'status': 'running'});
+        .update({'confirmed': true});
   }
 
   @override

@@ -124,7 +124,7 @@ class _TaskCard extends ConsumerWidget {
               ],
 
               // ── Error chip ──────────────────────────────────────────────
-              if (task.isFailed && task.error != null) ...[
+              if (task.status == 'failed' && task.error != null) ...[
                 const SizedBox(height: Spacing.sm),
                 Text(
                   task.error!.replaceAll('_', ' '),
@@ -213,8 +213,8 @@ class _PhaseRow extends StatelessWidget {
     );
   }
 
-  static int _phaseIndex(String phase) =>
-      _kPhases.indexOf(phase).clamp(0, _kPhases.length - 1);
+  // Returns -1 for unknown/empty phases so isDone comparisons stay correct.
+  static int _phaseIndex(String phase) => _kPhases.indexOf(phase);
 }
 
 // ── Status chip ───────────────────────────────────────────────────────────────
