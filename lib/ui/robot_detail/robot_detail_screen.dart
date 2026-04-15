@@ -1443,7 +1443,7 @@ class _VersionBadge extends ConsumerWidget {
             ]),
             const SizedBox(height: 12),
             Text(
-              'This sends a pip install --upgrade opencastor command to the robot via RCAN chat scope.',
+              'This sends a pip install --upgrade opencastor command to the robot via RCAN system scope.',
               style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(ctx).colorScheme.onSurfaceVariant),

@@ -60,7 +60,23 @@ export const sendCommand = https.onCall({ cors: ["https://app.opencastor.com", "
   }
 
   const robot = robotDoc.data()!;
-  const isOwner = robot.firebase_uid === auth.uid;
+  let isOwner: boolean = !!robot.firebase_uid && robot.firebase_uid === auth.uid;
+
+  // Fallback ownership check for robots registered without firebase_uid in their
+  // RCAN config (e.g. bridge.py started before firebase_uid was added to the yaml).
+  // If the robot doc lacks firebase_uid but the authenticated user owns another
+  // robot sharing the same `owner` string (RURI), treat them as the owner.
+  if (!isOwner && !robot.firebase_uid && robot.owner) {
+    const myRobotsSnap = await db()
+      .collection("robots")
+      .where("firebase_uid", "==", auth.uid)
+      .limit(10)
+      .get();
+    const myOwnerStrings = new Set(myRobotsSnap.docs.map((d) => d.data().owner as string));
+    if (myOwnerStrings.has(robot.owner as string)) {
+      isOwner = true;
+    }
+  }
 
   // system scope is owner-only — no peer delegation for safety-critical ops
   if (!isOwner && data.scope === "system") {
