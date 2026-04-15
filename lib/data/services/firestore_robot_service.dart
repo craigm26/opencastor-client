@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../../core/app_logger.dart';
 import '../models/command.dart';
 import '../models/robot.dart';
+import '../models/task_doc.dart';
 import '../repositories/robot_repository.dart';
 
 /// Firestore + Cloud Functions implementation of [RobotRepository].
@@ -133,5 +134,29 @@ class FirestoreRobotService implements RobotRepository {
         .snapshots()
         .map((snap) =>
             snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+  }
+
+  @override
+  Stream<TaskDoc?> watchTask(String rrn, String taskId) {
+    return _db
+        .collection('robots')
+        .doc(rrn)
+        .collection('tasks')
+        .doc(taskId)
+        .snapshots()
+        .map((snap) {
+      if (!snap.exists) return null;
+      return TaskDoc.fromMap(snap.id, snap.data() as Map<String, dynamic>);
+    });
+  }
+
+  @override
+  Future<void> confirmTask(String rrn, String taskId) {
+    return _db
+        .collection('robots')
+        .doc(rrn)
+        .collection('tasks')
+        .doc(taskId)
+        .update({'confirmed': true, 'status': 'running'});
   }
 }

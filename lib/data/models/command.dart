@@ -19,6 +19,9 @@ class RobotCommand {
   /// e.g. "human via OpenCastor app" | "service:opencastor-cloud-relay" | "robot:`<rrn>`"
   final String? senderType;
 
+  /// Links this command to a live Firestore task doc for pick-and-place tasks.
+  final String? taskId;
+
   const RobotCommand({
     required this.id,
     required this.instruction,
@@ -30,6 +33,7 @@ class RobotCommand {
     this.error,
     this.completedAt,
     this.senderType,
+    this.taskId,
   });
 
   factory RobotCommand.fromDoc(DocumentSnapshot doc) {
@@ -46,6 +50,7 @@ class RobotCommand {
       completedAt: _parseDateTime(m['completed_at']),
       // GAP-08: parse sender_type from audit field; default to human app sender
       senderType: m['sender_type'] as String? ?? 'human via OpenCastor app',
+      taskId: m['task_id'] as String?,
     );
   }
 

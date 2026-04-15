@@ -10,9 +10,11 @@ library;
 
 import '../models/command.dart';
 import '../models/robot.dart';
+import '../models/task_doc.dart';
 
 export '../models/command.dart';
 export '../models/robot.dart';
+export '../models/task_doc.dart';
 
 abstract class RobotRepository {
   // ── Fleet ──────────────────────────────────────────────────────────────────
@@ -58,4 +60,12 @@ abstract class RobotRepository {
 
   /// Live stream of recent alerts (ESTOP events, faults) for [rrn].
   Stream<List<Map<String, dynamic>>> watchAlerts(String rrn, {int limit = 20});
+
+  // ── Tasks ──────────────────────────────────────────────────────────────────
+
+  /// Live stream of a pick-and-place task doc.
+  Stream<TaskDoc?> watchTask(String rrn, String taskId);
+
+  /// Confirm a pending task — writes confirmed=true to Firestore.
+  Future<void> confirmTask(String rrn, String taskId);
 }
