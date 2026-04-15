@@ -142,3 +142,27 @@ final latestVersionProvider = FutureProvider<String?>((ref) async {
   } catch (_) {}
   return null;
 });
+
+/// Live stream of a pick-and-place task doc for [rrn] + [taskId].
+final taskDocProvider = StreamProvider.autoDispose
+    .family<TaskDoc?, ({String rrn, String taskId})>((ref, args) {
+  return ref.read(robotRepositoryProvider).watchTask(args.rrn, args.taskId);
+});
+
+/// Notifier for the "confirm task" action — writes confirmed=true to Firestore.
+class ConfirmTaskNotifier extends AutoDisposeAsyncNotifier<void> {
+  @override
+  Future<void> build() async {}
+
+  Future<void> confirm({required String rrn, required String taskId}) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(robotRepositoryProvider).confirmTask(rrn, taskId),
+    );
+  }
+}
+
+final confirmTaskProvider =
+    AsyncNotifierProvider.autoDispose<ConfirmTaskNotifier, void>(
+  ConfirmTaskNotifier.new,
+);
