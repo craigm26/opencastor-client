@@ -3,7 +3,7 @@
 Web dashboard for managing your OpenCastor robot fleet — real-time monitoring, control, ESTOP, and consent management from any browser.
 
 [![Live](https://img.shields.io/badge/live-app.opencastor.com-orange)](https://app.opencastor.com)
-[![RCAN Spec](https://img.shields.io/badge/RCAN-v1.6-blue)](https://rcan.dev/spec/)
+[![RCAN](https://img.shields.io/badge/RCAN-protocol-blue)](https://rcan.dev/compatibility)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 **Live at [app.opencastor.com](https://app.opencastor.com)**
@@ -11,13 +11,13 @@ Web dashboard for managing your OpenCastor robot fleet — real-time monitoring,
 ## What It Does
 
 - **Fleet overview** — real-time status cards for all your robots; one-tap ESTOP on every screen
-- **Robot detail** — telemetry, command history, RCAN v1.6 capability badges (transport, LoA, federation)
+- **Robot detail** — telemetry, command history, [RCAN protocol](https://rcan.dev/compatibility) capability badges (transport, LoA, federation)
 - **Chat control** — send instructions in natural language via the chat interface
 - **Control panel** — arm teleop with confirmation modal + persistent ESTOP button
 - **Consent management** — approve/deny R2RAM access requests; view and revoke established peer consent
 - **Revocation display** — badges show when a robot's RCAN identity is revoked
 - **LoA display** — shows operator Level of Assurance on each control command
-- **Multi-modal stub** — media attachment UI for RCAN v1.6 multi-modal payloads
+- **Multi-modal stub** — media attachment UI for [RCAN protocol](https://rcan.dev/compatibility) multi-modal payloads
 
 ## Tech Stack
 
@@ -102,7 +102,7 @@ castor bridge --config bob.rcan.yaml
 
 The bridge connects outbound to Firestore. Your robot appears in the fleet dashboard within 30 seconds.
 
-## RCAN v1.6 Features
+## RCAN Protocol Features
 
 | Feature | UI Location |
 |---|---|
@@ -110,7 +110,7 @@ The bridge connects outbound to Firestore. Your robot appears in the fleet dashb
 | Revocation badges | Robot detail — red badge if RRN is revoked |
 | LoA display | Command history — operator LoA shown per command |
 | Transport badges | Robot detail — HTTP / Compact / Minimal transport indicators |
-| Multi-modal stub | Chat — attach media for RCAN v1.6 multi-modal payloads |
+| Multi-modal stub | Chat — attach media for [RCAN protocol](https://rcan.dev/compatibility) multi-modal payloads |
 
 ## Deployment
 
