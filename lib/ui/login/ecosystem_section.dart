@@ -33,9 +33,11 @@ const _items = [
     emoji: '🤖',
     name: 'OpenCastor',
     description: 'Robot runtime & AI brain',
-    version: AppConstants.opencastorReleaseVersion,
-    installCommand:
-        'pip install opencastor==${AppConstants.opencastorReleaseVersion}',
+    // No version pin: OpenCastor's PyPI version scheme is in transition
+    // (CalVer → SemVer) and the apex copy + login card pin don't track it
+    // reliably. Keep the install command unpinned so it always picks latest;
+    // see opencastor-ops findings-app-opencastor.md (F-OCC-02 follow-up).
+    installCommand: 'pip install opencastor',
     links: [
       (label: 'GitHub', url: AppConstants.opencastorGitHub),
       (label: 'Docs', url: AppConstants.docsRoot),

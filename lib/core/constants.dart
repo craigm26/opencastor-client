@@ -7,7 +7,10 @@ class AppConstants {
   static const String appVersion = '1.5.0';
   static const String rcanVersion = '3.2';
   static const String versionLabel = 'v$appVersion · RCAN v$rcanVersion';
-  static const String opencastorReleaseVersion = '3.0.1';
+  // opencastorReleaseVersion removed: PyPI publishing is in CalVer → SemVer
+  // transition (last CalVer release 2026.4.23.0; pyproject + CHANGELOG list
+  // SemVer 3.0.2 but it's not yet on PyPI). No pin = no broken install
+  // command. See opencastor-ops findings-app-opencastor.md F-OCC-02 follow-up.
 
   // Documentation URLs
   static const String docsRoot = 'https://opencastor.com/docs/';
