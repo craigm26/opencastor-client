@@ -45,7 +45,7 @@ const _items = [
     emoji: '📡',
     name: 'RCAN Protocol',
     description: 'Robot communication standard',
-    version: 'v2.2 · ML-DSA-65 · 40+ message types',
+    version: 'v3.2 · ML-DSA-65 hybrid',
     links: [
       (label: 'Spec', url: AppConstants.rcanSpecUrl),
       (label: 'rcan.dev', url: AppConstants.rcanDevUrl),
@@ -64,8 +64,8 @@ const _items = [
     emoji: '🐍',
     name: 'rcan-py',
     description: 'Python SDK',
-    version: '0.6.0',
-    installCommand: 'pip install rcan==0.6.0',
+    version: '3.4.0',
+    installCommand: 'pip install rcan==3.4.0',
     links: [
       (label: 'PyPI', url: AppConstants.rcanPyPypi),
       (label: 'GitHub', url: AppConstants.rcanPyGitHub),
@@ -75,8 +75,8 @@ const _items = [
     emoji: '📦',
     name: 'rcan-ts',
     description: 'TypeScript SDK',
-    version: '0.6.0',
-    installCommand: 'npm install @continuonai/rcan@0.6.0',
+    version: '3.4.2',
+    installCommand: 'npm install rcan-ts@3.4.2',
     links: [
       (label: 'npm', url: AppConstants.rcanTsNpm),
       (label: 'GitHub', url: AppConstants.rcanTsGitHub),

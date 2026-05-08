@@ -5,9 +5,9 @@ class AppConstants {
   AppConstants._();
 
   static const String appVersion = '1.5.0';
-  static const String rcanVersion = '3.0';
+  static const String rcanVersion = '3.2';
   static const String versionLabel = 'v$appVersion · RCAN v$rcanVersion';
-  static const String opencastorReleaseVersion = '2026.3.29.1';
+  static const String opencastorReleaseVersion = '3.0.1';
 
   // Documentation URLs
   static const String docsRoot = 'https://opencastor.com/docs/';
@@ -31,7 +31,7 @@ class AppConstants {
   static const String rcanPyGitHub =
       'https://github.com/continuonai/rcan-py';
   static const String rcanTsNpm =
-      'https://www.npmjs.com/package/@continuonai/rcan';
+      'https://www.npmjs.com/package/rcan-ts';
   static const String rcanTsGitHub =
       'https://github.com/continuonai/rcan-ts';
 }
