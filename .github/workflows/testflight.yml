@@ -1,5 +1,8 @@
 name: iOS TestFlight
 
+# Manual-trigger only as of 2026-05-08 — the `push: tags: v*` auto-trigger was
+# removed to prevent a release tag from auto-firing macOS-runner time.
+# To ship a TF build: tag locally, then `gh workflow run iOS\ TestFlight --ref v<x.y.z>`.
 on:
   workflow_dispatch:
     inputs:
@@ -7,9 +10,6 @@ on:
         description: "Build note (e.g. 'competition UI')"
         required: false
         default: ""
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   testflight:
