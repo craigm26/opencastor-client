@@ -14,10 +14,10 @@ Deployed at **[app.opencastor.com](https://app.opencastor.com)** via Cloudflare 
 | [craigm26/OpenCastor](https://github.com/craigm26/OpenCastor) | Robot runtime (Python). `castor` CLI, Protocol 66 safety layer, RCAN router, `castor bridge` daemon. | `main` |
 | [craigm26/opencastor-client](https://github.com/craigm26/opencastor-client) | **This repo.** Flutter web fleet management app. | `master` |
 | [craigm26/opencastor-ops](https://github.com/craigm26/opencastor-ops) | Private. Business, legal, compliance, infrastructure docs. | `main` |
-| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification (v1.6.1). Astro site at rcan.dev. | `master` |
-| [continuonai/rcan-py](https://github.com/continuonai/rcan-py) | Python RCAN SDK (v0.6.0). `pip install rcan`. | `main` |
-| [continuonai/rcan-ts](https://github.com/continuonai/rcan-ts) | TypeScript RCAN SDK (v0.6.0). `npm install @continuonai/rcan`. | `master` |
-| [continuonai/RobotRegistryFoundation](https://github.com/continuonai/RobotRegistryFoundation) | Robot Registry Foundation — canonical RRN records. | `main` |
+| [continuonai/rcan-spec](https://github.com/continuonai/rcan-spec) | RCAN protocol specification. Astro site at rcan.dev. Canonical version: see [rcan.dev/compatibility](https://rcan.dev/compatibility) (current `rcan_spec_version` in `opencastor-ops/config/repos.json`: 3.2). | `master` |
+| [continuonai/rcan-py](https://github.com/continuonai/rcan-py) | Python RCAN SDK. `pip install rcan` (PyPI canonical name is `rcan`, currently v3.4.0; verify with `pip index versions rcan`). | `main` |
+| [continuonai/rcan-ts](https://github.com/continuonai/rcan-ts) | TypeScript RCAN SDK. `npm install rcan-ts` (npm published name is `rcan-ts`, currently v3.4.2 — NOT `@continuonai/rcan`; verify with `npm view rcan-ts version`). | `master` |
+| [craigm26/RobotRegistryFoundation](https://github.com/craigm26/RobotRegistryFoundation) | Robot Registry Foundation — neutral identity and evidence registry (Layer 6 per spec §3). Site at robotregistryfoundation.org. | `main` |
 | [craigm26/personalsite](https://github.com/craigm26/personalsite) | craigmerry.com — Astro + Cloudflare Pages. | `main` |
 
 ---
@@ -241,7 +241,7 @@ This client implements the consumer side of the [RCAN protocol](https://rcan.dev
   - Scopes: `discover(0) < status(1) < chat(2) < control(3) < safety(99)`
   - Higher scope satisfies lower (control implies chat)
   - ESTOP: any authenticated owner can send regardless of scope
-- **Message types**: 20 types including CONSENT_REQUEST (20), CONSENT_GRANT (21), CONSENT_DENY (22)
+- **Message types**: defined in `rcan-py/rcan/message.py` (currently 44 types; integer assignments stable per spec). Notable: CONSENT_REQUEST (20), CONSENT_GRANT (21), CONSENT_DENY (22). See [rcan.dev/compatibility](https://rcan.dev/compatibility) for current count + spec version.
 
 ---
 
