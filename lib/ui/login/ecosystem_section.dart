@@ -33,9 +33,11 @@ const _items = [
     emoji: '🤖',
     name: 'OpenCastor',
     description: 'Robot runtime & AI brain',
-    version: AppConstants.opencastorReleaseVersion,
-    installCommand:
-        'pip install opencastor==${AppConstants.opencastorReleaseVersion}',
+    // No version pin: OpenCastor's PyPI version scheme is in transition
+    // (CalVer → SemVer) and the apex copy + login card pin don't track it
+    // reliably. Keep the install command unpinned so it always picks latest;
+    // see opencastor-ops findings-app-opencastor.md (F-OCC-02 follow-up).
+    installCommand: 'pip install opencastor',
     links: [
       (label: 'GitHub', url: AppConstants.opencastorGitHub),
       (label: 'Docs', url: AppConstants.docsRoot),
@@ -45,7 +47,7 @@ const _items = [
     emoji: '📡',
     name: 'RCAN Protocol',
     description: 'Robot communication standard',
-    version: 'v2.2 · ML-DSA-65 · 40+ message types',
+    version: 'v3.2 · ML-DSA-65 hybrid',
     links: [
       (label: 'Spec', url: AppConstants.rcanSpecUrl),
       (label: 'rcan.dev', url: AppConstants.rcanDevUrl),
@@ -64,8 +66,8 @@ const _items = [
     emoji: '🐍',
     name: 'rcan-py',
     description: 'Python SDK',
-    version: '0.6.0',
-    installCommand: 'pip install rcan==0.6.0',
+    version: '3.4.0',
+    installCommand: 'pip install rcan==3.4.0',
     links: [
       (label: 'PyPI', url: AppConstants.rcanPyPypi),
       (label: 'GitHub', url: AppConstants.rcanPyGitHub),
@@ -75,8 +77,8 @@ const _items = [
     emoji: '📦',
     name: 'rcan-ts',
     description: 'TypeScript SDK',
-    version: '0.6.0',
-    installCommand: 'npm install @continuonai/rcan@0.6.0',
+    version: '3.4.2',
+    installCommand: 'npm install rcan-ts@3.4.2',
     links: [
       (label: 'npm', url: AppConstants.rcanTsNpm),
       (label: 'GitHub', url: AppConstants.rcanTsGitHub),
