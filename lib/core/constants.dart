@@ -6,7 +6,7 @@ class AppConstants {
 
   static const String appVersion = '1.5.0';
   static const String rcanVersion = '3.0';
-  static const String versionLabel = 'v1.5.0 · RCAN v3.0';
+  static const String versionLabel = 'v$appVersion · RCAN v$rcanVersion';
   static const String opencastorReleaseVersion = '2026.3.29.1';
 
   // Documentation URLs
