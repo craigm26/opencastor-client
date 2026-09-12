@@ -15,6 +15,7 @@ import '../../ui/core/widgets/health_indicator.dart';
 import '../fleet/fleet_view_model.dart' show robotRepositoryProvider;
 import '../shared/error_view.dart';
 import '../shared/empty_view.dart';
+import '../shared/estop_feedback.dart';
 import '../shared/loading_view.dart';
 import '../robot_detail/robot_detail_view_model.dart';
 import '../../core/constants.dart';
@@ -102,25 +103,56 @@ class _PhysicalControlScreenState
     }
   }
 
+  /// Send ESTOP and report only what is actually known (OC-M-01).
+  ///
+  /// `sendEstop` returns when the command document has been written. That is a
+  /// QUEUE acceptance, not a halt: the bridge has not necessarily read it, let
+  /// alone dispatched it. So the first snackbar says queued, and the screen
+  /// then waits for the bridge to stamp `ack_qos` onto the command document
+  /// from its dispatch result before it says confirmed or not confirmed.
   Future<void> _sendEstop(Robot robot) async {
     final confirmed = await showEstopDialog(context, robot.name);
     if (!confirmed || !mounted) return;
+
+    final String cmdId;
     try {
-      await ref.read(robotRepositoryProvider).sendEstop(robot.rrn);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ESTOP sent — robot halted'),
-            backgroundColor: AppTheme.estop,
-          ),
-        );
-      }
+      cmdId = await ref.read(robotRepositoryProvider).sendEstop(robot.rrn);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('ESTOP failed: $e')),
         );
       }
+      return;
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(buildEstopSnackBar(EstopAck.queued));
+
+    final ack = await _awaitStopAck(robot.rrn, cmdId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(buildEstopSnackBar(ack));
+  }
+
+  /// Waits for the bridge's dispatch-result stamp on the command document.
+  ///
+  /// Returns [EstopAck.notConfirmed] on timeout or stream error: an
+  /// acknowledgement that never arrives is not an acknowledgement.
+  Future<EstopAck> _awaitStopAck(String rrn, String cmdId) async {
+    try {
+      final ack = await ref
+          .read(robotRepositoryProvider)
+          .watchCommand(rrn, cmdId)
+          .map((cmd) => estopAckFromQos(cmd?.ackQos))
+          .firstWhere(
+            (a) => a != EstopAck.queued,
+            orElse: () => EstopAck.notConfirmed,
+          )
+          .timeout(kEstopAckDeadline);
+      return ack;
+    } catch (_) {
+      return EstopAck.notConfirmed;
     }
   }
 

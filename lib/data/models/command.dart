@@ -22,6 +22,18 @@ class RobotCommand {
   /// Links this command to a live Firestore task doc for pick-and-place tasks.
   final String? taskId;
 
+  /// OC-M-01: the cloud bridge's stop quality-of-service marker, written from
+  /// the DISPATCH RESULT, never from the queue write.
+  /// One of `queued` | `acknowledged` | `stop_not_confirmed`, or null when the
+  /// bridge has not touched the document yet. Parse it with
+  /// `estopAckFromQos` in `ui/shared/estop_feedback.dart`.
+  final String? ackQos;
+
+  /// Whatever the runtime returned with an acknowledged stop (the gateway
+  /// receipt or the stop endpoint's body). Display only; absence of a receipt
+  /// is not evidence of a stop.
+  final Map<String, dynamic>? stopReceipt;
+
   const RobotCommand({
     required this.id,
     required this.instruction,
@@ -34,6 +46,8 @@ class RobotCommand {
     this.completedAt,
     this.senderType,
     this.taskId,
+    this.ackQos,
+    this.stopReceipt,
   });
 
   factory RobotCommand.fromDoc(DocumentSnapshot doc) {
@@ -51,6 +65,10 @@ class RobotCommand {
       // GAP-08: parse sender_type from audit field; default to human app sender
       senderType: m['sender_type'] as String? ?? 'human via OpenCastor app',
       taskId: m['task_id'] as String?,
+      ackQos: m['ack_qos'] as String?,
+      stopReceipt: m['stop_receipt'] is Map
+          ? Map<String, dynamic>.from(m['stop_receipt'] as Map)
+          : null,
     );
   }
 

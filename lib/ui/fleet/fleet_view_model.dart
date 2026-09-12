@@ -17,8 +17,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/app_logger.dart';
 import '../../data/repositories/lan_mode_provider.dart';
 import '../../data/repositories/robot_repository_provider.dart';
+import '../shared/estop_feedback.dart';
 
 export '../../data/repositories/robot_repository.dart';
+export '../shared/estop_feedback.dart'
+    show EstopAck, estopAckFromQos, estopAckMessage, buildEstopSnackBar;
 export '../../data/repositories/lan_mode_provider.dart' show lanModeProvider;
 // Re-export so existing UI files that `show robotRepositoryProvider` from here
 // continue to resolve without changes.
@@ -97,9 +100,30 @@ class EstopSending extends EstopState {
   final String rrn;
   const EstopSending(this.rrn);
 }
-class EstopSent extends EstopState {
+/// The stop was accepted into the cloud queue. OC-M-01: this says nothing
+/// about motion — the bridge may not have read the document yet.
+class EstopQueued extends EstopState {
   final String rrn;
-  const EstopSent(this.rrn);
+  final String? cmdId;
+  const EstopQueued(this.rrn, {this.cmdId});
+}
+
+/// A dispatch result came back: the robot's own LAN API answered 2xx, or the
+/// bridge stamped `ack_qos: acknowledged` onto the command document.
+class EstopConfirmed extends EstopState {
+  final String rrn;
+
+  /// 'lan' when the robot answered directly, 'cloud' when the bridge did.
+  final String source;
+  const EstopConfirmed(this.rrn, {required this.source});
+}
+
+/// Dispatched, but no acknowledgement arrived before the deadline, or the
+/// bridge reported the dispatch failed.
+class EstopNotConfirmed extends EstopState {
+  final String rrn;
+  final String reason;
+  const EstopNotConfirmed(this.rrn, this.reason);
 }
 class EstopError extends EstopState {
   final String rrn;
@@ -112,17 +136,35 @@ class EstopError extends EstopState {
 /// Views call: `ref.read(estopCommandProvider.notifier).send(rrn)`
 /// Views observe: `ref.watch(estopCommandProvider)` for loading/error state.
 class EstopCommand extends AutoDisposeNotifier<EstopState> {
+  bool _disposed = false;
+
   @override
-  EstopState build() => const EstopIdle();
+  EstopState build() {
+    ref.onDispose(() => _disposed = true);
+    return const EstopIdle();
+  }
+
+  void _set(EstopState next) {
+    if (_disposed) return;
+    state = next;
+  }
 
   /// Send ESTOP to [rrn]. Never requires confirmation (immediate execution).
   ///
   /// When LAN mode is enabled for [rrn], attempts to send ESTOP directly to
   /// the robot's local API for minimum latency (~30 ms vs ~500 ms cloud).
   /// Falls back to Firebase Cloud Functions if LAN send fails.
+  ///
+  /// OC-M-01 — the two branches do NOT know the same thing, and the state they
+  /// publish now says so:
+  ///   * LAN: `POST /api/stop` answered 2xx from the robot itself. That is a
+  ///     dispatch result, so the state is [EstopConfirmed].
+  ///   * Cloud: `sendEstop` only wrote a command document. That is a queue
+  ///     acceptance, so the state is [EstopQueued] until the bridge stamps
+  ///     `ack_qos` onto the document from its own dispatch result.
   Future<void> send(String rrn) async {
     if (state is EstopSending) return; // debounce
-    state = EstopSending(rrn);
+    _set(EstopSending(rrn));
     try {
       // ── Try LAN ESTOP first if enabled ─────────────────────────────────────
       final fleet = ref.read(fleetProvider).valueOrNull;
@@ -133,7 +175,7 @@ class EstopCommand extends AutoDisposeNotifier<EstopState> {
       if (lan != null) {
         try {
           await lan.sendEstop();
-          state = EstopSent(rrn);
+          _set(EstopConfirmed(rrn, source: 'lan'));
           return;
         } catch (_) {
           // LAN ESTOP failed — fall through to cloud relay
@@ -142,14 +184,40 @@ class EstopCommand extends AutoDisposeNotifier<EstopState> {
       }
 
       // ── Firebase cloud relay ────────────────────────────────────────────────
-      await ref.read(robotRepositoryProvider).sendEstop(rrn);
-      state = EstopSent(rrn);
+      final cmdId = await ref.read(robotRepositoryProvider).sendEstop(rrn);
+      _set(EstopQueued(rrn, cmdId: cmdId));
+      await _awaitCloudAck(rrn, cmdId);
     } catch (e) {
-      state = EstopError(rrn, e.toString());
+      _set(EstopError(rrn, e.toString()));
     }
   }
 
-  void reset() => state = const EstopIdle();
+  /// Promote [EstopQueued] to confirmed or not-confirmed once the bridge's
+  /// dispatch result lands on the command document. A deadline that passes in
+  /// silence is [EstopNotConfirmed]: no acknowledgement means no stop.
+  Future<void> _awaitCloudAck(String rrn, String cmdId) async {
+    EstopAck ack;
+    try {
+      ack = await ref
+          .read(robotRepositoryProvider)
+          .watchCommand(rrn, cmdId)
+          .map((cmd) => estopAckFromQos(cmd?.ackQos))
+          .firstWhere(
+            (a) => a != EstopAck.queued,
+            orElse: () => EstopAck.notConfirmed,
+          )
+          .timeout(kEstopAckDeadline);
+    } catch (_) {
+      ack = EstopAck.notConfirmed;
+    }
+    if (ack == EstopAck.confirmed) {
+      _set(EstopConfirmed(rrn, source: 'cloud'));
+    } else {
+      _set(EstopNotConfirmed(rrn, 'no stop acknowledgement from the robot'));
+    }
+  }
+
+  void reset() => _set(const EstopIdle());
 }
 
 final estopCommandProvider =

@@ -59,6 +59,11 @@ abstract class RobotRepository {
 
   /// Send ESTOP — bypasses rate limiting in Cloud Functions.
   /// ESTOP must NEVER be rate-limited (Protocol 66 §4.1).
+  ///
+  /// OC-M-01: the returned future completing means the command was QUEUED,
+  /// never that motion ceased. A stop is acknowledged only by a dispatch
+  /// result — a 2xx from the robot's LAN API, or `ack_qos: acknowledged` on
+  /// the command document. UI must say queued until one arrives.
   Future<String> sendEstop(String rrn, {String reason = 'manual estop'});
 
   /// Send RESUME after ESTOP.

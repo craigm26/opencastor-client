@@ -105,6 +105,18 @@ class FirestoreRobotService implements RobotRepository {
         .map((snap) => snap.exists ? RobotCommand.fromDoc(snap) : null);
   }
 
+  /// Queue an ESTOP command for [rrn] and return its command id.
+  ///
+  /// OC-M-01 — WHAT THE RETURNED FUTURE MEANS: the command document was
+  /// written. That is all. It does NOT mean the cloud bridge read it, that the
+  /// bridge dispatched it to the runtime, or that any motion ceased. This is a
+  /// Firestore write and nothing more.
+  ///
+  /// The only stop acknowledgement in this system is a dispatch result: a 2xx
+  /// from the robot's own LAN API, or `ack_qos: acknowledged` stamped onto this
+  /// command document by the bridge after it dispatched. Callers must show
+  /// "queued" until one of those lands, and must never claim motion ceased.
+  /// See `ui/shared/estop_feedback.dart`.
   @override
   Future<String> sendEstop(String rrn, {String reason = 'manual estop'}) {
     // ESTOP bypasses all rate limiting — see Cloud Functions relay.ts

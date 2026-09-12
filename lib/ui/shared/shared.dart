@@ -5,6 +5,7 @@ export 'adaptive_navigation.dart';
 export 'confirmation_dialog.dart';
 export 'empty_view.dart';
 export 'error_view.dart';
+export 'estop_feedback.dart';
 export 'google_sign_in_button.dart';
 export 'loading_skeleton.dart';
 export 'loading_view.dart';
