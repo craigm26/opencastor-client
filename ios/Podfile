@@ -1,5 +1,5 @@
-# Minimum iOS 13.0 — broadest compatible baseline.
-platform :ios, '13.0'
+# Minimum iOS 15.0: cloud_firestore and firebase_messaging require it (2026-09).
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
