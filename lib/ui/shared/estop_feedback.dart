@@ -32,9 +32,12 @@ enum EstopAck { queued, confirmed, notConfirmed }
 
 /// How long the app waits for an acknowledgement before it says so out loud.
 ///
-/// Mirrors the bridge's own ESTOP_ACK_DEADLINE_S. Staying silent past this
-/// point would leave the optimistic "queued" message on screen forever, which
-/// reads as success; saying "not confirmed" is the honest fallback.
+/// This is the PHONE's own wait budget, not the bridge's. The bridge's
+/// ESTOP_ACK_DEADLINE_S is 2 s and covers only its own write; this one has to
+/// cover that plus the Firestore round trip back to the handset, so it is
+/// deliberately longer. Staying silent past this point would leave the
+/// optimistic "queued" message on screen forever, which reads as success;
+/// saying "not confirmed" is the honest fallback.
 const Duration kEstopAckDeadline = Duration(seconds: 10);
 
 /// Maps the `ack_qos` field the cloud bridge writes onto a command document.
