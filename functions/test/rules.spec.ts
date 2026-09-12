@@ -42,14 +42,29 @@ const [EMULATOR_ADDR, EMULATOR_PORT] = EMULATOR_HOST.split(":");
 
 describe("firestore.rules — /robots/{rrn}/commands", () => {
   before(async () => {
-    testEnv = await initializeTestEnvironment({
-      projectId: PROJECT_ID,
-      firestore: {
-        rules: readFileSync(RULES_PATH, "utf8"),
-        host: EMULATOR_ADDR,
-        port: Number(EMULATOR_PORT),
-      },
-    });
+    try {
+      testEnv = await initializeTestEnvironment({
+        projectId: PROJECT_ID,
+        firestore: {
+          rules: readFileSync(RULES_PATH, "utf8"),
+          host: EMULATOR_ADDR,
+          port: Number(EMULATOR_PORT),
+        },
+      });
+    } catch (err) {
+      // Without FIRESTORE_EMULATOR_HOST this falls back to 127.0.0.1:8080,
+      // where some other process may well be listening. Say what we tried to
+      // talk to, so a stray 404 from an unrelated service is not mistaken for
+      // a rules failure.
+      throw new Error(
+        `could not reach the Firestore emulator at ${EMULATOR_HOST} ` +
+          `(${err instanceof Error ? err.message : String(err)}). ` +
+          "Run this suite as: " +
+          'firebase emulators:exec --only firestore "npm --prefix functions test" ' +
+          "— or export FIRESTORE_EMULATOR_HOST if the emulator is already up on " +
+          "another port."
+      );
+    }
 
     // Seed the robot doc with the Admin path (rules disabled), the way the
     // castor bridge would.
