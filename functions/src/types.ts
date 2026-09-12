@@ -44,6 +44,8 @@ export interface CommandDoc {
   completed_at?: string;
   source_rrn?: string;
   reason?: string;
+  /** Structured arguments carried alongside the instruction. */
+  params?: Record<string, unknown>;
 }
 
 export interface ConsentRequestDoc {
@@ -86,6 +88,11 @@ export interface SendCommandPayload {
   instruction: string;
   scope: CommandScope;
   reason?: string;
+  /**
+   * Structured arguments for the instruction, e.g.
+   * `{ run_id: "abc", community: true }`. Passed through to the command doc.
+   */
+  params?: Record<string, unknown>;
 }
 
 /** Payload for the resolveConsent callable function. */

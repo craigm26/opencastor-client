@@ -4,6 +4,21 @@ All notable changes to opencastor-client are documented here.
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+**Every command now travels through the server-side relay**
+- The capability toggles (LoA enforcement, idle-compute donation, auto-apply champion, apply-champion-now) and the personal research actions (run, submit to community) used to write `system` scope commands straight into `robots/{rrn}/commands` from the app. They now call the `sendCommand` Cloud Function, which is where the owner-only check on `system` scope, the per-scope rate limit, and the `issued_by_uid` attribution field are applied. Nothing in `lib/` writes a command document any more.
+- `sendCommand` accepts an optional `params` map, so structured instruction arguments (e.g. `run_id`) survive the move to the callable.
+- `firestore.rules`: creating a document under `robots/{rrn}/commands` is now bounded by scope and requires an attributed issuer. A client can only create the non-actuating scopes, and only with its own uid in `issued_by_uid`; `system`, `control` and `safety` are refused and must go through the callable. The Admin SDK (the relay and the castor bridge) is unaffected.
+- Mission fanout no longer hands each robot the roster of the other robots on the mission (the `participants` field is gone from the fanned-out command), and it now fans out only to robots whose owner is still a mission participant.
+
+### Added
+- `functions/test/rules.spec.ts` plus a `npm --prefix functions test` script: a Firestore rules suite run against the emulator with `firebase emulators:exec --only firestore "npm --prefix functions test"`.
+
+---
+
 ## [2.0.0] - 2026-04-12
 
 ### Added

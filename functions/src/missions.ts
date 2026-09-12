@@ -467,7 +467,6 @@ export const sendMissionMessage = https.onCall(
       (p): p is MissionParticipant & { rrn: string } =>
         p.type === "robot" && typeof p.rrn === "string"
     );
-    const robotRrns = robotParticipants.map((p) => p.rrn);
 
     const msgId = `msg-${uuid.v4().replace(/-/g, "").slice(0, 12)}`;
     const now = new Date().toISOString();
@@ -491,8 +490,26 @@ export const sendMissionMessage = https.onCall(
     await missionRef.collection("messages").doc(msgId).set(message);
     await missionRef.update({ last_message_at: now });
 
-    // Fanout to each robot command queue concurrently (Promise.all)
-    const fanoutPromises = robotParticipants.map((robot) => {
+    // Fan out only to robots whose owner is still a mission participant.
+    // Ownership can change after a mission is created, and a robot whose owner
+    // never joined (or has left) has not consented to receive this thread's
+    // traffic, so it is skipped rather than queued.
+    const participantUids = new Set(mission.participant_uids || []);
+    const robotOwnerDocs = await Promise.all(
+      robotParticipants.map((robot) => db().collection("robots").doc(robot.rrn).get())
+    );
+    const consentedRobots = robotParticipants.filter((_robot, i) => {
+      const doc = robotOwnerDocs[i];
+      if (!doc.exists) return false;
+      const ownerUid = doc.data()?.firebase_uid as string | undefined;
+      return !!ownerUid && participantUids.has(ownerUid);
+    });
+    const skippedRobots = robotParticipants.length - consentedRobots.length;
+
+    // Fanout to each consented robot's command queue concurrently (Promise.all).
+    // Each robot is told the message and who sent it, and nothing about the
+    // other robots on the mission: the roster is not its to know.
+    const fanoutPromises = consentedRobots.map((robot) => {
       const cmdId = `mc-${uuid.v4().replace(/-/g, "").slice(0, 12)}`;
       return db()
         .collection("robots")
@@ -505,7 +522,6 @@ export const sendMissionMessage = https.onCall(
           scope: "chat",
           mission_id: data.missionId,
           mission_msg_id: msgId,
-          participants: robotRrns,
           context: "mission_thread",
           issued_by_uid: authCtx.uid,
           issued_by_owner: authCtx.uid,
@@ -520,7 +536,13 @@ export const sendMissionMessage = https.onCall(
 
     await Promise.all(fanoutPromises);
 
-    return { msgId, robotsFannedOut: robotParticipants.length, mentions, senderRole };
+    return {
+      msgId,
+      robotsFannedOut: consentedRobots.length,
+      robotsSkipped: skippedRobots,
+      mentions,
+      senderRole,
+    };
   }
 );
 

@@ -10,7 +10,8 @@
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "test": "TS_NODE_PROJECT=test/tsconfig.json mocha --require ts-node/register --timeout 20000 \"test/**/*.spec.ts\""
   },
   "engines": {
     "node": "22"
@@ -22,7 +23,12 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "@types/mocha": "^10.0.10",
     "@types/uuid": "^9.0.0",
+    "firebase": "^12.4.0",
+    "mocha": "^12.0.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.0"
   },
   "overrides": {

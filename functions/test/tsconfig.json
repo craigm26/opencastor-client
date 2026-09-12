@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["mocha", "node"],
+    // The firebase web SDK's .d.ts references the Temporal namespace, which
+    // this project's es2017 lib does not declare. The tests do not touch it.
+    "skipLibCheck": true
+  },
+  "include": ["."]
+}

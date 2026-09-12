@@ -14,7 +14,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/command.dart';
 import '../../data/models/robot.dart';
+import '../../data/repositories/robot_repository_provider.dart'
+    show robotRepositoryProvider;
 import '../shared/loading_view.dart';
 
 class ContributeSettingsView extends ConsumerStatefulWidget {
@@ -72,25 +75,22 @@ class _ContributeSettingsViewState
   Future<void> _toggleDonate(bool v) async {
     setState(() => _savingDonate = true);
     try {
-      // R2RAM command flow: write to robots/{rrn}/commands subcollection.
-      // The bridge polls `.where("status", "==", "pending")` and executes
-      // the instruction locally. Never write to the root robot doc for
-      // operational state — the bridge owns that after execution.
+      // Routed through the sendCommand callable so the owner-only check on
+      // `system` scope, the per-scope rate limit and the `issued_by_uid`
+      // attribution field all run server-side. The callable writes the queue
+      // doc with the Admin SDK; the bridge polls
+      // `.where("status", "==", "pending")` and executes locally. Never write
+      // to the root robot doc for operational state.
       //
       // Instruction naming convention: <noun>_<verb> (no slash prefix).
-      //   contribute_start → bridge enables idle-compute donation
-      //   contribute_stop  → bridge disables idle-compute donation
-      await FirebaseFirestore.instance
-          .collection('robots')
-          .doc(widget.robot.rrn)
-          .collection('commands')
-          .add({
-        'instruction': v ? 'contribute_start' : 'contribute_stop',
-        'scope': 'system',
-        'source': 'app',
-        'status': 'pending',
-        'issued_at': FieldValue.serverTimestamp(),
-      });
+      //   contribute_start -> bridge enables idle-compute donation
+      //   contribute_stop  -> bridge disables idle-compute donation
+      await ref.read(robotRepositoryProvider).sendCommand(
+            rrn: widget.robot.rrn,
+            instruction: v ? 'contribute_start' : 'contribute_stop',
+            scope: CommandScope.system,
+            reason: 'user toggled idle-compute donation',
+          );
 
       if (mounted) setState(() => _donateEnabled = v);
     } catch (e) {
@@ -107,23 +107,20 @@ class _ContributeSettingsViewState
   Future<void> _toggleAutoApply(bool v) async {
     setState(() => _savingAutoApply = true);
     try {
-      // R2RAM command flow: route through commands subcollection so the bridge
-      // can validate and apply the change. Direct root-doc writes bypass the
-      // authorization model and are silently ignored by the bridge.
+      // Routed through the sendCommand callable so the owner-only check on
+      // `system` scope, the per-scope rate limit and the `issued_by_uid`
+      // attribution field all run server-side. A direct Firestore write to
+      // robots/{rrn}/commands skips all three and is refused by the rules.
       //
-      //   contribute_auto_apply_on  → bridge enables auto-champion installs
-      //   contribute_auto_apply_off → bridge disables auto-champion installs
-      await FirebaseFirestore.instance
-          .collection('robots')
-          .doc(widget.robot.rrn)
-          .collection('commands')
-          .add({
-        'instruction': v ? 'contribute_auto_apply_on' : 'contribute_auto_apply_off',
-        'scope': 'system',
-        'source': 'app',
-        'status': 'pending',
-        'issued_at': FieldValue.serverTimestamp(),
-      });
+      //   contribute_auto_apply_on  -> bridge enables auto-champion installs
+      //   contribute_auto_apply_off -> bridge disables auto-champion installs
+      await ref.read(robotRepositoryProvider).sendCommand(
+            rrn: widget.robot.rrn,
+            instruction:
+                v ? 'contribute_auto_apply_on' : 'contribute_auto_apply_off',
+            scope: CommandScope.system,
+            reason: 'user toggled auto-apply champion',
+          );
       if (mounted) setState(() => _autoApply = v);
     } catch (e) {
       if (mounted) {
@@ -142,18 +139,12 @@ class _ContributeSettingsViewState
       _applyError = null;
     });
     try {
-      await FirebaseFirestore.instance
-          .collection('robots')
-          .doc(widget.robot.rrn)
-          .collection('commands')
-          .add({
-        'instruction': '/harness apply-champion',
-        'scope': 'system',
-        'source': 'app',
-        'status': 'pending',
-        'created_at': FieldValue.serverTimestamp(),
-        'issued_at': FieldValue.serverTimestamp(),
-      });
+      await ref.read(robotRepositoryProvider).sendCommand(
+            rrn: widget.robot.rrn,
+            instruction: '/harness apply-champion',
+            scope: CommandScope.system,
+            reason: 'user applied the community champion config',
+          );
       if (mounted) {
         setState(() => _pendingChampion = null);
         ScaffoldMessenger.of(context).showSnackBar(

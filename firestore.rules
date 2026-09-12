@@ -29,6 +29,13 @@ service cloud.firestore {
       return scope in ['discover', 'status', 'chat', 'control', 'safety', 'transparency'];
     }
 
+    // Scopes a signed-in client is allowed to write into a command queue on
+    // its own. Everything else — system, control, safety — must travel
+    // through the sendCommand Cloud Function.
+    function isClientCreatableScope(scope) {
+      return scope in ['chat', 'observe'];
+    }
+
     // -----------------------------------------------------------------------
     // /robots/{rrn}  — robot identity + status
     // -----------------------------------------------------------------------
@@ -55,11 +62,22 @@ service cloud.firestore {
           get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
             == request.auth.uid;
 
-        // Owner can write commands directly (bridge polls this subcollection).
-        // CF relay is preferred but not required — local robots need direct writes.
+        // Command creation is bounded by scope and must be attributed.
+        //
+        // Anything that can change the robot's configuration or move it —
+        // system, control, safety — goes through the sendCommand Cloud
+        // Function, which is where the owner-only check on system scope, the
+        // per-scope rate limit, and the issuer field are applied. The Admin
+        // SDK bypasses these rules, so the callable is unaffected by them.
+        //
+        // A client may still create the non-actuating scopes directly, and
+        // only with its own uid in issued_by_uid, so no unattributed command
+        // can exist in the queue.
         allow create: if isSignedIn() &&
           get(/databases/$(database)/documents/robots/$(rrn)).data.firebase_uid
-            == request.auth.uid;
+            == request.auth.uid &&
+          isClientCreatableScope(request.resource.data.scope) &&
+          request.resource.data.issued_by_uid == request.auth.uid;
         allow update, delete: if false; // immutable once created
       }
 

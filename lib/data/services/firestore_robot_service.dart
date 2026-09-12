@@ -60,6 +60,7 @@ class FirestoreRobotService implements RobotRepository {
     required CommandScope scope,
     String? reason,
     List<Map<String, dynamic>>? mediaChunks,
+    Map<String, dynamic>? params,
   }) async {
     final callable = _fn.httpsCallable('sendCommand');
     final result = await callable.call({
@@ -68,6 +69,7 @@ class FirestoreRobotService implements RobotRepository {
       'scope': scope.name,
       if (reason != null) 'reason': reason,
       if (mediaChunks != null) 'media_chunks': mediaChunks,
+      if (params != null) 'params': params,
     });
     return result.data['cmd_id'] as String;
   }

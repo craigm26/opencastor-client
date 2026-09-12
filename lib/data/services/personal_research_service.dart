@@ -1,16 +1,26 @@
 /// PersonalResearchService — reads research runs from Firestore subcollection
-/// and triggers runs via robots/{rrn}/commands (same pattern as contribute toggle).
+/// and triggers runs through the `sendCommand` Cloud Function callable.
 ///
-/// Cloud Functions relay cannot reach local-network robots, so we write commands
-/// directly to Firestore and read results from the subcollection.
+/// Reads come straight from Firestore (telemetry is owner-readable). Writes do
+/// NOT: queuing a command by writing to robots/{rrn}/commands from the client
+/// skips the owner-only check on `system` scope, skips the per-scope rate
+/// limit, and leaves the command with no `issued_by_uid`, so nothing can say
+/// who asked for it. The callable is the only sanctioned path, and
+/// firestore.rules refuses a client-created `system` command outright.
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/personal_research.dart';
 
 class PersonalResearchService {
   static final _db = FirebaseFirestore.instance;
+
+  final FirebaseFunctions _fn;
+
+  PersonalResearchService({FirebaseFunctions? fn})
+      : _fn = fn ?? FirebaseFunctions.instance;
 
   /// Fetches the personal research summary for [rrn] from Firestore.
   ///
@@ -51,18 +61,16 @@ class PersonalResearchService {
     });
   }
 
-  /// Submits [runId] to the community leaderboard via Firestore command.
+  /// Submits [runId] to the community leaderboard via the sendCommand callable.
   Future<bool> submitToCommunity(String rrn, String runId) async {
     if (rrn.isEmpty) return false;
     try {
-      await _db.collection('robots').doc(rrn).collection('commands').add({
+      await _fn.httpsCallable('sendCommand').call({
+        'rrn': rrn,
         'instruction': 'research_submit',
         'scope': 'system',
+        'reason': 'user submitted a research run to the community leaderboard',
         'params': {'run_id': runId, 'community': true},
-        'status': 'pending',
-        'source': 'app',
-        'ts': FieldValue.serverTimestamp(),
-        'issued_at': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {
@@ -70,18 +78,16 @@ class PersonalResearchService {
     }
   }
 
-  /// Triggers a personal OHB-1 research run via Firestore command.
+  /// Triggers a personal OHB-1 research run via the sendCommand callable.
   Future<bool> triggerRun(String rrn) async {
     if (rrn.isEmpty) return false;
     try {
-      await _db.collection('robots').doc(rrn).collection('commands').add({
+      await _fn.httpsCallable('sendCommand').call({
+        'rrn': rrn,
         'instruction': 'research_run',
         'scope': 'system',
+        'reason': 'user started a personal research run',
         'params': {'personal': true},
-        'status': 'pending',
-        'source': 'app',
-        'ts': FieldValue.serverTimestamp(),
-        'issued_at': FieldValue.serverTimestamp(),
       });
       return true;
     } catch (_) {

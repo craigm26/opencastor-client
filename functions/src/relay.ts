@@ -157,7 +157,17 @@ const SLASH_COMMAND_MAP: Record<string, (args: string[]) => string> = {
     message_type: isEstop ? "estop" : "command",
     status: "pending",
     reason: data.reason,
+    params: data.params,
   };
+
+  // issued_by_uid is the attribution field: a command with no issuer cannot be
+  // traced back to anyone, so refuse to write one rather than queue it blank.
+  if (!cmd.issued_by_uid) {
+    throw new https.HttpsError(
+      "failed-precondition",
+      "command is missing issued_by_uid \u2014 refusing to queue an unattributed command"
+    );
+  }
 
   // Remove undefined fields
   const clean = Object.fromEntries(

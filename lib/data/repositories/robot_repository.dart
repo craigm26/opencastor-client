@@ -33,14 +33,22 @@ abstract class RobotRepository {
   /// Enqueue a command via Cloud Functions (enforces R2RAM + rate limiting).
   /// Returns the new command ID.
   ///
+  /// This is the ONLY sanctioned way to queue a command. Never write to
+  /// `robots/{rrn}/commands` from the client: that path skips the owner check
+  /// on `system` scope, skips the rate limiter, and leaves the command with no
+  /// `issued_by_uid`, so it cannot be attributed to anyone.
+  ///
   /// [mediaChunks] — optional list of media attachments; each map must have
   /// `mime_type`, `data` (base64), and optionally `description`.
+  /// [params] — optional structured arguments carried alongside the
+  /// instruction (e.g. `{'run_id': 'abc', 'community': true}`).
   Future<String> sendCommand({
     required String rrn,
     required String instruction,
     required CommandScope scope,
     String? reason,
     List<Map<String, dynamic>>? mediaChunks,
+    Map<String, dynamic>? params,
   });
 
   /// Live stream of command history for [rrn] (most recent first).
