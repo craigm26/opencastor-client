@@ -41,7 +41,7 @@ dependencies:
   url_launcher: ^6.3.0
   web_socket_channel: ^3.0.1
   package_info_plus: ^9.0.1
-  speech_to_text: ^7.3.0
+  speech_to_text: ^7.4.0
   image_picker: ^1.2.2
   file_picker: ^11.0.1
   shimmer: ^3.0.0
